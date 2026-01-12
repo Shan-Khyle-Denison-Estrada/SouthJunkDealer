@@ -10,7 +10,7 @@ export default function Index() {
         alignItems: "center",
       }}
     >
-      <Text style={styles.message}
+      <Text className="text-2xl text-blue-600 font-bold border-2 border-blue-600 p-2 text-center"
       >Edit app/index.tsx to edit this screen.</Text>
       <Link href="/aboutUs">Go to About Us page</Link>
     </View>
