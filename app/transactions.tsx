@@ -10,7 +10,7 @@ export default function Index() {
       }}
     >
       <Text style={styles.message}
-      >Edit app/aboutUs.tsx to edit this screen.</Text>
+      >Edit app/Transactions.tsx to edit this screen.</Text>
     </View>
   );
 }
