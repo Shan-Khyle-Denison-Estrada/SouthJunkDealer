@@ -50,6 +50,16 @@ export default function RootLayout() {
         name="editInventory"
         options={{ title: 'Edit Inventory' }}
       />
+
+      <Stack.Screen
+        name="transactionDetailed"
+        options={{ title: 'Detailed Transaction' }}
+      />
+
+      <Stack.Screen
+        name="scannedInventory"
+        options={{ title: 'Scanned Inventory' }}
+      />
     </Stack>
   );
 }

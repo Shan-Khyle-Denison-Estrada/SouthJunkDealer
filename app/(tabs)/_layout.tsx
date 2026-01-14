@@ -52,7 +52,7 @@ export default function Layout() {
         headerShown: true,
         // --- ADDED HEADER RIGHT LOGIC HERE ---
         headerRight: () => (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginRight: 15 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 10 }}>
             {/* <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333' }}>
               Acme Corp
             </Text> */}

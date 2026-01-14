@@ -179,17 +179,11 @@ export default function ScanQR() {
 
             {/* BOTTOM SECTION: ACTIONS */}
             <View className="flex-1 flex-row gap-4 px-4">
-                <TouchableOpacity className="bg-red-600 flex-1 justify-center items-center rounded-md">
-                    <Text className="font-semibold text-2xl text-white">Cancel</Text>
+                <TouchableOpacity className="bg-gray-500 flex-1 place-content-center items-center rounded-md">
+                    <Text className="font-semibold text-2xl text-white">Back</Text>
                 </TouchableOpacity>
-                <TouchableOpacity className="bg-blue-500 flex-1 justify-center items-center rounded-md">
+                <TouchableOpacity className="bg-blue-500 flex-1 place-content-center items-center rounded-md">
                     <Text className="font-semibold text-2xl text-white">Print</Text>
-                </TouchableOpacity>
-                <TouchableOpacity className="bg-primary flex-1 justify-center items-center rounded-md">
-                    <Text className="font-semibold text-2xl text-white">Add</Text>
-                </TouchableOpacity>
-                <TouchableOpacity className="bg-green-500 flex-1 justify-center items-center rounded-md">
-                    <Text className="font-semibold text-2xl text-white">Done</Text>
                 </TouchableOpacity>
             </View>
         </View>

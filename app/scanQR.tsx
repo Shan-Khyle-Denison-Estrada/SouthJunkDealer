@@ -73,15 +73,23 @@ export default function ScanQR() {
 
                     {/* Bottom Mask */}
                     <View style={styles.maskRow}>
-                         <Text style={styles.instructionText}>Align QR code within the frame</Text>
-                         
-                         {/* Close Button */}
-                         <TouchableOpacity 
+                        <Text style={styles.instructionText}>Align QR code within the frame</Text>
+                        
+                        {/* --- TEMP BUTTON FOR REDIRECT --- */}
+                        <TouchableOpacity 
+                            onPress={() => router.push('/scannedInventory')} 
+                            style={[styles.closeButton, { marginBottom: 12, backgroundColor: HIGHLIGHT_COLOR, borderColor: HIGHLIGHT_COLOR }]}
+                        >
+                            <Text style={[styles.closeButtonText, { color: 'black' }]}>Debug: Go to Scanned</Text>
+                        </TouchableOpacity>
+
+                        {/* Close Button */}
+                        <TouchableOpacity 
                             onPress={() => router.back()} 
                             style={styles.closeButton}
-                         >
+                        >
                             <Text style={styles.closeButtonText}>Close Scanner</Text>
-                         </TouchableOpacity>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </CameraView>
@@ -169,6 +177,8 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         borderWidth: 1,
         borderColor: 'white',
+        minWidth: 200, // Added minWidth to make buttons same size
+        alignItems: 'center',
     },
     closeButtonText: {
         color: 'white',

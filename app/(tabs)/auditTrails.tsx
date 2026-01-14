@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react-native";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -37,9 +38,9 @@ export default function AuditIndex() {
         </View>
 
         
-        <Pressable className="w-[25%] h-full flex-row items-center justify-center bg-primary rounded-md py-2 active:bg-gray-900">
+        <Pressable className="w-[25%] h-full flex-row items-center justify-center bg-primary rounded-md py-2 active:bg-gray-900" onPress={() => router.push('/scannedInventory')}>
           <Plus size={20} color="white" />
-          <Text className="text-white font-medium ml-2">New Audit Trail</Text>
+          <Text className="text-white font-medium ml-2">Inventory Check</Text>
         </Pressable>
       </View>
 

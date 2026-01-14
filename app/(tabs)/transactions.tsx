@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react-native";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -26,7 +27,7 @@ export default function Index() {
         </View>
 
         {/* New Transaction Button: Width 2/8 (25%) */}
-        <Pressable className="w-[25%] h-full flex-row items-center justify-center bg-primary rounded-md py-2 active:bg-blue-700">
+        <Pressable className="w-[25%] h-full flex-row items-center justify-center bg-primary rounded-md py-2 active:bg-blue-700" onPress={() => router.push('/newTransaction')}>
           <Plus size={20} color="white" />
           <Text className="text-white font-medium ml-2">New Transaction</Text>
         </Pressable>
@@ -46,6 +47,7 @@ export default function Index() {
           {tableData.map((item, index) => (
             <Pressable 
               key={index} 
+              onPress={() => router.push('/transactionDetailed')}
               className="flex-1 flex-row items-center p-4 border-b border-gray-100 hover:bg-gray-50 active:bg-gray-50"
             >
               <Text className="flex-1 text-gray-800">{item.name}</Text>
