@@ -116,7 +116,7 @@ export default function NewTransaction() {
                         <Text className="text-6xl font-bold">69,000 Php</Text>
                     </View>
                     <View className="flex-1 justify-center">
-                        <Pressable onPress={() => router.push('/transactionSummary')} className="w-full items-center justify-center bg-primary rounded-md active:bg-blue-700 py-8">
+                        <Pressable onPress={() => router.push('/scanQR')} className="w-full items-center justify-center bg-primary rounded-md active:bg-blue-700 py-8">
                             <Text className="text-white font-bold text-4xl">Submit</Text>
                         </Pressable>
                     </View>

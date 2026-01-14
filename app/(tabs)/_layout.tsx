@@ -8,10 +8,11 @@ import {
   LayoutDashboard,
   Package
 } from 'lucide-react-native';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+// 1. Add Image to imports
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import "../global.css";
 
-// 1. Create the Custom Drawer Content Component
+// 2. Create the Custom Drawer Content Component
 function CustomDrawerContent(props: any) {
   return (
     <DrawerContentScrollView {...props}>
@@ -41,7 +42,7 @@ function CustomDrawerContent(props: any) {
   );
 }
 
-// 2. The Main Layout
+// 3. The Main Layout
 export default function Layout() {
   return (
     <Drawer
@@ -49,6 +50,19 @@ export default function Layout() {
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         headerShown: true,
+        // --- ADDED HEADER RIGHT LOGIC HERE ---
+        headerRight: () => (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginRight: 15 }}>
+            {/* <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333' }}>
+              Acme Corp
+            </Text> */}
+            <Image
+              // REPLACE THIS with your actual logo path
+              source={require('../../assets/images/icon.png')} 
+              style={{ width: 60, height: 60, resizeMode: 'contain' }}
+            />
+          </View>
+        ),
       }}
     >
       <Drawer.Screen
@@ -105,7 +119,7 @@ export default function Layout() {
   );
 }
 
-// 3. Styles
+// 4. Styles
 const styles = StyleSheet.create({
   buttonsContainer: {
     padding: 20,

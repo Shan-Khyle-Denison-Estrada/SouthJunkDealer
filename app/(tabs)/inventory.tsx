@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { ChevronLeft, ChevronRight, ClipboardCheck, Package, Plus, Search } from "lucide-react-native";
 import { Pressable, Text, TextInput, View } from "react-native";
 
@@ -28,7 +29,7 @@ export default function InventoryIndex() {
         {/* Right Side Buttons Group */}
         <View className="flex-row gap-2 h-full">
             {/* Inventory Check Button */}
-            <Pressable className="px-4 h-full flex-row items-center justify-center bg-white rounded-md active:bg-gray-50">
+            <Pressable className="px-4 h-full flex-row items-center justify-center bg-white rounded-md active:bg-gray-50" onPress={() => router.push('/inventoryDetailed')}>
                 <ClipboardCheck size={20} color="#4b5563" />
                 <Text className="text-gray-700 font-medium ml-2">Inventory Check</Text>
             </Pressable>
