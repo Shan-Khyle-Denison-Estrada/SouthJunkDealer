@@ -42,7 +42,7 @@ export default function InventoryIndex() {
       </View>
 
       {/* 2. MIDDLE VIEW: Inventory Table */}
-      <View className="flex-[12] bg-white rounded-lg overflow-hidden shadow-sm">
+      <View className="flex-[12] bg-white rounded-lg overflow-hidden">
         {/* Table Header */}
         <View className="flex-row bg-gray-200 p-4 border-b border-gray-300">
           <Text className="flex-1 font-bold text-gray-700">Item Name</Text>

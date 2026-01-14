@@ -14,7 +14,7 @@ export default function AuditIndex() {
   ];
 
   // Helper to determine text color based on action type
-  const getActionColor = (type) => {
+  const getActionColor = (type: string) => {
     switch (type) {
       case 'create': return 'text-green-600';
       case 'delete': return 'text-red-600';

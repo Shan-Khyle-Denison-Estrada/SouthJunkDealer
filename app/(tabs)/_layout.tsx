@@ -1,11 +1,12 @@
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import { router } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import {
-    ArrowRightLeft,
-    Blocks,
-    FileClock,
-    LayoutDashboard,
-    Package
+  ArrowRightLeft,
+  Blocks,
+  FileClock,
+  LayoutDashboard,
+  Package
 } from 'lucide-react-native';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import "../global.css";
@@ -19,11 +20,11 @@ function CustomDrawerContent(props: any) {
       <View style={styles.buttonsContainer}>
         <Text style={styles.sectionTitle}>Quick Access</Text>
         
-        <TouchableOpacity style={styles.button} onPress={() => console.log('New Transaction')}>
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/newTransaction')}>
           <Text style={styles.buttonText}>New Transaction</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={() => console.log('Scan QR')}>
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/scanQR')}>
           <Text style={styles.buttonText}>Scan QR</Text>
         </TouchableOpacity>
       </View>
