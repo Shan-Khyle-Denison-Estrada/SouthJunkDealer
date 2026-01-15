@@ -110,14 +110,14 @@ export default function InventoryDetailed() {
 
             {/* --- ACTION BUTTONS --- */}
             <View className="flex-1 flex-row gap-4 px-4">
-                <TouchableOpacity className="bg-red-500 flex-1 justify-center items-center rounded-md">
+                <TouchableOpacity className="bg-red-500 flex-1 justify-center items-center rounded-md" onPress={() => router.back()}>
                     <Text className="font-semibold text-2xl text-white">Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity className="bg-blue-500 flex-1 justify-center items-center rounded-md">
                     <Text className="font-semibold text-2xl text-white">Print QR</Text>
                 </TouchableOpacity>
                 <TouchableOpacity className="bg-primary flex-1 justify-center items-center rounded-md" onPress={() => router.push('/editInventory')}>
-                    <Text className="font-semibold text-2xl text-white">Add</Text>
+                    <Text className="font-semibold text-2xl text-white">Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity className="bg-green-500 flex-1 justify-center items-center rounded-md" onPress={() => router.push('/scannedInventory')}>
                     <Text className="font-semibold text-2xl text-white">Inventory Check</Text>

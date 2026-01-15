@@ -1,6 +1,6 @@
 import { Picker } from '@react-native-picker/picker';
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function ScanQR() {
     // State for Transaction Type
@@ -10,6 +10,18 @@ export default function ScanQR() {
     // State for Payment Method
     const [paymentMethod, setPaymentMethod] = useState();
     const [isPaymentMethodFocused, setIsPaymentMethodFocused] = useState(false);
+
+    // Dummy data for Transaction Line Items (Based on DB Schema)
+    const lineItems = [
+        { id: "L-001", material: "PET Bottles", weight: "15.0 kg", price: "₱12.00", subtotal: "₱180.00" },
+        { id: "L-002", material: "Aluminum Cans", weight: "8.5 kg", price: "₱45.00", subtotal: "₱382.50" },
+        { id: "L-003", material: "Copper Wire", weight: "2.3 kg", price: "₱320.00", subtotal: "₱736.00" },
+        { id: "L-004", material: "Cardboard", weight: "50.0 kg", price: "₱5.00", subtotal: "₱250.00" },
+        { id: "L-005", material: "Glass Bottles", weight: "20.0 kg", price: "₱8.00", subtotal: "₱160.00" },
+        { id: "L-006", material: "PET Bottles", weight: "15.0 kg", price: "₱12.00", subtotal: "₱180.00" },
+        { id: "L-007", material: "Aluminum Cans", weight: "8.5 kg", price: "₱45.00", subtotal: "₱382.50" },
+        { id: "L-008", material: "Copper Wire", weight: "2.3 kg", price: "₱320.00", subtotal: "₱736.00" },
+    ];
 
     return (
         <View className="flex-1 gap-4 p-4">
@@ -29,7 +41,6 @@ export default function ScanQR() {
                             className="bg-white rounded-md px-4 text-black text-2xl flex-1"
                             placeholder="Juan"
                             placeholderTextColor="#9ca3af"
-                            // Removed fixed height (h-16), added flex-1 to fill space
                         />
                     </View>
                     <View className="flex-1">
@@ -66,7 +77,6 @@ export default function ScanQR() {
                             styles.pickerContainer,
                             isTransTypeFocused && styles.pickerFocused 
                         ]}>
-                            {/* Visual Layer */}
                             <View style={styles.visualContainer}>
                                 <Text 
                                     style={[
@@ -88,7 +98,6 @@ export default function ScanQR() {
                                 </View>
                             </View>
 
-                            {/* Functional Layer */}
                             <Picker
                                 selectedValue={transactionType}
                                 onValueChange={(itemValue) => {
@@ -117,7 +126,6 @@ export default function ScanQR() {
                             styles.pickerContainer,
                             isPaymentMethodFocused && styles.pickerFocused 
                         ]}>
-                            {/* Visual Layer */}
                             <View style={styles.visualContainer}>
                                 <Text 
                                     style={[
@@ -139,7 +147,6 @@ export default function ScanQR() {
                                 </View>
                             </View>
 
-                            {/* Functional Layer */}
                             <Picker
                                 selectedValue={paymentMethod}
                                 onValueChange={(itemValue) => {
@@ -162,18 +169,37 @@ export default function ScanQR() {
                 </View>
             </View>
 
-            {/* MIDDLE SECTION: TABLE / LIST */}
-            <View className="flex-[7] border-black border-4 rounded-md overflow-clip">
-                <View className="flex-[7]">
-                    {/* List Items would go here */}
+            {/* MIDDLE SECTION: TRANSACTION LINE ITEMS TABLE */}
+            <View className="flex-[7] bg-white border-4 rounded-lg overflow-hidden">
+                {/* Table Header - Styled consistently with transactions.tsx */}
+                <View className="flex-row bg-gray-800 p-4">
+                    <Text className="flex-1 font-bold text-white text-center text-lg">ID</Text>
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Material</Text>
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Weight</Text>
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Price/Unit</Text>
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Subtotal</Text>
                 </View>
-                <View className="flex-1 bg-gray-300 flex-row justify-center items-center gap-2">
-                    <Text className="font-semibold text-xl">
-                        Total:
-                    </Text>
-                    <Text className="font-bold text-2xl">
-                        69,000 Php
-                    </Text>
+
+                {/* Scrollable Table Body */}
+                <ScrollView className="flex-1">
+                    {lineItems.map((item, index) => (
+                        <View 
+                            key={index} 
+                            className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                        >
+                            <Text className="flex-1 text-gray-800 text-center text-lg font-medium">{item.id}</Text>
+                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.material}</Text>
+                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.weight}</Text>
+                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.price}</Text>
+                            <Text className="flex-1 text-blue-700 text-center text-lg font-bold">{item.subtotal}</Text>
+                        </View>
+                    ))}
+                </ScrollView>
+
+                {/* Total Summary Bar */}
+                <View className="h-20 bg-gray-300 flex-row justify-center items-center gap-2">
+                    <Text className="font-semibold text-2xl text-gray-700">Total:</Text>
+                    <Text className="font-bold text-3xl text-black">₱1,708.50</Text>
                 </View>
             </View>
 
@@ -182,7 +208,7 @@ export default function ScanQR() {
                 <TouchableOpacity className="bg-gray-500 flex-1 justify-center items-center rounded-md">
                     <Text className="font-semibold text-2xl text-white">Back</Text>
                 </TouchableOpacity>
-                <TouchableOpacity className="bg-blue-500 flex-1 justify-center items-center rounded-md">
+                <TouchableOpacity className="bg-primary flex-1 justify-center items-center rounded-md">
                     <Text className="font-semibold text-2xl text-white">Print</Text>
                 </TouchableOpacity>
             </View>
@@ -192,14 +218,13 @@ export default function ScanQR() {
 
 const styles = StyleSheet.create({
     pickerContainer: {
-      flex: 1, // Changed from fixed height to flex: 1 to fill vertical space
+      flex: 1, 
       backgroundColor: 'white',
       borderRadius: 6, 
       justifyContent: 'center',
       position: 'relative', 
       overflow: 'hidden', 
       width: '100%',
-      // Transparent border prevents layout jump
       borderWidth: 2,
       borderColor: 'transparent', 
     },
@@ -223,7 +248,6 @@ const styles = StyleSheet.create({
     placeholderText: {
       color: '#9ca3af', 
     },
-    // --- ARROW STYLES ---
     arrowContainer: {
       justifyContent: 'center',
       alignItems: 'center',
@@ -244,7 +268,6 @@ const styles = StyleSheet.create({
        transform: [{ rotate: '225deg' }], 
        marginTop: 4,
     },
-    // --- INVISIBLE PICKER ---
     invisiblePicker: {
       position: 'absolute',
       top: 0,
@@ -253,6 +276,6 @@ const styles = StyleSheet.create({
       bottom: 0,
       opacity: 0, 
       width: '100%', 
-      height: '100%', // Ensure it covers the flexed container
+      height: '100%', 
     }
   });

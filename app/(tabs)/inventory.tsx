@@ -1,6 +1,6 @@
 import { Picker } from '@react-native-picker/picker';
 import { router } from "expo-router";
-import { ChevronLeft, ChevronRight, ClipboardCheck, Package, Plus, Search } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react-native";
 import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
@@ -59,121 +59,98 @@ export default function InventoryIndex() {
 
     // Form State
     const [selectedItem, setSelectedItem] = useState();
-    const [location, setLocation] = useState();
-    const [notes, setNotes] = useState("");
+    const [capacity, setCapacity] = useState("");
 
     // Dummy Data for Form Dropdowns
     const itemOptions = [
-        { label: "Wireless Mouse (PER-001)", value: "PER-001" },
-        { label: "Mech Keyboard (PER-002)", value: "PER-002" },
-        { label: "USB-C Hub (ACC-055)", value: "ACC-055" },
-        { label: "Monitor 27in (DIS-101)", value: "DIS-101" },
+        { label: "Copper Wire", value: "copper" },
+        { label: "Aluminum Cans", value: "aluminum" },
+        { label: "PET Bottles", value: "pet" },
+        { label: "Steel Scraps", value: "steel" },
     ];
 
-    const locationOptions = [
-        { label: "Warehouse A - Row 1", value: "A1" },
-        { label: "Warehouse A - Row 2", value: "A2" },
-        { label: "Store Front", value: "Store" },
-        { label: "Receiving Dock", value: "Dock" },
-    ];
-
-    // Dummy data for Inventory Table
+    // UPDATED Dummy Data for Table (Added Date)
     const inventoryData = [
-        { id: "001", name: "Wireless Mouse", sku: "PER-001", stock: "145" },
-        { id: "002", name: "Mechanical Keyboard", sku: "PER-002", stock: "32" },
-        { id: "003", name: "USB-C Hub", sku: "ACC-055", stock: "89" },
-        { id: "004", name: "Monitor 27-inch", sku: "DIS-101", stock: "12" },
-        { id: "005", name: "Laptop Stand", sku: "ACC-012", stock: "205" },
-        { id: "006", name: "Webcam 1080p", sku: "PER-099", stock: "0" }, 
+        { batchId: "BATCH-8829-X", material: "Copper Wire", weight: "450.0 kg", date: "2023-10-27", status: "In Stock" },
+        { batchId: "BATCH-9021-A", material: "Aluminum Cans", weight: "120.5 kg", date: "2023-10-26", status: "Processing" },
+        { batchId: "BATCH-7712-C", material: "PET Bottles", weight: "890.0 kg", date: "2023-10-25", status: "In Stock" },
+        { batchId: "BATCH-3321-B", material: "Steel Scraps", weight: "2,100 kg", date: "2023-10-24", status: "Shipped" },
+        { batchId: "BATCH-1102-D", material: "Cardboard", weight: "350.0 kg", date: "2023-10-23", status: "In Stock" },
+        { batchId: "BATCH-5543-F", material: "Glass Bottles", weight: "500.0 kg", date: "2023-10-22", status: "Processing" },
     ];
+
+    // Helper for Status Color
+    const getStatusColor = (status) => {
+        switch (status.toLowerCase()) {
+            case 'in stock': return 'text-green-600';
+            case 'processing': return 'text-blue-600';
+            case 'shipped': return 'text-gray-500';
+            default: return 'text-gray-800';
+        }
+    };
 
     return (
         <View className="flex-1 bg-gray-100 p-4 gap-4">
 
-            {/* --- MODAL FORM --- */}
+            {/* --- MODAL FORM (Updated to match Materials Page) --- */}
             <Modal
                 animationType="fade"
                 transparent={true}
                 visible={modalVisible}
                 onRequestClose={() => setModalVisible(false)}
             >
-                <View className="flex-1 bg-black/50 justify-center px-4">
-                    <View className="bg-gray-100 h-3/5 rounded-lg p-4 shadow-xl">
-                        <View className="flex-1 gap-4">
-                            
-                            {/* Header */}
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        {/* Header */}
+                        <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
                             <Text className="text-xl font-bold text-gray-800">New Inventory Batch</Text>
+                            <TouchableOpacity onPress={() => setModalVisible(false)}>
+                                <X size={24} color="#9ca3af" />
+                            </TouchableOpacity>
+                        </View>
 
-                            {/* ROW 1: Item Select (Wide) & Quantity (Narrow) */}
-                            <View className="flex-1 gap-4 flex-row">
-                                <View className="flex-[2]">
-                                    <Text className="text-black font-bold mb-1">Item / SKU</Text>
+                        {/* Fields: Material Category & Total Capacity */}
+                        <View className="gap-4">
+                            <View>
+                                <Text className="text-gray-700 font-bold mb-1">Material Category</Text>
+                                <View className="h-12">
                                     <CustomPicker 
                                         selectedValue={selectedItem} 
                                         onValueChange={setSelectedItem} 
-                                        placeholder="Select Item..." 
+                                        placeholder="Select Material..." 
                                         items={itemOptions}
                                     />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="text-black font-bold mb-1">Quantity</Text>
-                                    <TextInput 
-                                        className="bg-white flex-1 rounded-md px-3" 
-                                        placeholder="0" 
-                                        keyboardType="numeric"
-                                    />
-                                </View>
                             </View>
-
-                            {/* ROW 2: Batch # & Location */}
-                            <View className="flex-1 gap-4 flex-row">
-                                <View className="flex-1">
-                                    <Text className="text-black font-bold mb-1">Batch ID</Text>
-                                    <TextInput className="bg-white flex-1 rounded-md px-3" placeholder="#BATCH-001" />
-                                </View>
-                                <View className="flex-1">
-                                    <Text className="text-black font-bold mb-1">Location</Text>
-                                    <CustomPicker 
-                                        selectedValue={location} 
-                                        onValueChange={setLocation} 
-                                        placeholder="Select Loc..." 
-                                        items={locationOptions}
-                                    />
-                                </View>
-                            </View>
-
-                            {/* ROW 3: Supplier / Notes */}
-                            <View className="flex-[2]">
-                                <Text className="text-black font-bold mb-1">Supplier / Notes</Text>
+                            
+                            <View>
+                                <Text className="text-gray-700 font-bold mb-1">Total Capacity</Text>
                                 <TextInput 
-                                    className="bg-white flex-1 rounded-md p-3 text-base" 
-                                    multiline={true}
-                                    textAlignVertical="top"
-                                    value={notes}
-                                    onChangeText={setNotes}
-                                    placeholder="Enter supplier details..."
+                                    className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300" 
+                                    placeholder="0.00" 
+                                    keyboardType="numeric"
+                                    value={capacity}
+                                    onChangeText={setCapacity}
                                 />
                             </View>
-
-                            {/* ROW 4: Buttons */}
-                            <View className="flex-1 items-center">
-                                <View className="w-1/2 h-full gap-4 flex-row">
-                                    <TouchableOpacity 
-                                        onPress={() => setModalVisible(false)}
-                                        className="bg-red-600 flex-1 justify-center items-center rounded-md h-3/4"
-                                    >
-                                        <Text className="font-semibold text-lg text-white">Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity 
-                                        onPress={() => setModalVisible(false)}
-                                        className="bg-green-500 flex-1 justify-center items-center rounded-md h-3/4"
-                                    >
-                                        <Text className="font-semibold text-lg text-white">Save</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
                         </View>
+
+                        {/* Buttons */}
+                        <View className="mt-6 flex-row gap-3">
+                            <TouchableOpacity 
+                                onPress={() => setModalVisible(false)} 
+                                className="flex-1 bg-red-600 p-3 rounded-md items-center"
+                            >
+                                <Text className="font-bold text-white">Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                onPress={() => setModalVisible(false)} 
+                                className="flex-1 bg-green-600 p-3 rounded-md items-center"
+                            >
+                                <Text className="font-bold text-white">Save</Text>
+                            </TouchableOpacity>
+                        </View>
+
                     </View>
                 </View>
             </Modal>
@@ -192,50 +169,41 @@ export default function InventoryIndex() {
 
                 {/* Right Side Buttons Group */}
                 <View className="flex-row gap-2 h-full">
-                    {/* Inventory Check Button */}
-                    <Pressable 
-                        className="px-4 h-full flex-row items-center justify-center bg-white rounded-md active:bg-gray-50" 
-                        onPress={() => router.push('/inventoryDetailed')}
-                    >
-                        <ClipboardCheck size={20} color="#4b5563" />
-                        <Text className="text-gray-700 font-medium ml-2">Inventory Check</Text>
-                    </Pressable>
-
-                    {/* New Item Button - Triggers Modal */}
                     <Pressable 
                         onPress={() => setModalVisible(true)}
                         className="px-4 h-full flex-row items-center justify-center bg-primary rounded-md active:bg-blue-700"
                     >
-                        <Plus size={20} color="white" />
-                        <Text className="text-white font-medium ml-2">New Inventory Batch</Text>
+                        <Plus size={24} color="white" />
+                        <Text className="text-white font-bold text-lg ml-2">New Inventory Batch</Text>
                     </Pressable>
                 </View>
             </View>
 
-            {/* 2. MIDDLE VIEW: Inventory Table */}
-            <View className="flex-[12] bg-white rounded-lg overflow-hidden">
-                {/* Table Header */}
-                <View className="flex-row bg-gray-200 p-4 border-b border-gray-300">
-                    <Text className="flex-1 font-bold text-gray-700">Item Name</Text>
-                    <Text className="flex-1 font-bold text-gray-700">SKU</Text>
-                    <Text className="flex-1 font-bold text-right text-gray-700">Stock Level</Text>
+            {/* 2. MIDDLE VIEW: Inventory Table (Static View, Consistent Design) */}
+            <View className="flex-[12] bg-white rounded-lg overflow-hidden border border-gray-200">
+                {/* Table Header - Added Date */}
+                <View className="flex-row bg-gray-800 p-4">
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Batch ID</Text>
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Material</Text>
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Net Weight</Text>
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Date</Text>
+                    <Text className="flex-1 font-bold text-white text-center text-lg">Status</Text>
                 </View>
 
-                {/* Table Body */}
+                {/* Table Body (Not Scrollable) */}
                 <View className="flex-1">
                     {inventoryData.map((item, index) => (
                         <Pressable 
-                            onPress={() => router.push('/editInventory')}
+                            onPress={() => router.push('/inventoryDetailed')}
                             key={index} 
-                            className="flex-1 flex-row items-center p-4 border-b border-gray-100 hover:bg-gray-50 active:bg-gray-50"
+                            className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} active:bg-blue-50`}
                         >
-                            <View className="flex-1 flex-row items-center gap-2">
-                                <Package size={16} color="gray" />
-                                <Text className="text-gray-800 font-medium">{item.name}</Text>
-                            </View>
-                            <Text className="flex-1 text-gray-600">{item.sku}</Text>
-                            <Text className={`flex-1 text-right font-bold ${item.stock === "0" ? "text-red-500" : "text-gray-800"}`}>
-                                {item.stock}
+                            <Text className="flex-1 text-gray-800 text-center text-lg font-medium">{item.batchId}</Text>
+                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.material}</Text>
+                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.weight}</Text>
+                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.date}</Text>
+                            <Text className={`flex-1 text-center text-lg font-bold ${getStatusColor(item.status)}`}>
+                                {item.status}
                             </Text>
                         </Pressable>
                     ))}
@@ -328,5 +296,23 @@ const styles = StyleSheet.create({
         opacity: 0,
         width: '100%',
         height: '100%'
+    },
+    modalOverlay: { 
+        flex: 1, 
+        backgroundColor: 'rgba(0,0,0,0.5)', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        padding: 20 
+    },
+    modalContent: { 
+        backgroundColor: 'white', 
+        width: '50%', 
+        borderRadius: 12, 
+        padding: 24, 
+        shadowColor: "#000", 
+        shadowOffset: { width: 0, height: 2 }, 
+        shadowOpacity: 0.25, 
+        shadowRadius: 4, 
+        elevation: 5 
     }
 });

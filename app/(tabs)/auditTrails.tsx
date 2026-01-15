@@ -1,104 +1,107 @@
 import { router } from "expo-router";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react-native";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 
 export default function AuditIndex() {
-  // Dummy data for Audit Trails
-  // Context: Logs tracking Who (User), What (Activity), and When (Timestamp)
+  // --- DUMMY DATA ---
+  // Columns: Audit ID, Inventory Batch ID, Action Taken, Note, Date
   const auditData = [
-    { id: "LOG-001", user: "Admin", action: "Created Material: Steel Beams", type: "create", time: "2023-10-27 14:30" },
-    { id: "LOG-002", user: "John Doe", action: "Updated Stock: Cement (M-102)", type: "update", time: "2023-10-27 12:15" },
-    { id: "LOG-003", user: "Jane Smith", action: "Deleted Item: Old Wiring", type: "delete", time: "2023-10-26 09:00" },
-    { id: "LOG-004", user: "System", action: "Auto-Backup Completed", type: "system", time: "2023-10-26 02:00" },
-    { id: "LOG-005", user: "Admin", action: "User Login: Supervisor", type: "access", time: "2023-10-25 08:45" },
-    { id: "LOG-006", user: "John Doe", action: "Exported Monthly Report", type: "export", time: "2023-10-25 16:20" },
+    { id: "AUD-1001", batchId: "BATCH-8829-X", action: "Added", note: "All items checked and accounted for without issues.", date: "2023-10-27" },
+    { id: "AUD-1002", batchId: "BATCH-9021-A", action: "Damaged", note: "Found 3 broken seals and water damage on the bottom layer of the pallet.", date: "2023-10-27" },
+    { id: "AUD-1003", batchId: "BATCH-7712-C", action: "Adjusted", note: "FWeight discrepancy detected. Adjusted from 50kg to 48.5kg after re-weighing.", date: "2023-10-26" },
+    { id: "AUD-1004", batchId: "BATCH-3321-B", action: "Verified", note: "Routine check completed.", date: "2023-10-26" },
+    { id: "AUD-1005", batchId: "BATCH-1102-D", action: "Damaged", note: "Rat infestation signs observed near the storage rack. Flagged for cleaning.", date: "2023-10-25" },
+    { id: "AUD-1006", batchId: "BATCH-5543-F", action: "Adjusted", note: "Manual override approved by supervisor.", date: "2023-10-25" },
+    { id: "AUD-1007", batchId: "BATCH-6678-G", action: "Verified", note: "Stock matches system records perfectly.", date: "2023-10-24" },
+    { id: "AUD-1008", batchId: "BATCH-9988-H", action: "Added", note: "No issues found during random spot check.", date: "2023-10-24" },
   ];
 
-  // Helper to determine text color based on action type
-  const getActionColor = (type: string) => {
-    switch (type) {
-      case 'create': return 'text-green-600';
-      case 'delete': return 'text-red-600';
-      case 'update': return 'text-blue-600';
+  // --- HELPER FUNCTIONS ---
+  
+  // Truncate text if it exceeds a certain length (e.g., 25 characters)
+  const truncate = (str, n) => {
+    return (str.length > n) ? str.substr(0, n - 1) + '...' : str;
+  };
+
+  // Color coding for actions
+  const getActionColor = (action) => {
+    switch (action.toLowerCase()) {
+      case 'verified': return 'text-green-600';
+      case 'damaged': return 'text-red-600';
+      case 'adjusted': return 'text-blue-600';
+      case 'added': return 'text-[#F2C94C]'; // Updated to use the primary color #F2C94C
       default: return 'text-gray-800';
     }
   };
 
   return (
     <View className="flex-1 bg-gray-100 p-4 gap-4">
-      {/* 1. TOP VIEW: Search and Export Button */}
+      {/* 1. TOP VIEW: Search and Inventory Button */}
       <View className="flex-[1] flex-row items-center justify-between">
-        {/* Search Bar: Width 3/8 (37.5%) */}
-        <View className="w-[37.5%] h-full flex-row items-center bg-white rounded-md px-3 py-2">
-          <Search size={20} color="gray" />
+        <View className="w-[45%] h-full flex-row items-center bg-white rounded-md px-3 py-2">
+          <Search size={24} color="gray" />
           <TextInput 
-            placeholder="Search Audit Trail" 
-            className="flex-1 ml-2 text-base text-gray-700"
+            placeholder="Search Audit ID..." 
+            className="flex-1 ml-2 text-lg text-gray-700"
           />
         </View>
 
-        
-        <Pressable className="w-[25%] h-full flex-row items-center justify-center bg-primary rounded-md py-2 active:bg-gray-900" onPress={() => router.push('/scannedInventory')}>
-          <Plus size={20} color="white" />
-          <Text className="text-white font-medium ml-2">Inventory Check</Text>
+        <Pressable 
+          className="w-[30%] h-full flex-row items-center justify-center bg-primary rounded-md py-2 active:bg-yellow-500" 
+          onPress={() => router.push('/scannedInventory')}
+        >
+          <Plus size={24} color="white" />
+          <Text className="text-white text-lg font-bold ml-2">New Audit Trail</Text>
         </Pressable>
       </View>
 
-      {/* 2. MIDDLE VIEW: Non-scrollable Table */}
-      <View className="flex-[12] bg-white rounded-lg overflow-hidden">
-        {/* Table Header */}
-        <View className="flex-row bg-gray-200 p-4 border-b border-gray-300">
-          <Text className="flex-1 font-bold text-gray-700">User</Text>
-          <Text className="flex-[2] font-bold text-gray-700">Activity</Text>
-          <Text className="flex-1 font-bold text-right text-gray-700">Timestamp</Text>
+      {/* 2. MIDDLE VIEW: Table with Consistent Design */}
+      <View className="flex-[12] bg-white rounded-lg overflow-hidden border border-gray-200">
+        {/* Table Header - Dark Background, Bold White Text */}
+        <View className="flex-row bg-gray-800 p-4">
+          <Text className="flex-1 font-bold text-white text-center text-lg">Audit ID</Text>
+          <Text className="flex-1 font-bold text-white text-center text-lg">Batch ID</Text>
+          <Text className="flex-1 font-bold text-white text-center text-lg">Action</Text>
+          <Text className="flex-1 font-bold text-white text-center text-lg">Note</Text>
+          <Text className="flex-1 font-bold text-white text-center text-lg">Date</Text>
         </View>
 
-        {/* Table Body */}
-        <View className="flex-1">
+        {/* Table Body - Scrollable */}
+        <ScrollView className="flex-1">
           {auditData.map((item, index) => (
-            <Pressable 
+            <Pressable
+              onPress={() => router.push('/detailedAuditTrail')}
               key={index} 
-              className="flex-1 flex-row items-center p-4 border-b border-gray-100 hover:bg-gray-50 active:bg-gray-50"
+              className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} active:bg-blue-50`}
             >
-              {/* User Column */}
-              <View className="flex-1 flex-row items-center">
-                 {/* Optional: Small circle avatar indicator */}
-                <View className="w-2 h-2 rounded-full bg-gray-400 mr-2" />
-                <Text className="text-gray-800 font-medium">{item.user}</Text>
-              </View>
-              
-              {/* Activity Column (Wider flex-2) */}
-              <Text className={`flex-[2] font-medium ${getActionColor(item.type)}`}>
-                {item.action}
+              <Text className="flex-1 text-gray-800 text-center text-lg font-medium">{item.id}</Text>
+              <Text className="flex-1 text-gray-600 text-center text-lg">{item.batchId}</Text>
+              <Text className={`flex-1 text-center text-lg font-bold ${getActionColor(item.action)}`}>{item.action}</Text>
+              {/* Note Column with Truncation */}
+              <Text className="flex-1 text-gray-600 text-center text-lg" numberOfLines={1}>
+                {truncate(item.note, 20)}
               </Text>
-              
-              {/* Time Column */}
-              <Text className="flex-1 text-right text-gray-500 text-xs">
-                {item.time}
-              </Text>
+              <Text className="flex-1 text-gray-600 text-center text-lg">{item.date}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       </View>
 
-      {/* 3. BOTTOM VIEW: Pagination (Unchanged) */}
-      <View className="flex-1 flex-row items-center justify-center gap-2">
-        <Pressable className="p-2 bg-gray-200 rounded-md">
-          <ChevronLeft size={20} color="gray" />
+      {/* 3. BOTTOM VIEW: Pagination */}
+      <View className="flex-1 flex-row items-center justify-center gap-3">
+        <Pressable className="p-3 bg-white border border-gray-300 rounded-md">
+          <ChevronLeft size={24} color="black" />
         </Pressable>
         
-        <View className="px-4 py-2 bg-blue-600 rounded-md">
-          <Text className="text-white font-bold">1</Text>
+        <View className="px-5 py-3 bg-blue-600 rounded-md">
+          <Text className="text-white text-xl font-bold">1</Text>
         </View>
-        <View className="px-4 py-2 bg-white rounded-md border border-gray-200">
-          <Text className="text-gray-600">2</Text>
-        </View>
-        <View className="px-4 py-2 bg-white rounded-md border border-gray-200">
-          <Text className="text-gray-600">3</Text>
+        <View className="px-5 py-3 bg-white rounded-md border border-gray-300">
+          <Text className="text-gray-600 text-xl">2</Text>
         </View>
 
-        <Pressable className="p-2 bg-gray-200 rounded-md">
-          <ChevronRight size={20} color="gray" />
+        <Pressable className="p-3 bg-white border border-gray-300 rounded-md">
+          <ChevronRight size={24} color="black" />
         </Pressable>
       </View>
     </View>
