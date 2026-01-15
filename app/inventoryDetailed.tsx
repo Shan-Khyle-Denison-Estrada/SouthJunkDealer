@@ -64,7 +64,7 @@ export default function InventoryDetailed() {
 
             {/* --- DETAILS ROW --- */}
             <View className="flex-1 flex-row gap-4 px-4">
-                <View className="flex-1 place-content-center items-center">
+                <View className="flex-1 justify-center items-center">
                     <Text className="font-semibold text-lg">
                         Batch ID
                     </Text>
@@ -72,7 +72,7 @@ export default function InventoryDetailed() {
                         {selectedBatch || "---"}
                     </Text>
                 </View>
-                <View className="flex-1 place-content-center items-center">
+                <View className="flex-1 justify-center items-center">
                     <Text className="font-semibold text-lg">
                         Material
                     </Text>
@@ -80,7 +80,7 @@ export default function InventoryDetailed() {
                         Copper
                     </Text>
                 </View>
-                <View className="flex-1 place-content-center items-center">
+                <View className="flex-1 justify-center items-center">
                     <Text className="font-semibold text-lg">
                         Net Weight
                     </Text>
@@ -88,7 +88,7 @@ export default function InventoryDetailed() {
                         559 Kg
                     </Text>
                 </View>
-                <View className="flex-1 place-content-center items-center">
+                <View className="flex-1 justify-center items-center">
                     <Text className="font-semibold text-lg">
                         Status
                     </Text>

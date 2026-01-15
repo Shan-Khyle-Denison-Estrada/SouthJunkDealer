@@ -19,7 +19,7 @@ export default function NewTransaction() {
                     <Text className="font-bold w-full text-center text-4xl">New Transaction Line Item</Text>
                     
                     {/* --- MATERIAL PICKER SECTION --- */}
-                    <View className="flex-1 place-content-center">
+                    <View className="flex-1 justify-center">
                         <Text className="text-lg font-semibold mb-2 ml-1">
                             Material
                         </Text>
@@ -82,7 +82,7 @@ export default function NewTransaction() {
                     </View>
 
                     {/* --- PRICE INPUT --- */}
-                    <View className="flex-1 place-content-center">
+                    <View className="flex-1 justify-center">
                         <Text className="text-lg font-semibold mb-2 ml-1">
                             Material Price
                         </Text>
@@ -95,7 +95,7 @@ export default function NewTransaction() {
                     </View>
 
                     {/* --- WEIGHT INPUT --- */}
-                    <View className="flex-1 place-content-center">
+                    <View className="flex-1 justify-center">
                         <Text className="text-lg font-semibold mb-2 ml-1">
                             Weight
                         </Text>
@@ -111,7 +111,7 @@ export default function NewTransaction() {
                 <View style={styles.separator} />
                 
                 <View className="flex-1 flex-row gap-4">
-                    <View className="flex-[2] flex-row place-content-center items-center gap-4">
+                    <View className="flex-[2] flex-row justify-center items-center gap-4">
                         <Text className="text-4xl font-semibold">Subtotal:</Text>
                         <Text className="text-6xl font-bold">69,000 Php</Text>
                     </View>

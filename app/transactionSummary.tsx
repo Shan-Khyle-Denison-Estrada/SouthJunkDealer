@@ -167,7 +167,7 @@ export default function ScanQR() {
                 <View className="flex-[7]">
                     {/* List Items would go here */}
                 </View>
-                <View className="flex-1 bg-gray-300 flex-row place-content-center items-center gap-2">
+                <View className="flex-1 bg-gray-300 flex-row justify-center items-center gap-2">
                     <Text className="font-semibold text-xl">
                         Total:
                     </Text>
