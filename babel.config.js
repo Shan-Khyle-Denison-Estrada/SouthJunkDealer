@@ -5,5 +5,7 @@ module.exports = function (api) {
       ["babel-preset-expo", { jsxImportSource: "nativewind" }],
       "nativewind/babel",
     ],
+    // Add this plugin for Drizzle migrations
+    plugins: [["inline-import", { extensions: [".sql"] }]], 
   };
 };

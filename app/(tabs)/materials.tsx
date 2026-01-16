@@ -1,12 +1,18 @@
 import { Picker } from '@react-native-picker/picker';
+import { useFocusEffect } from 'expo-router';
 import { ChevronLeft, ChevronRight, Plus, Search, Trash2, X } from "lucide-react-native";
-import React, { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useState } from 'react';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
-// --- REUSABLE PICKER COMPONENT ---
+// --- DATABASE IMPORTS ---
+import { eq } from 'drizzle-orm';
+import { materials } from '../../db/schema';
+import { db } from './_layout';
+
+// --- REUSABLE PICKER ---
 const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
     const [isFocused, setIsFocused] = useState(false);
-    const truncate = (str, n) => (str.length > n) ? str.substr(0, n - 1) + '...' : str;
+    const truncate = (str, n) => (str?.length > n) ? str.substr(0, n - 1) + '...' : str;
 
     return (
         <View style={[styles.pickerContainer, isFocused && styles.pickerFocused]}>
@@ -36,27 +42,20 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
 };
 
 export default function MaterialIndex() {
-    // --- STATE MANAGEMENT ---
+    // --- STATE ---
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [selectedMaterial, setSelectedMaterial] = useState(null);
 
+    // Data State
+    const [materialsData, setMaterialsData] = useState([]);
+    const [searchQuery, setSearchQuery] = useState("");
+
     // Form States
     const [materialName, setMaterialName] = useState("");
-    const [materialClass, setMaterialClass] = useState();
-    const [uom, setUom] = useState();
-    const [maxCap, setMaxCap] = useState("");
-
-    // --- DUMMY DATA ---
-    // Columns: ID, Material Name, Class, UoM, Max Capacity, Total Load
-    const materialsData = [
-        { id: "MAT-001", name: "Copper Wire", class: "A", uom: "kg", maxCap: "5,000", totalLoad: "450" },
-        { id: "MAT-002", name: "Aluminum Cans", class: "B", uom: "kg", maxCap: "2,000", totalLoad: "120.5" },
-        { id: "MAT-003", name: "PET Bottles", class: "C", uom: "kg", maxCap: "10,000", totalLoad: "890" },
-        { id: "MAT-004", name: "Steel Scraps", class: "A", uom: "ton", maxCap: "50", totalLoad: "2.1" },
-        { id: "MAT-005", name: "Cardboard", class: "B", uom: "kg", maxCap: "3,000", totalLoad: "350" },
-        { id: "MAT-006", name: "Glass Bottles", class: "C", uom: "units", maxCap: "20,000", totalLoad: "500" },
-    ];
+    const [materialClass, setMaterialClass] = useState(null);
+    const [uom, setUom] = useState(null);
+    // REMOVED: maxCap state
 
     const classOptions = [
         { label: "Class A (High Value)", value: "A" },
@@ -71,14 +70,93 @@ export default function MaterialIndex() {
         { label: "Units / Pieces", value: "units" },
     ];
 
-    // --- HANDLERS ---
+    // --- DATA FETCHING ---
+    const loadData = async () => {
+        try {
+            const data = await db.select().from(materials);
+            setMaterialsData(data);
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            Alert.alert("Error", "Failed to load materials");
+        }
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [])
+    );
+
+    // --- SEARCH LOGIC ---
+    const filteredMaterials = materialsData.filter((item) => {
+        const query = searchQuery.toLowerCase();
+        return (
+            item.name.toLowerCase().includes(query) ||
+            item.id.toString().includes(query) ||
+            (item.class && item.class.toLowerCase().includes(query))
+        );
+    });
+
+    // --- CRUD ACTIONS ---
+    const handleAddMaterial = async () => {
+        try {
+            if (!materialName) { Alert.alert("Error", "Material Name is required"); return; }
+            if (!materialClass) { Alert.alert("Error", "Class is required"); return; }
+            if (!uom) { Alert.alert("Error", "UoM is required"); return; }
+
+            await db.insert(materials).values({
+                name: materialName,
+                class: materialClass,
+                uom: uom,
+                // REMOVED: maxCap
+            });
+
+            setAddModalVisible(false);
+            resetForm();
+            loadData();
+        } catch (error) {
+            Alert.alert("Database Error", error.message);
+        }
+    };
+
+    const handleUpdateMaterial = async () => {
+        if (!selectedMaterial) return;
+        try {
+            await db.update(materials)
+                .set({
+                    name: materialName,
+                    class: materialClass,
+                    uom: uom,
+                    // REMOVED: maxCap
+                })
+                .where(eq(materials.id, selectedMaterial.id));
+
+            setEditModalVisible(false);
+            resetForm();
+            loadData();
+        } catch (error) {
+            Alert.alert("Database Error", error.message);
+        }
+    };
+
+    const handleDeleteMaterial = async () => {
+        if (!selectedMaterial) return;
+        try {
+            await db.delete(materials).where(eq(materials.id, selectedMaterial.id));
+            setEditModalVisible(false);
+            resetForm();
+            loadData();
+        } catch (error) {
+            Alert.alert("Database Error", error.message);
+        }
+    };
+
     const handleRowClick = (item) => {
         setSelectedMaterial(item);
-        // Pre-fill form for editing
         setMaterialName(item.name);
         setMaterialClass(item.class);
         setUom(item.uom);
-        setMaxCap(item.maxCap);
+        // REMOVED: setMaxCap
         setEditModalVisible(true);
     };
 
@@ -86,13 +164,14 @@ export default function MaterialIndex() {
         setMaterialName("");
         setMaterialClass(null);
         setUom(null);
-        setMaxCap("");
+        // REMOVED: setMaxCap
+        setSelectedMaterial(null);
     };
 
     return (
         <View className="flex-1 bg-gray-100 p-4 gap-4">
 
-            {/* --- 1. ADD NEW MATERIAL MODAL --- */}
+            {/* --- ADD MODAL --- */}
             <Modal
                 animationType="fade"
                 transparent={true}
@@ -108,11 +187,15 @@ export default function MaterialIndex() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Form Fields */}
                         <View className="gap-4">
                             <View>
                                 <Text className="text-gray-700 font-bold mb-1">Material Name</Text>
-                                <TextInput className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300" placeholder="Ex: Copper Wire" />
+                                <TextInput 
+                                    className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300" 
+                                    placeholder="Ex: Copper Wire" 
+                                    value={materialName}
+                                    onChangeText={setMaterialName}
+                                />
                             </View>
                             <View className="flex-row gap-4">
                                 <View className="flex-1">
@@ -128,17 +211,14 @@ export default function MaterialIndex() {
                                     </View>
                                 </View>
                             </View>
-                            <View>
-                                <Text className="text-gray-700 font-bold mb-1">Max Capacity</Text>
-                                <TextInput className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300" placeholder="0" keyboardType="numeric" />
-                            </View>
+                            {/* REMOVED: Max Capacity Input View */}
                         </View>
 
                         <View className="mt-6 flex-row gap-3">
                             <TouchableOpacity onPress={() => setAddModalVisible(false)} className="flex-1 bg-red-600 p-3 rounded-md items-center">
                                 <Text className="font-bold text-white">Cancel</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setAddModalVisible(false)} className="flex-1 bg-green-600 p-3 rounded-md items-center">
+                            <TouchableOpacity onPress={handleAddMaterial} className="flex-1 bg-green-600 p-3 rounded-md items-center">
                                 <Text className="font-bold text-white">Save</Text>
                             </TouchableOpacity>
                         </View>
@@ -146,7 +226,7 @@ export default function MaterialIndex() {
                 </View>
             </Modal>
 
-            {/* --- 2. EDIT / DELETE MODAL --- */}
+            {/* --- EDIT MODAL --- */}
             <Modal
                 animationType="fade"
                 transparent={true}
@@ -162,7 +242,6 @@ export default function MaterialIndex() {
                             </TouchableOpacity>
                         </View>
 
-                         {/* Form Fields (Pre-filled) */}
                          <View className="gap-4">
                             <View>
                                 <Text className="text-gray-700 font-bold mb-1">Material Name</Text>
@@ -186,23 +265,15 @@ export default function MaterialIndex() {
                                     </View>
                                 </View>
                             </View>
-                            <View>
-                                <Text className="text-gray-700 font-bold mb-1">Max Capacity</Text>
-                                <TextInput 
-                                    className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300" 
-                                    value={maxCap}
-                                    onChangeText={setMaxCap} 
-                                    keyboardType="numeric" 
-                                />
-                            </View>
+                             {/* REMOVED: Max Capacity Input View */}
                         </View>
 
                         <View className="mt-6 flex-row gap-3">
-                            <TouchableOpacity onPress={() => setEditModalVisible(false)} className="flex-1 bg-red-600 p-3 rounded-md items-center flex-row justify-center gap-2">
+                            <TouchableOpacity onPress={handleDeleteMaterial} className="flex-1 bg-red-600 p-3 rounded-md items-center flex-row justify-center gap-2">
                                 <Trash2 size={20} color="white" />
                                 <Text className="font-bold text-white">Delete</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setEditModalVisible(false)} className="flex-1 bg-blue-600 p-3 rounded-md items-center">
+                            <TouchableOpacity onPress={handleUpdateMaterial} className="flex-1 bg-blue-600 p-3 rounded-md items-center">
                                 <Text className="font-bold text-white">Update</Text>
                             </TouchableOpacity>
                         </View>
@@ -210,13 +281,16 @@ export default function MaterialIndex() {
                 </View>
             </Modal>
 
-            {/* 3. TOP VIEW: Search and Add Button */}
+            {/* --- TOP BAR (SEARCH & ADD) --- */}
             <View className="flex-[1] flex-row items-center justify-between">
-                <View className="w-[45%] h-full flex-row items-center bg-white rounded-md px-3 py-2">
+                <View className="w-[45%] h-full flex-row items-center bg-white rounded-md px-3">
                     <Search size={24} color="gray" />
                     <TextInput 
                         placeholder="Search Material..." 
-                        className="flex-1 ml-2 text-lg text-gray-700"
+                        className="flex-1 ml-2 text-lg text-gray-700 h-full"
+                        style={{ textAlignVertical: 'center' }}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
                     />
                 </View>
 
@@ -232,50 +306,54 @@ export default function MaterialIndex() {
                 </Pressable>
             </View>
 
-            {/* 4. MIDDLE VIEW: Table (Static, Consistent Design) */}
+            {/* --- TABLE (FLATLIST) --- */}
             <View className="flex-[12] bg-white rounded-lg overflow-hidden border border-gray-200">
-                {/* Table Header */}
                 <View className="flex-row bg-gray-800 p-4">
                     <Text className="flex-1 font-bold text-white text-center text-lg">ID</Text>
                     <Text className="flex-[2] font-bold text-white text-center text-lg">Material Name</Text>
                     <Text className="flex-1 font-bold text-white text-center text-lg">Class</Text>
                     <Text className="flex-1 font-bold text-white text-center text-lg">UoM</Text>
-                    <Text className="flex-1 font-bold text-white text-center text-lg">Max Cap</Text>
+                    {/* REMOVED: Max Cap Header */}
                     <Text className="flex-1 font-bold text-white text-center text-lg">Total Load</Text>
                 </View>
 
-                {/* Table Body */}
-                <View className="flex-1">
-                    {materialsData.map((item, index) => (
-                        <Pressable 
-                            key={index} 
-                            onPress={() => handleRowClick(item)}
-                            className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} active:bg-blue-50`}
-                        >
-                            <Text className="flex-1 text-gray-800 text-center text-lg font-medium">{item.id}</Text>
-                            <Text className="flex-[2] text-gray-600 text-center text-lg">{item.name}</Text>
-                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.class}</Text>
-                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.uom}</Text>
-                            <Text className="flex-1 text-gray-600 text-center text-lg">{item.maxCap}</Text>
-                            <Text className="flex-1 text-blue-700 text-center text-lg font-bold">{item.totalLoad}</Text>
-                        </Pressable>
-                    ))}
-                </View>
+                {filteredMaterials.length === 0 ? (
+                    <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
+                         <Text style={{color: '#888'}}>No materials found.</Text>
+                         {materialsData.length === 0 ? (
+                             <Text style={{color: '#aaa', fontSize: 12, marginTop: 5}}>Try adding a new material.</Text>
+                         ) : (
+                             <Text style={{color: '#aaa', fontSize: 12, marginTop: 5}}>Try adjusting your search.</Text>
+                         )}
+                    </View>
+                ) : (
+                    <FlatList
+                        data={filteredMaterials}
+                        keyExtractor={(item) => item.id.toString()}
+                        renderItem={({ item, index }) => (
+                            <Pressable 
+                                onPress={() => handleRowClick(item)}
+                                className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} active:bg-blue-50`}
+                            >
+                                <Text className="flex-1 text-gray-800 text-center text-lg font-medium">{item.id}</Text>
+                                <Text className="flex-[2] text-gray-600 text-center text-lg">{item.name}</Text>
+                                <Text className="flex-1 text-gray-600 text-center text-lg">{item.class}</Text>
+                                <Text className="flex-1 text-gray-600 text-center text-lg">{item.uom}</Text>
+                                {/* REMOVED: Max Cap Data */}
+                                <Text className="flex-1 text-blue-700 text-center text-lg font-bold">-</Text>
+                            </Pressable>
+                        )}
+                    />
+                )}
             </View>
 
-            {/* 5. BOTTOM VIEW: Pagination */}
             <View className="flex-1 flex-row items-center justify-center gap-3">
                 <Pressable className="p-3 bg-white border border-gray-300 rounded-md">
                     <ChevronLeft size={24} color="black" />
                 </Pressable>
-                
                 <View className="px-5 py-3 bg-blue-600 rounded-md">
                     <Text className="text-white text-xl font-bold">1</Text>
                 </View>
-                <View className="px-5 py-3 bg-white rounded-md border border-gray-300">
-                    <Text className="text-gray-600 text-xl">2</Text>
-                </View>
-
                 <Pressable className="p-3 bg-white border border-gray-300 rounded-md">
                     <ChevronRight size={24} color="black" />
                 </Pressable>
