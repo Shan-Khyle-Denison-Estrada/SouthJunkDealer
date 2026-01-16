@@ -5,7 +5,7 @@ import { Alert, Image, Pressable, Text, View } from "react-native";
 import QRCode from 'react-native-qrcode-svg';
 
 // --- DATABASE IMPORTS ---
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { inventory, materials } from '../db/schema';
 import { db } from './_layout';
 
@@ -28,8 +28,8 @@ export default function InventoryDetailed() {
                 uom: materials.uom,
                 imageUri: inventory.imageUri, 
                 qrContent: inventory.qrContent,
-                // Calculate weight from linked items
-                calculatedWeight: sql`COALESCE((SELECT SUM(allocated_weight) FROM inventory_transaction_items WHERE inventory_transaction_items.inventory_id = inventory.id), 0)`
+                // Use Actual Net Weight
+                netWeight: inventory.netWeight 
             })
             .from(inventory)
             .leftJoin(materials, eq(inventory.materialId, materials.id))
@@ -74,7 +74,8 @@ export default function InventoryDetailed() {
                 </View>
                 <View className="flex-1 justify-center">
                     <Text className="text-gray-500 text-xs font-bold uppercase">Weight</Text>
-                    <Text className="text-lg font-bold text-gray-800">{batchData.calculatedWeight} {batchData.uom}</Text>
+                    {/* SAFETY CHECK: Prevent undefined.toFixed crash */}
+                    <Text className="text-lg font-bold text-gray-800">{(batchData.netWeight || 0).toFixed(2)} {batchData.uom}</Text>
                 </View>
                 <View className="flex-1 justify-center items-end">
                     <Text className="text-gray-500 text-xs font-bold uppercase">Status</Text>
@@ -82,10 +83,9 @@ export default function InventoryDetailed() {
                 </View>
             </View>
 
-            {/* 2. MIDDLE SECTION (Image & QR) - 3/4 vs 1/4 Split */}
+            {/* 2. MIDDLE SECTION (Image & QR) */}
             <View className="flex-[10] flex-row gap-4">
                 
-                {/* IMAGE CONTAINER (3/4 Width) */}
                 <View className="flex-[3] bg-white rounded-lg border border-gray-200 p-2 items-center justify-center overflow-hidden">
                     {batchData.imageUri ? (
                         <Image 
@@ -97,12 +97,11 @@ export default function InventoryDetailed() {
                     )}
                 </View>
 
-                {/* QR CODE CONTAINER (1/4 Width) */}
                 <View 
                     className="flex-1 bg-white rounded-lg border border-gray-200 items-center justify-center p-2"
                     onLayout={(event) => {
                         const { width, height } = event.nativeEvent.layout;
-                        setQrContainerSize(Math.min(width, height) - 20); // Calculate max size minus padding
+                        setQrContainerSize(Math.min(width, height) - 20); 
                     }}
                 >
                      {batchData.qrContent ? (
@@ -120,7 +119,7 @@ export default function InventoryDetailed() {
                 </View>
             </View>
 
-            {/* 3. FOOTER BUTTONS (Print, Edit, Check) */}
+            {/* 3. FOOTER BUTTONS */}
             <View className="h-20 flex-row gap-4 mt-2">
                 <Pressable 
                     onPress={handlePrint}
@@ -130,7 +129,6 @@ export default function InventoryDetailed() {
                     <Text className="text-white font-bold text-xl">Print QR</Text>
                 </Pressable>
 
-                {/* --- REDIRECTION TO EDIT INVENTORY --- */}
                 <Pressable 
                     onPress={() => router.push({ pathname: '/editInventory', params: { batchId: batchId } })}
                     className="flex-1 bg-blue-600 rounded-lg flex-row items-center justify-center gap-2 active:bg-blue-700"

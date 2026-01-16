@@ -6,8 +6,8 @@ import React, { useCallback, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 // --- DATABASE IMPORTS ---
-import { desc, eq, sql } from 'drizzle-orm';
-import { inventory, materials } from '../../db/schema';
+import { and, desc, eq, sql } from 'drizzle-orm';
+import { inventory, inventoryTransactionItems, materials } from '../../db/schema';
 import { db } from './_layout';
 
 const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
@@ -57,20 +57,43 @@ export default function InventoryIndex() {
     // --- DATA FETCHING ---
     const loadData = async () => {
         try {
+            // 1. REPAIR DATA: Fix "In Stock" batches with 0 weight (if they have items)
+            const zeroBatches = await db.select()
+                .from(inventory)
+                .where(and(eq(inventory.status, 'In Stock'), eq(inventory.netWeight, 0)));
+
+            if (zeroBatches.length > 0) {
+                for (const batch of zeroBatches) {
+                    const result = await db.select({ 
+                        totalAllocated: sql`sum(${inventoryTransactionItems.allocatedWeight})` 
+                    })
+                    .from(inventoryTransactionItems)
+                    .where(eq(inventoryTransactionItems.inventoryId, batch.id));
+                    
+                    const realWeight = result[0]?.totalAllocated || 0;
+                    
+                    if (realWeight > 0) {
+                        await db.update(inventory)
+                            .set({ netWeight: realWeight })
+                            .where(eq(inventory.id, batch.id));
+                    }
+                }
+            }
+
+            // 2. Load Materials
             const materialsList = await db.select().from(materials);
             const options = materialsList.map(m => ({ label: m.name, value: m.id }));
             setMaterialOptions(options);
 
-            // Fetch inventory and calculate weight dynamically from linked items
+            // 3. Load Inventory
             const invList = await db.select({
                 id: inventory.id,
                 batchId: inventory.batchId,
+                netWeight: inventory.netWeight, 
                 date: inventory.date,
                 status: inventory.status,
                 materialName: materials.name,
-                uom: materials.uom,
-                // Calculate total weight from inventory_transaction_items
-                calculatedWeight: sql`COALESCE((SELECT SUM(allocated_weight) FROM inventory_transaction_items WHERE inventory_transaction_items.inventory_id = inventory.id), 0)`
+                uom: materials.uom
             })
             .from(inventory)
             .leftJoin(materials, eq(inventory.materialId, materials.id))
@@ -130,7 +153,7 @@ export default function InventoryIndex() {
             await db.insert(inventory).values({
                 batchId: generatedBatchId,
                 materialId: selectedMaterialId,
-                netWeight: 0, // Initialize as 0, will be updated when items are added
+                netWeight: 0, 
                 date: today,
                 status: 'In Stock',
                 imageUri: imageUri,
@@ -153,6 +176,7 @@ export default function InventoryIndex() {
             case 'in stock': return 'text-green-600';
             case 'processing': return 'text-blue-600';
             case 'shipped': return 'text-gray-500';
+            case 'sold': return 'text-red-500';
             default: return 'text-gray-800';
         }
     };
@@ -198,9 +222,6 @@ export default function InventoryIndex() {
                                 </View>
                             </View>
                             
-                            {/* REMOVED NET WEIGHT INPUT */}
-
-                            {/* --- CAMERA SECTION --- */}
                             <View>
                                 <Text className="text-gray-700 font-bold mb-1">Batch Photo</Text>
                                 <TouchableOpacity 
@@ -286,8 +307,9 @@ export default function InventoryIndex() {
                             >
                                 <Text className="flex-1 text-gray-800 text-center text-lg font-medium">{item.batchId}</Text>
                                 <Text className="flex-1 text-gray-600 text-center text-lg">{item.materialName || 'Unknown'}</Text>
+                                {/* SAFETY CHECK: Prevent crash */}
                                 <Text className="flex-1 text-gray-600 text-center text-lg">
-                                    {item.calculatedWeight} {item.uom || ''}
+                                    {(item.netWeight || 0).toFixed(2)} {item.uom || ''}
                                 </Text>
                                 <Text className="flex-1 text-gray-600 text-center text-lg">{item.date}</Text>
                                 <Text className={`flex-1 text-center text-lg font-bold ${getStatusColor(item.status)}`}>

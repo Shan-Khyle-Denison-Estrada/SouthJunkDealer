@@ -3,8 +3,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { eq } from 'drizzle-orm';
-import { materials, transactionItems } from '../db/schema';
+// --- DATABASE IMPORTS ---
+import { and, asc, eq, sql } from 'drizzle-orm';
+import { inventory, inventoryTransactionItems, materials, transactionItems, transactions } from '../db/schema';
 import { db } from './_layout';
 
 export default function NewTransaction() {
@@ -14,6 +15,8 @@ export default function NewTransaction() {
 
     const [materialsList, setMaterialsList] = useState([]);
     const [selectedMaterial, setSelectedMaterial] = useState();
+    const [stockMap, setStockMap] = useState({}); 
+    const [transactionType, setTransactionType] = useState(null);
     
     const [weight, setWeight] = useState("");
     const [price, setPrice] = useState("");
@@ -21,7 +24,7 @@ export default function NewTransaction() {
     const [isFocused, setIsFocused] = useState(false);
 
     useEffect(() => {
-        loadMaterials();
+        loadData();
         if (itemIdParam) loadExistingItem(itemIdParam);
     }, []);
 
@@ -31,9 +34,70 @@ export default function NewTransaction() {
         setSubtotal((w * p).toFixed(2));
     }, [weight, price]);
 
-    const loadMaterials = async () => {
-        const data = await db.select().from(materials);
-        setMaterialsList(data.map(m => ({ label: m.name, value: m.id })));
+    const loadData = async () => {
+        try {
+            // --- GENTLE SELF-HEAL ---
+            // Only fix batches that are 'In Stock' but somehow have 0 weight
+            // This prevents "Available: 0" when data actually exists, without resetting valid sales.
+            const zeroBatches = await db.select()
+                .from(inventory)
+                .where(and(eq(inventory.status, 'In Stock'), eq(inventory.netWeight, 0)));
+
+            for (const batch of zeroBatches) {
+                const result = await db.select({ 
+                    totalAllocated: sql`sum(${inventoryTransactionItems.allocatedWeight})` 
+                })
+                .from(inventoryTransactionItems)
+                .where(eq(inventoryTransactionItems.inventoryId, batch.id));
+                
+                const realWeight = result[0]?.totalAllocated || 0;
+                
+                if (realWeight > 0) {
+                    await db.update(inventory)
+                        .set({ netWeight: realWeight })
+                        .where(eq(inventory.id, batch.id));
+                }
+            }
+
+            // 1. Get Transaction Type
+            if (transactionIdParam) {
+                const tx = await db.select().from(transactions).where(eq(transactions.id, transactionIdParam));
+                if (tx.length > 0) setTransactionType(tx[0].type);
+            }
+
+            // 2. Get Materials
+            const allMaterials = await db.select().from(materials);
+
+            // 3. Get Stock Levels (Sum of 'In Stock' Inventory Net Weight)
+            const stockLevels = await db.select({
+                materialId: inventory.materialId,
+                totalWeight: sql`sum(${inventory.netWeight})`
+            })
+            .from(inventory)
+            .where(eq(inventory.status, 'In Stock'))
+            .groupBy(inventory.materialId);
+
+            // Create a map for easy lookup
+            const stockMapping = {};
+            stockLevels.forEach(s => {
+                stockMapping[s.materialId] = s.totalWeight;
+            });
+            setStockMap(stockMapping);
+
+            // 4. Format List for Dropdown
+            const formattedList = allMaterials.map(m => {
+                const avail = stockMapping[m.id] || 0;
+                return {
+                    label: `${m.name} (Avail: ${avail.toFixed(2)} ${m.uom || 'kg'})`,
+                    value: m.id,
+                    available: avail
+                };
+            });
+            setMaterialsList(formattedList);
+
+        } catch (error) {
+            console.error("Error loading data", error);
+        }
     };
 
     const loadExistingItem = async (id) => {
@@ -51,9 +115,60 @@ export default function NewTransaction() {
             Alert.alert("Error", "Please fill all fields");
             return;
         }
+
+        const weightVal = parseFloat(weight);
+
+        // --- INVENTORY CHECK & DEDUCTION (If Selling) ---
+        if (transactionType === 'Selling') {
+            const available = stockMap[selectedMaterial] || 0;
+
+            if (weightVal > available) {
+                Alert.alert("Insufficient Stock", `You only have ${available.toFixed(2)} available for this material.`);
+                return;
+            }
+
+            try {
+                // Perform FIFO Deduction
+                let remainingToDeduct = weightVal;
+                
+                const batches = await db.select()
+                    .from(inventory)
+                    .where(and(
+                        eq(inventory.materialId, selectedMaterial),
+                        eq(inventory.status, 'In Stock')
+                    ))
+                    .orderBy(asc(inventory.date)); // Oldest First
+
+                for (const batch of batches) {
+                    if (remainingToDeduct <= 0.001) break;
+
+                    if (batch.netWeight <= 0) continue; 
+
+                    if (batch.netWeight <= remainingToDeduct) {
+                        // Consume entire batch
+                        remainingToDeduct -= batch.netWeight;
+                        await db.update(inventory)
+                            .set({ netWeight: 0, status: 'Sold' }) 
+                            .where(eq(inventory.id, batch.id));
+                    } else {
+                        // Partial consumption
+                        const newWeight = batch.netWeight - remainingToDeduct;
+                        await db.update(inventory)
+                            .set({ netWeight: newWeight })
+                            .where(eq(inventory.id, batch.id));
+                        remainingToDeduct = 0;
+                    }
+                }
+
+            } catch (error) {
+                console.error("Deduction Error", error);
+                Alert.alert("Error", "Failed to update inventory.");
+                return;
+            }
+        }
+
+        // --- SAVE TRANSACTION ITEM ---
         try {
-            // Because we now redirect from Transactions -> Summary first,
-            // transactionIdParam SHOULD always exist.
             if (!transactionIdParam) {
                 Alert.alert("Error", "No Transaction ID found");
                 return;
@@ -62,7 +177,7 @@ export default function NewTransaction() {
             if (itemIdParam) {
                 await db.update(transactionItems).set({
                     materialId: selectedMaterial,
-                    weight: parseFloat(weight),
+                    weight: weightVal,
                     price: parseFloat(price),
                     subtotal: parseFloat(subtotal),
                 }).where(eq(transactionItems.id, itemIdParam));
@@ -70,13 +185,12 @@ export default function NewTransaction() {
                 await db.insert(transactionItems).values({
                     transactionId: transactionIdParam,
                     materialId: selectedMaterial,
-                    weight: parseFloat(weight),
+                    weight: weightVal,
                     price: parseFloat(price),
                     subtotal: parseFloat(subtotal),
                 });
             }
 
-            // Go back to summary
             router.back();
 
         } catch (error) {
@@ -102,7 +216,6 @@ export default function NewTransaction() {
                                 <Text style={[styles.pickerText, !selectedMaterial && styles.placeholderText]} numberOfLines={1}>
                                     {selectedMaterial ? materialsList.find(i => i.value === selectedMaterial)?.label : "Select Material..."}
                                 </Text>
-                                {/* Added Arrow */}
                                 <View style={styles.arrowContainer}>
                                     <View style={[styles.roundedArrow, isFocused && styles.arrowOpen]} />
                                 </View>

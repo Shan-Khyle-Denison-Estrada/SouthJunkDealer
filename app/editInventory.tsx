@@ -17,7 +17,7 @@ import {
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
-import { desc, eq, inArray } from 'drizzle-orm';
+import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { inventory, inventoryTransactionItems, materials, transactionItems, transactions } from '../db/schema';
 import { db } from './_layout';
 
@@ -101,6 +101,8 @@ export default function EditInventory() {
             const inv = invResult[0];
             setInventoryRecord(inv);
             setNotes(inv.notes || "");
+            // SAFETY CHECK: Ensure netWeight is not undefined
+            setNetWeight((inv.netWeight || 0).toFixed(2));
             
             // Fetch Material Name & UOM
             const matResult = await db.select().from(materials).where(eq(materials.id, inv.materialId));
@@ -108,10 +110,10 @@ export default function EditInventory() {
             setMaterialName(mat.name);
             setUom(mat.uom);
 
-            // Fetch Linked Items & Calculate Total Weight
+            // Fetch Linked Items
             const links = await db.select({
                 linkId: inventoryTransactionItems.id,
-                txItemId: transactionItems.id, // ADDED: Specific Line Item ID
+                txItemId: transactionItems.id,
                 txId: transactions.id,
                 date: transactions.date,
                 allocated: inventoryTransactionItems.allocatedWeight,
@@ -120,14 +122,29 @@ export default function EditInventory() {
             .from(inventoryTransactionItems)
             .leftJoin(transactionItems, eq(inventoryTransactionItems.transactionItemId, transactionItems.id))
             .leftJoin(transactions, eq(transactionItems.transactionId, transactions.id))
-            .where(eq(inventoryTransactionItems.inventoryId, inv.id));
+            .where(eq(inventoryTransactionItems.inventoryId, inv.id))
+            .orderBy(asc(transactions.date)); 
             
-            setLinkedItems(links);
+            // --- FIFO CALCULATION ---
+            const totalOriginalAllocated = links.reduce((sum, item) => sum + (item.allocated || 0), 0);
+            const currentNetWeight = inv.netWeight || 0;
             
-            // Calculate Net Weight
-            const totalWeight = links.reduce((sum, item) => sum + item.allocated, 0);
-            setNetWeight(totalWeight.toFixed(2));
+            // Amount lost/sold/shrunk
+            let lostWeight = Math.max(0, totalOriginalAllocated - currentNetWeight);
 
+            const linksWithRemaining = links.map(item => {
+                let remaining = item.allocated || 0;
+                
+                if (lostWeight > 0) {
+                    const deduction = Math.min(remaining, lostWeight);
+                    remaining -= deduction;
+                    lostWeight -= deduction;
+                }
+                
+                return { ...item, remaining };
+            });
+
+            setLinkedItems(linksWithRemaining);
             setAreSourcesLoaded(false); 
 
         } catch (error) {
@@ -180,15 +197,15 @@ export default function EditInventory() {
 
             const usageMap = {};
             allocations.forEach(row => {
-                usageMap[row.itemId] = (usageMap[row.itemId] || 0) + row.allocated;
+                usageMap[row.itemId] = (usageMap[row.itemId] || 0) + (row.allocated || 0);
             });
 
             const options = recentItems
                 .map(item => {
                     const used = usageMap[item.itemId] || 0;
-                    const remaining = item.weight - used;
+                    const remaining = (item.weight || 0) - used;
                     return {
-                        label: `TX-${item.txId} (Line: ${item.itemId}) - Avail: ${remaining.toFixed(2)}kg`, // Added Line ID to label for clarity
+                        label: `TX-${item.txId} (Line: ${item.itemId}) - Avail: ${remaining.toFixed(2)}kg`, 
                         value: item.itemId,
                         remaining: remaining
                     };
@@ -217,23 +234,44 @@ export default function EditInventory() {
         if (isNaN(val) || val <= 0 || val > maxAllocatable + 0.001) return Alert.alert("Error", "Invalid weight");
 
         try {
-            await db.insert(inventoryTransactionItems).values({
-                inventoryId: inventoryRecord.id,
-                transactionItemId: selectedSourceId,
-                allocatedWeight: val
+            await db.transaction(async (tx) => {
+                await tx.insert(inventoryTransactionItems).values({
+                    inventoryId: inventoryRecord.id,
+                    transactionItemId: selectedSourceId,
+                    allocatedWeight: val
+                });
+
+                await tx.update(inventory)
+                    .set({ netWeight: sql`${inventory.netWeight} + ${val}` })
+                    .where(eq(inventory.id, inventoryRecord.id));
             });
+
             setIsAddModalVisible(false);
             setWeightToAllocate("");
             loadBatchData(); 
         } catch (e) { Alert.alert("Error", e.message); }
     };
 
-    const handleDeleteItem = async (linkId) => {
+    const handleDeleteItem = async (linkId, allocatedAmount) => {
         try {
-            await db.delete(inventoryTransactionItems).where(eq(inventoryTransactionItems.id, linkId));
+             await db.transaction(async (tx) => {
+                await tx.delete(inventoryTransactionItems).where(eq(inventoryTransactionItems.id, linkId));
+                
+                await tx.update(inventory)
+                    .set({ netWeight: sql`MAX(0, ${inventory.netWeight} - ${allocatedAmount})` })
+                    .where(eq(inventory.id, inventoryRecord.id));
+             });
+
             loadBatchData();
         } catch (e) { Alert.alert("Error", e.message); }
     };
+
+    const confirmDelete = (linkId, amount) => {
+        Alert.alert("Remove Item", "This will reduce the batch weight.", [
+            { text: "Cancel", style: "cancel" },
+            { text: "Remove", style: "destructive", onPress: () => handleDeleteItem(linkId, amount) }
+        ]);
+    }
 
     const handleSubmit = async () => {
         router.back();
@@ -271,6 +309,7 @@ export default function EditInventory() {
                              <Text className="text-gray-500 text-sm" numberOfLines={1}>{materialName}</Text>
                         </View>
                     </View>
+                    
                     <View className="flex-1">
                         <Text className="text-gray-700 font-bold mb-1 text-xs">Net Weight</Text>
                         <TextInput 
@@ -300,9 +339,8 @@ export default function EditInventory() {
                 <View className="flex-row bg-gray-800 p-3 items-center">
                     <Text className="flex-1 font-bold text-white text-center text-xs">Line ID</Text>
                     <Text className="flex-1 font-bold text-white text-center text-xs">Tx Date</Text>
-                    <Text className="flex-1 font-bold text-white text-center text-xs">Tx ID</Text>
                     <Text className="flex-1 font-bold text-white text-center text-xs">Original</Text>
-                    <Text className="flex-1 font-bold text-white text-center text-xs">Allocated</Text>
+                    <Text className="flex-[1.5] font-bold text-white text-center text-xs">Avail / Alloc</Text>
                     <TouchableOpacity onPress={handleOpenAddModal} className="w-8 items-center justify-center bg-blue-600 rounded-sm h-6">
                         <Plus size={16} color="white" />
                     </TouchableOpacity>
@@ -315,10 +353,16 @@ export default function EditInventory() {
                             <View key={item.linkId} className={`flex-row items-center p-3 border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                                 <Text className="flex-1 text-gray-800 text-center text-xs font-medium">{item.txItemId}</Text>
                                 <Text className="flex-1 text-gray-600 text-center text-xs">{item.date}</Text>
-                                <Text className="flex-1 text-gray-800 text-center text-xs">{item.txId}</Text>
                                 <Text className="flex-1 text-gray-600 text-center text-xs">{item.totalOriginal} {uom}</Text>
-                                <Text className="flex-1 text-blue-700 font-bold text-center text-xs">{item.allocated} {uom}</Text>
-                                <TouchableOpacity onPress={() => handleDeleteItem(item.linkId)} className="w-8 items-center justify-center"><Trash2 size={16} color="#ef4444" /></TouchableOpacity>
+                                
+                                {/* SAFETY CHECK: Handle potentially undefined/null remaining value */}
+                                <Text className={`flex-[1.5] text-center text-xs font-bold ${item.remaining === 0 ? 'text-red-400' : 'text-blue-700'}`}>
+                                    {(item.remaining || 0).toFixed(2)} / {item.allocated}
+                                </Text>
+                                
+                                <TouchableOpacity onPress={() => confirmDelete(item.linkId, item.allocated)} className="w-8 items-center justify-center">
+                                    <Trash2 size={16} color="#ef4444" />
+                                </TouchableOpacity>
                             </View>
                         ))
                     )}

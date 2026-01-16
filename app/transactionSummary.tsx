@@ -76,11 +76,9 @@ export default function TransactionSummary() {
 
     // --- AUTO SAVE HEADER CHANGES ---
     const updateHeader = async (field, value) => {
-        // 1. Update State UI
         if (field === 'type') setTransactionType(value);
         if (field === 'payment') setPaymentMethod(value);
 
-        // 2. Persist to DB immediately
         try {
             await db.update(transactions)
                 .set({ 
@@ -91,6 +89,19 @@ export default function TransactionSummary() {
             console.error("Failed to persist header", e);
         }
     }
+
+    // --- VALIDATE AND ADD ITEM ---
+    const handleAddItem = () => {
+        if (!transactionType || !paymentMethod) {
+            Alert.alert("Missing Information", "Please select a Transaction Type and Payment Method before adding items.");
+            return;
+        }
+
+        router.push({ 
+            pathname: '/newTransaction', 
+            params: { transactionId } 
+        });
+    };
 
     const handleDeleteItem = async (itemId) => {
         Alert.alert("Delete Item", "Are you sure?", [
@@ -135,7 +146,6 @@ export default function TransactionSummary() {
             <View className="flex-row gap-4 h-24">
                 <View className="flex-1">
                     <Text className="mb-1 font-bold text-gray-700">Type</Text>
-                    {/* Updates DB on change */}
                     <SummaryPicker 
                         selectedValue={transactionType} 
                         onValueChange={(v) => updateHeader('type', v)} 
@@ -145,7 +155,6 @@ export default function TransactionSummary() {
                 </View>
                 <View className="flex-1">
                     <Text className="mb-1 font-bold text-gray-700">Payment</Text>
-                    {/* Updates DB on change */}
                     <SummaryPicker 
                         selectedValue={paymentMethod} 
                         onValueChange={(v) => updateHeader('payment', v)} 
@@ -192,12 +201,9 @@ export default function TransactionSummary() {
             </View>
 
             <View className="h-20 flex-row gap-4 mt-2">
-                <Pressable onPress={() => router.push({ pathname: '/newTransaction', params: { transactionId } })} className="flex-1 bg-blue-600 rounded-lg flex-row items-center justify-center gap-2">
+                <Pressable onPress={handleAddItem} className="flex-1 bg-blue-600 rounded-lg flex-row items-center justify-center gap-2">
                     <Plus size={24} color="white" />
                     <Text className="text-white font-bold text-xl">Add Item</Text>
-                </Pressable>
-                <Pressable className="flex-1 bg-primary rounded-lg items-center justify-center">
-                    <Text className="text-white font-bold text-xl">Print</Text>
                 </Pressable>
                 <Pressable onPress={handleDone} className="flex-1 bg-green-600 rounded-lg items-center justify-center">
                     <Text className="text-white font-bold text-xl">Done</Text>
