@@ -1,15 +1,15 @@
 import { Picker } from '@react-native-picker/picker';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from "expo-router";
-import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react-native";
+import { Camera, ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react-native";
 import React, { useCallback, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 // --- DATABASE IMPORTS ---
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { inventory, materials } from '../../db/schema';
 import { db } from './_layout';
 
-// --- REUSABLE PICKER (KEPT AS IS) ---
 const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
     const [isFocused, setIsFocused] = useState(false);
     const truncate = (str, n) => (str?.length > n) ? str.substr(0, n - 1) + '...' : str;
@@ -52,29 +52,29 @@ export default function InventoryIndex() {
 
     // Form State
     const [selectedMaterialId, setSelectedMaterialId] = useState(null);
-    const [netWeight, setNetWeight] = useState("");
+    const [imageUri, setImageUri] = useState(null);
 
     // --- DATA FETCHING ---
     const loadData = async () => {
         try {
-            // 1. Fetch Materials for the Dropdown
             const materialsList = await db.select().from(materials);
             const options = materialsList.map(m => ({ label: m.name, value: m.id }));
             setMaterialOptions(options);
 
-            // 2. Fetch Inventory (Joined with Materials to get names)
+            // Fetch inventory and calculate weight dynamically from linked items
             const invList = await db.select({
                 id: inventory.id,
                 batchId: inventory.batchId,
-                netWeight: inventory.netWeight,
                 date: inventory.date,
                 status: inventory.status,
-                materialName: materials.name, // Get name from relation
-                uom: materials.uom
+                materialName: materials.name,
+                uom: materials.uom,
+                // Calculate total weight from inventory_transaction_items
+                calculatedWeight: sql`COALESCE((SELECT SUM(allocated_weight) FROM inventory_transaction_items WHERE inventory_transaction_items.inventory_id = inventory.id), 0)`
             })
             .from(inventory)
             .leftJoin(materials, eq(inventory.materialId, materials.id))
-            .orderBy(desc(inventory.id)); // Newest first
+            .orderBy(desc(inventory.id));
 
             setInventoryData(invList);
 
@@ -90,41 +90,57 @@ export default function InventoryIndex() {
         }, [])
     );
 
-    // --- SEARCH LOGIC ---
-    const filteredInventory = inventoryData.filter((item) => {
-        const query = searchQuery.toLowerCase();
-        return (
-            item.batchId.toLowerCase().includes(query) ||
-            (item.materialName && item.materialName.toLowerCase().includes(query)) ||
-            item.status.toLowerCase().includes(query)
-        );
-    });
+    // --- CAMERA HANDLER ---
+    const takePicture = async () => {
+        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+        
+        if (permissionResult.granted === false) {
+            Alert.alert("Permission to access camera is required!");
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.5,
+        });
+
+        if (!result.canceled) {
+            setImageUri(result.assets[0].uri);
+        }
+    };
 
     // --- ADD INVENTORY BATCH ---
     const handleSaveBatch = async () => {
         if (!selectedMaterialId) { Alert.alert("Error", "Please select a material"); return; }
-        if (!netWeight) { Alert.alert("Error", "Please enter weight"); return; }
-
+        
         try {
-            // Generate a random Batch ID (e.g., BATCH-4821-X)
             const randomSuffix = Math.floor(1000 + Math.random() * 9000);
             const generatedBatchId = `BATCH-${randomSuffix}-A`; 
-
-            // Current Date
             const today = new Date().toISOString().split('T')[0];
+
+            const qrData = JSON.stringify({
+                type: 'inventory',
+                batchId: generatedBatchId,
+                action: 'redirect',
+                target: '/inventoryDetailed'
+            });
 
             await db.insert(inventory).values({
                 batchId: generatedBatchId,
                 materialId: selectedMaterialId,
-                netWeight: parseFloat(netWeight),
+                netWeight: 0, // Initialize as 0, will be updated when items are added
                 date: today,
-                status: 'In Stock' // Default status
+                status: 'In Stock',
+                imageUri: imageUri,
+                qrContent: qrData
             });
 
             setModalVisible(false);
-            setNetWeight("");
             setSelectedMaterialId(null);
-            loadData(); // Refresh list
+            setImageUri(null);
+            loadData();
 
         } catch (error) {
             console.error("Save failed:", error);
@@ -132,7 +148,6 @@ export default function InventoryIndex() {
         }
     };
 
-    // Helper for Status Color
     const getStatusColor = (status) => {
         switch (status?.toLowerCase()) {
             case 'in stock': return 'text-green-600';
@@ -141,6 +156,15 @@ export default function InventoryIndex() {
             default: return 'text-gray-800';
         }
     };
+
+    const filteredInventory = inventoryData.filter((item) => {
+        const query = searchQuery.toLowerCase();
+        return (
+            item.batchId.toLowerCase().includes(query) ||
+            (item.materialName && item.materialName.toLowerCase().includes(query)) ||
+            item.status.toLowerCase().includes(query)
+        );
+    });
 
     return (
         <View className="flex-1 bg-gray-100 p-4 gap-4">
@@ -165,7 +189,6 @@ export default function InventoryIndex() {
                             <View>
                                 <Text className="text-gray-700 font-bold mb-1">Material Category</Text>
                                 <View className="h-12">
-                                    {/* POPULATED FROM DB */}
                                     <CustomPicker 
                                         selectedValue={selectedMaterialId} 
                                         onValueChange={setSelectedMaterialId} 
@@ -175,15 +198,23 @@ export default function InventoryIndex() {
                                 </View>
                             </View>
                             
+                            {/* REMOVED NET WEIGHT INPUT */}
+
+                            {/* --- CAMERA SECTION --- */}
                             <View>
-                                <Text className="text-gray-700 font-bold mb-1">Net Weight</Text>
-                                <TextInput 
-                                    className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300" 
-                                    placeholder="0.00" 
-                                    keyboardType="numeric"
-                                    value={netWeight}
-                                    onChangeText={setNetWeight}
-                                />
+                                <Text className="text-gray-700 font-bold mb-1">Batch Photo</Text>
+                                <TouchableOpacity 
+                                    onPress={takePicture}
+                                    className="h-12 bg-blue-100 border border-blue-300 rounded-md flex-row items-center justify-center gap-2"
+                                >
+                                    <Camera size={20} color="#2563EB" />
+                                    <Text className="text-blue-700 font-semibold">
+                                        {imageUri ? "Retake Photo" : "Take Photo"}
+                                    </Text>
+                                </TouchableOpacity>
+                                {imageUri && (
+                                    <Text className="text-green-600 text-xs mt-1 text-center">Photo captured successfully</Text>
+                                )}
                             </View>
                         </View>
 
@@ -200,7 +231,7 @@ export default function InventoryIndex() {
             </Modal>
 
 
-            {/* 1. TOP VIEW: Search and Add Button */}
+            {/* 1. TOP VIEW */}
             <View className="flex-[1] flex-row items-center justify-between">
                 <View className="w-[45%] h-full flex-row items-center bg-white rounded-md px-3">
                     <Search size={20} color="gray" />
@@ -215,7 +246,10 @@ export default function InventoryIndex() {
 
                 <View className="flex-row gap-2 h-full">
                     <Pressable 
-                        onPress={() => setModalVisible(true)}
+                        onPress={() => {
+                            setModalVisible(true);
+                            setImageUri(null); // Reset photo
+                        }}
                         className="px-4 h-full flex-row items-center justify-center bg-primary rounded-md active:bg-blue-700"
                     >
                         <Plus size={24} color="white" />
@@ -224,7 +258,7 @@ export default function InventoryIndex() {
                 </View>
             </View>
 
-            {/* 2. MIDDLE VIEW: Inventory Table */}
+            {/* 2. MIDDLE VIEW */}
             <View className="flex-[12] bg-white rounded-lg overflow-hidden border border-gray-200">
                 <View className="flex-row bg-gray-800 p-4">
                     <Text className="flex-1 font-bold text-white text-center text-lg">Batch ID</Text>
@@ -244,13 +278,16 @@ export default function InventoryIndex() {
                         keyExtractor={(item) => item.id.toString()}
                         renderItem={({ item, index }) => (
                             <Pressable 
-                                onPress={() => router.push('/inventoryDetailed')} // Disabled for now until detail page exists
+                                onPress={() => router.push({
+                                    pathname: '/inventoryDetailed',
+                                    params: { batchId: item.batchId }
+                                })}
                                 className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} active:bg-blue-50`}
                             >
                                 <Text className="flex-1 text-gray-800 text-center text-lg font-medium">{item.batchId}</Text>
                                 <Text className="flex-1 text-gray-600 text-center text-lg">{item.materialName || 'Unknown'}</Text>
                                 <Text className="flex-1 text-gray-600 text-center text-lg">
-                                    {item.netWeight} {item.uom || ''}
+                                    {item.calculatedWeight} {item.uom || ''}
                                 </Text>
                                 <Text className="flex-1 text-gray-600 text-center text-lg">{item.date}</Text>
                                 <Text className={`flex-1 text-center text-lg font-bold ${getStatusColor(item.status)}`}>
@@ -262,7 +299,7 @@ export default function InventoryIndex() {
                 )}
             </View>
 
-            {/* 3. BOTTOM VIEW: Pagination */}
+            {/* 3. BOTTOM VIEW */}
             <View className="flex-1 flex-row items-center justify-center gap-2">
                 <Pressable className="p-2 bg-gray-200 rounded-md">
                     <ChevronLeft size={20} color="gray" />
@@ -278,7 +315,6 @@ export default function InventoryIndex() {
     );
 }
 
-// --- STYLES (Kept exactly as original) ---
 const styles = StyleSheet.create({
     pickerContainer: { flex: 1, backgroundColor: 'white', borderRadius: 6, justifyContent: 'center', position: 'relative', overflow: 'hidden', width: '100%', borderWidth: 2, borderColor: 'transparent' },
     pickerFocused: { borderColor: '#F2C94C' },

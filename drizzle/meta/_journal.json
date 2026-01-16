@@ -29,6 +29,34 @@
       "when": 1768543005199,
       "tag": "0003_concerned_jean_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1768545656759,
+      "tag": "0004_remarkable_kree",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1768546032142,
+      "tag": "0005_sharp_karma",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1768547558475,
+      "tag": "0006_powerful_harry_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1768548005787,
+      "tag": "0007_vengeful_stellaris",
+      "breakpoints": true
     }
   ]
 }

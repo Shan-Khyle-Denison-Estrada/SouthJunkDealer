@@ -8,13 +8,14 @@ import {
   LayoutDashboard,
   Package
 } from 'lucide-react-native';
-import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import "../global.css";
 
 // --- DATABASE IMPORTS ---
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { openDatabaseSync } from 'expo-sqlite';
+import { transactions } from '../../db/schema';
 import migrations from '../../drizzle/migrations';
 
 // 1. Initialize DB Instance (Exported for use in other files)
@@ -27,7 +28,7 @@ function CustomDrawerContent(props: any) {
     <DrawerContentScrollView {...props}>
       <View style={styles.buttonsContainer}>
         <Text style={styles.sectionTitle}>Quick Access</Text>
-        <TouchableOpacity style={styles.button} onPress={() => router.push('/transactionSummary')}>
+        <TouchableOpacity style={styles.button} onPress={handleNewTransaction}>
           <Text style={styles.buttonText}>New Transaction</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => router.push('/scanQR')}>
@@ -41,6 +42,31 @@ function CustomDrawerContent(props: any) {
     </DrawerContentScrollView>
   );
 }
+
+  // --- HANDLE NEW TRANSACTION ---
+  const handleNewTransaction = async () => {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        // 1. Create a blank draft immediately
+        const result = await db.insert(transactions).values({
+            date: today,
+            status: 'Draft',
+            totalAmount: 0,
+        }).returning({ insertedId: transactions.id });
+
+        const newId = result[0].insertedId;
+
+        // 2. Redirect straight to Summary
+        router.push({
+            pathname: '/transactionSummary',
+            params: { transactionId: newId }
+        });
+
+    } catch (error) {
+        Alert.alert("Error", "Could not initialize transaction");
+    }
+  };
 
 // 3. The Main Layout
 export default function Layout() {

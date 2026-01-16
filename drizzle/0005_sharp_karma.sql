@@ -1,0 +1,1 @@
+ALTER TABLE `inventory` ADD `qr_content` text;

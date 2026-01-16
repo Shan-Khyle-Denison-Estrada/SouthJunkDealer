@@ -15,16 +15,18 @@ export const inventory = sqliteTable('inventory', {
   netWeight: real('net_weight').notNull(),
   date: text('date').notNull(),
   status: text('status').default('In Stock'),
+  imageUri: text('image_uri'),
+  qrContent: text('qr_content'),
+  notes: text('notes'), // Added Notes field
 });
 
-// --- NEW TRANSACTIONS TABLES ---
 export const transactions = sqliteTable('transactions', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  type: text('type'), // 'Buying' or 'Selling'
-  paymentMethod: text('payment_method'), // 'Cash', 'G-Cash', 'Bank Transfer'
+  type: text('type'), 
+  paymentMethod: text('payment_method'), 
   totalAmount: real('total_amount').default(0),
-  date: text('date').notNull(), // ISO Date String
-  status: text('status').default('Draft'), // 'Draft' or 'Completed'
+  date: text('date').notNull(), 
+  status: text('status').default('Draft'),
 });
 
 export const transactionItems = sqliteTable('transaction_items', {
@@ -32,6 +34,14 @@ export const transactionItems = sqliteTable('transaction_items', {
   transactionId: integer('transaction_id').references(() => transactions.id, { onDelete: 'cascade' }),
   materialId: integer('material_id').references(() => materials.id),
   weight: real('weight').notNull(),
-  price: real('price').notNull(), // Price per unit
+  price: real('price').notNull(), 
   subtotal: real('subtotal').notNull(),
+});
+
+// --- NEW ASSOCIATIVE ENTITY ---
+export const inventoryTransactionItems = sqliteTable('inventory_transaction_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  inventoryId: integer('inventory_id').references(() => inventory.id),
+  transactionItemId: integer('transaction_item_id').references(() => transactionItems.id),
+  allocatedWeight: real('allocated_weight').notNull(),
 });

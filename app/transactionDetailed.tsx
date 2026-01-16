@@ -88,6 +88,7 @@ export default function TransactionDetailed() {
             {/* 2. TABLE SECTION */}
             <View className="flex-[10] bg-white rounded-lg overflow-hidden border border-gray-200">
                 <View className="flex-row bg-gray-800 p-4 items-center">
+                    <Text className="flex-1 font-bold text-white text-lg">Line ID</Text>
                     <Text className="flex-[2] font-bold text-white text-lg">Material</Text>
                     <Text className="flex-1 font-bold text-white text-center text-lg">Weight</Text>
                     <Text className="flex-1 font-bold text-white text-center text-lg">Price</Text>
@@ -99,6 +100,7 @@ export default function TransactionDetailed() {
                     keyExtractor={item => item.id.toString()}
                     renderItem={({ item, index }) => (
                         <View className={`flex-row items-center p-4 border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                            <Text className="flex-1 text-gray-800 text-lg font-medium">{item.id}</Text>
                             <Text className="flex-[2] text-gray-800 text-lg font-medium">{item.material}</Text>
                             <Text className="flex-1 text-gray-600 text-center text-lg">{item.weight} {item.uom}</Text>
                             <Text className="flex-1 text-gray-600 text-center text-lg">₱{item.price}</Text>
