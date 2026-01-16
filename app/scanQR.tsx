@@ -1,21 +1,28 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router'; // Added useFocusEffect
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ScanQR() {
     const router = useRouter();
     const [permission, requestPermission] = useCameraPermissions();
     const [scanned, setScanned] = useState(false);
+    const [statusMsg, setStatusMsg] = useState("Align Inventory QR code within the frame"); // Dynamic status text
+
+    // Reset scanner when screen comes into focus (e.g. going back from detail page)
+    useFocusEffect(
+        useCallback(() => {
+            setScanned(false);
+            setStatusMsg("Align Inventory QR code within the frame");
+        }, [])
+    );
 
     // --- PERMISSION HANDLING ---
     if (!permission) {
-        // Camera permissions are still loading
         return <View style={styles.container} />;
     }
 
     if (!permission.granted) {
-        // Camera permissions are not granted yet
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
                 <Text style={styles.permissionText}>We need your permission to use the camera</Text>
@@ -31,109 +38,144 @@ export default function ScanQR() {
 
     // --- SCAN HANDLER ---
     const handleBarCodeScanned = ({ type, data }) => {
-        setScanned(true);
-        // Frontend-only demo: alert the user
-        alert(`Scanned: ${data}`);
-        
-        // Reset scanner after a delay so they can scan again if needed
-        setTimeout(() => setScanned(false), 2000);
+        if (scanned) return;
+        setScanned(true); // Lock scanner to prevent duplicates
+
+        try {
+            // 1. Attempt to Parse JSON
+            const parsedData = JSON.parse(data);
+
+            // 2. Validate Batch ID
+            if (parsedData.batchId) {
+                setStatusMsg("QR Found! Redirecting...");
+                // Valid QR - Navigate
+                router.push({
+                    pathname: '/inventoryDetailed',
+                    params: { batchId: parsedData.batchId }
+                });
+                
+                // Optional: Reset scanner after a delay in case they navigate back immediately
+                // But usually the focus effect handles it.
+            } else {
+                // Valid JSON but not an Inventory QR
+                handleScanError("Invalid QR: Missing Batch ID");
+            }
+
+        } catch (error) {
+            // Not JSON / Garbage Data
+            handleScanError("Unrecognized QR Code");
+        }
+    };
+
+    // Helper to handle invalid scans without blocking Alert
+    const handleScanError = (msg) => {
+        setStatusMsg(msg);
+        // Wait 1.5 seconds then resume scanning automatically
+        setTimeout(() => {
+            setStatusMsg("Align Inventory QR code within the frame");
+            setScanned(false); 
+        }, 1500);
     };
 
     return (
         <View style={styles.container}>
             <CameraView
-                style={styles.camera}
-                facing="back"
+                style={StyleSheet.absoluteFillObject}
                 onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                 barcodeScannerSettings={{
                     barcodeTypes: ["qr"],
                 }}
-            >
-                {/* --- OVERLAY UI --- */}
-                <View style={styles.overlayContainer}>
-                    
-                    {/* Top Mask */}
-                    <View style={styles.maskRow} />
-
-                    {/* Middle Row (Mask - Scanner - Mask) */}
-                    <View style={styles.maskCenterRow}>
-                        <View style={styles.maskSide} />
-                        
-                        {/* The Transparent Scan Window */}
-                        <View style={styles.scanWindow}>
-                            {/* Corner Markers */}
-                            <View style={styles.topLeft} />
-                            <View style={styles.topRight} />
-                            <View style={styles.bottomLeft} />
-                            <View style={styles.bottomRight} />
-                        </View>
-                        
-                        <View style={styles.maskSide} />
-                    </View>
-
-                    {/* Bottom Mask */}
-                    <View style={styles.maskRow}>
-                        <Text style={styles.instructionText}>Align QR code within the frame</Text>
-                        
-                        {/* --- TEMP BUTTON FOR REDIRECT --- */}
-                        <TouchableOpacity 
-                            onPress={() => router.push('/scannedInventory')} 
-                            style={[styles.closeButton, { marginBottom: 12, backgroundColor: HIGHLIGHT_COLOR, borderColor: HIGHLIGHT_COLOR }]}
-                        >
-                            <Text style={[styles.closeButtonText, { color: 'black' }]}>Debug: Go to Scanned</Text>
-                        </TouchableOpacity>
-
-                        {/* Close Button */}
-                        <TouchableOpacity 
-                            onPress={() => router.back()} 
-                            style={styles.closeButton}
-                        >
-                            <Text style={styles.closeButtonText}>Close Scanner</Text>
-                        </TouchableOpacity>
-                    </View>
+            />
+            
+            {/* OVERLAY UI */}
+            <View style={styles.overlay}>
+                <View style={styles.topOverlay}>
+                    {/* Dynamic Status Text */}
+                    <Text style={[
+                        styles.instructionText, 
+                        // Change color if showing an error/success message
+                        statusMsg.includes("Align") ? {} : { color: '#F2C94C', fontWeight: 'bold' }
+                    ]}>
+                        {statusMsg}
+                    </Text>
                 </View>
-            </CameraView>
+                
+                <View style={styles.centerRow}>
+                    <View style={styles.sideOverlay} />
+                    <View style={styles.scanFrame}>
+                        <View style={styles.topLeft} />
+                        <View style={styles.topRight} />
+                        <View style={styles.bottomLeft} />
+                        <View style={styles.bottomRight} />
+                    </View>
+                    <View style={styles.sideOverlay} />
+                </View>
+
+                <View style={styles.bottomOverlay}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+                        <Text style={styles.closeButtonText}>Close Camera</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
         </View>
     );
 }
 
-const OVERLAY_COLOR = 'rgba(0,0,0,0.7)'; // Dark semi-transparent background
-const HIGHLIGHT_COLOR = '#F2C94C'; // Your project's gold color
+const HIGHLIGHT_COLOR = '#F2C94C';
+const OVERLAY_COLOR = 'rgba(0, 0, 0, 0.6)';
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: 'black',
     },
-    camera: {
-        flex: 1,
+    permissionText: {
+        fontSize: 18,
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    permissionButton: {
+        backgroundColor: '#2563EB',
+        padding: 12,
+        borderRadius: 8,
+    },
+    permissionButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 16,
     },
     // --- OVERLAY GRID ---
-    overlayContainer: {
+    overlay: {
         flex: 1,
     },
-    maskRow: {
+    topOverlay: {
         flex: 1,
         backgroundColor: OVERLAY_COLOR,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    maskCenterRow: {
-        flexDirection: 'row',
-        height: 250, // Height of the scanning square
+    bottomOverlay: {
+        flex: 1,
+        backgroundColor: OVERLAY_COLOR,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingBottom: 20,
     },
-    maskSide: {
+    centerRow: {
+        flexDirection: 'row',
+        height: 280, 
+    },
+    sideOverlay: {
         flex: 1,
         backgroundColor: OVERLAY_COLOR,
     },
-    // --- SCAN WINDOW ---
-    scanWindow: {
-        width: 250,
-        height: 250,
+    scanFrame: {
+        width: 280,
+        height: 280,
         backgroundColor: 'transparent',
         position: 'relative',
     },
-    // --- CORNER MARKERS ---
+    // --- CORNERS ---
     topLeft: {
         position: 'absolute',
         top: 0, left: 0,
@@ -165,10 +207,11 @@ const styles = StyleSheet.create({
     // --- TEXT & BUTTONS ---
     instructionText: {
         color: 'white',
-        fontSize: 16,
+        fontSize: 18,
         marginBottom: 20,
         textAlign: 'center',
         fontWeight: '500',
+        paddingHorizontal: 20,
     },
     closeButton: {
         backgroundColor: 'rgba(255,255,255,0.2)',
@@ -177,7 +220,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         borderWidth: 1,
         borderColor: 'white',
-        minWidth: 200, // Added minWidth to make buttons same size
+        minWidth: 200,
         alignItems: 'center',
     },
     closeButtonText: {
@@ -185,21 +228,4 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
     },
-    // --- PERMISSION SCREEN ---
-    permissionText: {
-        fontSize: 18,
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    permissionButton: {
-        backgroundColor: HIGHLIGHT_COLOR,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 8,
-    },
-    permissionButtonText: {
-        color: 'black',
-        fontWeight: 'bold',
-        fontSize: 16,
-    }
 });
