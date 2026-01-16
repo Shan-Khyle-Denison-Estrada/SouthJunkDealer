@@ -159,7 +159,7 @@ export default function InventoryIndex() {
             {/* 1. TOP VIEW: Search and Action Buttons */}
             <View className="flex-[1] flex-row items-center justify-between">
                 {/* Search Bar */}
-                <View className="w-[37.5%] h-full flex-row items-center bg-white rounded-md px-3 py-2">
+                <View className="w-[45%] h-full flex-row items-center bg-white rounded-md px-3 py-2">
                     <Search size={20} color="gray" />
                     <TextInput 
                         placeholder="Search Inventory Batch" 
