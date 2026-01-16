@@ -177,6 +177,7 @@ export default function InventoryIndex() {
             case 'processing': return 'text-blue-600';
             case 'shipped': return 'text-gray-500';
             case 'sold': return 'text-red-500';
+            case 'sold out': return 'text-red-500'; // Added Sold Out
             default: return 'text-gray-800';
         }
     };
@@ -307,7 +308,6 @@ export default function InventoryIndex() {
                             >
                                 <Text className="flex-1 text-gray-800 text-center text-lg font-medium">{item.batchId}</Text>
                                 <Text className="flex-1 text-gray-600 text-center text-lg">{item.materialName || 'Unknown'}</Text>
-                                {/* SAFETY CHECK: Prevent crash */}
                                 <Text className="flex-1 text-gray-600 text-center text-lg">
                                     {(item.netWeight || 0).toFixed(2)} {item.uom || ''}
                                 </Text>

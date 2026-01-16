@@ -57,6 +57,18 @@ export default function InventoryDetailed() {
         Alert.alert("Check", "Inventory marked as checked.");
     };
 
+    // Helper for Status Color
+    const getStatusColor = (status) => {
+        switch (status?.toLowerCase()) {
+            case 'in stock': return 'text-green-600';
+            case 'processing': return 'text-blue-600';
+            case 'shipped': return 'text-gray-500';
+            case 'sold': return 'text-red-500';
+            case 'sold out': return 'text-red-500'; // Added Sold Out
+            default: return 'text-gray-800';
+        }
+    };
+
     if (!batchData) return <View className="flex-1 bg-gray-100" />;
 
     return (
@@ -74,12 +86,12 @@ export default function InventoryDetailed() {
                 </View>
                 <View className="flex-1 justify-center">
                     <Text className="text-gray-500 text-xs font-bold uppercase">Weight</Text>
-                    {/* SAFETY CHECK: Prevent undefined.toFixed crash */}
                     <Text className="text-lg font-bold text-gray-800">{(batchData.netWeight || 0).toFixed(2)} {batchData.uom}</Text>
                 </View>
                 <View className="flex-1 justify-center items-end">
                     <Text className="text-gray-500 text-xs font-bold uppercase">Status</Text>
-                    <Text className="text-lg font-bold text-green-600">{batchData.status}</Text>
+                    {/* UPDATE: Dynamic Status Color */}
+                    <Text className={`text-lg font-bold ${getStatusColor(batchData.status)}`}>{batchData.status}</Text>
                 </View>
             </View>
 

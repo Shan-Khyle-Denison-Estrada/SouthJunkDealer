@@ -17,7 +17,7 @@ export const inventory = sqliteTable('inventory', {
   status: text('status').default('In Stock'),
   imageUri: text('image_uri'),
   qrContent: text('qr_content'),
-  notes: text('notes'), // Added Notes field
+  notes: text('notes'),
 });
 
 export const transactions = sqliteTable('transactions', {
@@ -38,10 +38,21 @@ export const transactionItems = sqliteTable('transaction_items', {
   subtotal: real('subtotal').notNull(),
 });
 
-// --- NEW ASSOCIATIVE ENTITY ---
 export const inventoryTransactionItems = sqliteTable('inventory_transaction_items', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   inventoryId: integer('inventory_id').references(() => inventory.id),
   transactionItemId: integer('transaction_item_id').references(() => transactionItems.id),
   allocatedWeight: real('allocated_weight').notNull(),
+});
+
+// --- UPDATED AUDIT TRAILS TABLE ---
+export const auditTrails = sqliteTable('audit_trails', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  inventoryId: integer('inventory_id').references(() => inventory.id).notNull(),
+  action: text('action').notNull(),
+  notes: text('notes'),
+  date: text('date').notNull(),
+  evidenceImageUri: text('evidence_image_uri'), // New: Photo Evidence
+  previousWeight: real('previous_weight'),     // New: For adjustments
+  newWeight: real('new_weight'),               // New: For adjustments
 });

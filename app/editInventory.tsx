@@ -17,7 +17,7 @@ import {
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
-import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { inventory, inventoryTransactionItems, materials, transactionItems, transactions } from '../db/schema';
 import { db } from './_layout';
 
@@ -101,7 +101,6 @@ export default function EditInventory() {
             const inv = invResult[0];
             setInventoryRecord(inv);
             setNotes(inv.notes || "");
-            // SAFETY CHECK: Ensure netWeight is not undefined
             setNetWeight((inv.netWeight || 0).toFixed(2));
             
             // Fetch Material Name & UOM
@@ -129,7 +128,6 @@ export default function EditInventory() {
             const totalOriginalAllocated = links.reduce((sum, item) => sum + (item.allocated || 0), 0);
             const currentNetWeight = inv.netWeight || 0;
             
-            // Amount lost/sold/shrunk
             let lostWeight = Math.max(0, totalOriginalAllocated - currentNetWeight);
 
             const linksWithRemaining = links.map(item => {
@@ -175,7 +173,10 @@ export default function EditInventory() {
             })
             .from(transactionItems)
             .leftJoin(transactions, eq(transactionItems.transactionId, transactions.id))
-            .where(eq(transactionItems.materialId, inventoryRecord.materialId))
+            .where(and(
+                eq(transactionItems.materialId, inventoryRecord.materialId),
+                eq(transactions.type, 'Buying')
+            ))
             .orderBy(desc(transactionItems.id))
             .limit(500);
 
@@ -204,13 +205,16 @@ export default function EditInventory() {
                 .map(item => {
                     const used = usageMap[item.itemId] || 0;
                     const remaining = (item.weight || 0) - used;
+                    
+                    if (remaining <= 0.01) return null;
+
                     return {
                         label: `TX-${item.txId} (Line: ${item.itemId}) - Avail: ${remaining.toFixed(2)}kg`, 
                         value: item.itemId,
                         remaining: remaining
                     };
                 })
-                .filter(item => item.remaining > 0.01);
+                .filter(item => item !== null);
 
             setAvailableSourceItems(options);
             setAreSourcesLoaded(true);
@@ -241,8 +245,12 @@ export default function EditInventory() {
                     allocatedWeight: val
                 });
 
+                // UPDATE: Force status to 'In Stock' when adding items
                 await tx.update(inventory)
-                    .set({ netWeight: sql`${inventory.netWeight} + ${val}` })
+                    .set({ 
+                        netWeight: sql`${inventory.netWeight} + ${val}`,
+                        status: 'In Stock' 
+                    })
                     .where(eq(inventory.id, inventoryRecord.id));
             });
 
@@ -254,11 +262,19 @@ export default function EditInventory() {
 
     const handleDeleteItem = async (linkId, allocatedAmount) => {
         try {
+             // UPDATE: Calculate new status based on weight change
+             const currentWeight = parseFloat(inventoryRecord.netWeight || 0);
+             const newWeight = Math.max(0, currentWeight - allocatedAmount);
+             const newStatus = newWeight > 0.001 ? 'In Stock' : 'Sold Out';
+
              await db.transaction(async (tx) => {
                 await tx.delete(inventoryTransactionItems).where(eq(inventoryTransactionItems.id, linkId));
                 
                 await tx.update(inventory)
-                    .set({ netWeight: sql`MAX(0, ${inventory.netWeight} - ${allocatedAmount})` })
+                    .set({ 
+                        netWeight: newWeight,
+                        status: newStatus
+                    })
                     .where(eq(inventory.id, inventoryRecord.id));
              });
 
@@ -355,7 +371,6 @@ export default function EditInventory() {
                                 <Text className="flex-1 text-gray-600 text-center text-xs">{item.date}</Text>
                                 <Text className="flex-1 text-gray-600 text-center text-xs">{item.totalOriginal} {uom}</Text>
                                 
-                                {/* SAFETY CHECK: Handle potentially undefined/null remaining value */}
                                 <Text className={`flex-[1.5] text-center text-xs font-bold ${item.remaining === 0 ? 'text-red-400' : 'text-blue-700'}`}>
                                     {(item.remaining || 0).toFixed(2)} / {item.allocated}
                                 </Text>

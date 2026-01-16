@@ -57,6 +57,20 @@
       "when": 1768548005787,
       "tag": "0007_vengeful_stellaris",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1768578030987,
+      "tag": "0008_amused_northstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1768579764384,
+      "tag": "0009_aberrant_human_torch",
+      "breakpoints": true
     }
   ]
 }
