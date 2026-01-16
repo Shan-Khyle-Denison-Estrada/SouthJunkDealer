@@ -8,15 +8,14 @@ import {
   LayoutDashboard,
   Package
 } from 'lucide-react-native';
-import { Image, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import "../global.css";
 
 // --- DATABASE IMPORTS ---
-import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { drizzle } from 'drizzle-orm/expo-sqlite';
+import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { openDatabaseSync } from 'expo-sqlite';
 import migrations from '../../drizzle/migrations';
-import { materials } from '../../db/schema'; // Ensure this matches your schema file path
 
 // 1. Initialize DB Instance (Exported for use in other files)
 const expoDb = openDatabaseSync('db.db');
@@ -28,7 +27,7 @@ function CustomDrawerContent(props: any) {
     <DrawerContentScrollView {...props}>
       <View style={styles.buttonsContainer}>
         <Text style={styles.sectionTitle}>Quick Access</Text>
-        <TouchableOpacity style={styles.button} onPress={() => router.push('/newTransaction')}>
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/transactionSummary')}>
           <Text style={styles.buttonText}>New Transaction</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => router.push('/scanQR')}>
