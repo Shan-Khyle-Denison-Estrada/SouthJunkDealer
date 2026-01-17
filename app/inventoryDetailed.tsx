@@ -53,8 +53,10 @@ export default function InventoryDetailed() {
         Alert.alert("Print", "Sending to printer...");
     };
 
+    // --- UPDATED HANDLER ---
     const handleCheck = () => {
-        Alert.alert("Check", "Inventory marked as checked.");
+        // Redirect to scannedInventory and pass the batchId to auto-select it
+        router.push({ pathname: '/scannedInventory', params: { batchId: batchId } });
     };
 
     // Helper for Status Color
@@ -64,7 +66,7 @@ export default function InventoryDetailed() {
             case 'processing': return 'text-blue-600';
             case 'shipped': return 'text-gray-500';
             case 'sold': return 'text-red-500';
-            case 'sold out': return 'text-red-500'; // Added Sold Out
+            case 'sold out': return 'text-red-500'; 
             default: return 'text-gray-800';
         }
     };
@@ -90,7 +92,6 @@ export default function InventoryDetailed() {
                 </View>
                 <View className="flex-1 justify-center items-end">
                     <Text className="text-gray-500 text-xs font-bold uppercase">Status</Text>
-                    {/* UPDATE: Dynamic Status Color */}
                     <Text className={`text-lg font-bold ${getStatusColor(batchData.status)}`}>{batchData.status}</Text>
                 </View>
             </View>
@@ -149,6 +150,7 @@ export default function InventoryDetailed() {
                     <Text className="text-white font-bold text-xl">Edit</Text>
                 </Pressable>
 
+                {/* MODIFIED CHECK BUTTON */}
                 <Pressable 
                     onPress={handleCheck}
                     className="flex-1 bg-green-600 rounded-lg flex-row items-center justify-center gap-2 active:bg-green-700"

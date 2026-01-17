@@ -23,7 +23,8 @@ export default function AuditIndex() {
         })
         .from(auditTrails)
         .leftJoin(inventory, eq(auditTrails.inventoryId, inventory.id))
-        .orderBy(desc(auditTrails.date));
+        // UPDATED: Sort by ID descending to ensure absolute newest entries are on top
+        .orderBy(desc(auditTrails.id));
 
         setAuditData(result);
     } catch (e) {
@@ -77,9 +78,9 @@ export default function AuditIndex() {
 
         <Pressable 
           onPress={() => router.push('/scannedInventory')} 
-          className="px-4 h-full flex-row items-center justify-center bg-blue-600 rounded-md active:bg-blue-700"
+          className="px-4 h-full flex-row items-center justify-center bg-primary rounded-md active:bg-yellow-500"
         >
-          <Plus size={20} color="white" />
+          <Plus size={24} color="white" />
           <Text className="text-white font-bold text-lg ml-2">New Audit</Text>
         </Pressable>
       </View>

@@ -18,7 +18,7 @@ import {
 
 // --- DATABASE IMPORTS ---
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
-import { inventory, inventoryTransactionItems, materials, transactionItems, transactions } from '../db/schema';
+import { auditTrails, inventory, inventoryTransactionItems, materials, transactionItems, transactions } from '../db/schema';
 import { db } from './_layout';
 
 // --- REUSABLE PICKER ---
@@ -231,27 +231,43 @@ export default function EditInventory() {
         setTimeout(() => loadAvailableSources(), 100);
     };
 
-    // --- ACTIONS ---
     const handleAddLineItem = async () => {
         if (!selectedSourceId || !weightToAllocate) return Alert.alert("Error", "Missing fields");
         const val = parseFloat(weightToAllocate);
         if (isNaN(val) || val <= 0 || val > maxAllocatable + 0.001) return Alert.alert("Error", "Invalid weight");
 
+        // PREPARE DATA FOR AUDIT TRAIL
+        const currentWeight = parseFloat(inventoryRecord.netWeight || 0);
+        const newWeight = currentWeight + val;
+        // UPDATED: Now removes the time portion, saving only YYYY-MM-DD
+        const now = new Date().toISOString().split('T')[0];
+
         try {
             await db.transaction(async (tx) => {
+                // 1. Create Link
                 await tx.insert(inventoryTransactionItems).values({
                     inventoryId: inventoryRecord.id,
                     transactionItemId: selectedSourceId,
                     allocatedWeight: val
                 });
 
-                // UPDATE: Force status to 'In Stock' when adding items
+                // 2. Update Inventory Batch Weight
                 await tx.update(inventory)
                     .set({ 
                         netWeight: sql`${inventory.netWeight} + ${val}`,
                         status: 'In Stock' 
                     })
                     .where(eq(inventory.id, inventoryRecord.id));
+
+                // 3. Create Audit Trail Entry
+                await tx.insert(auditTrails).values({
+                    inventoryId: inventoryRecord.id,
+                    action: 'Batch Update',
+                    notes: `Added ${val}kg from Transaction Item #${selectedSourceId}`,
+                    date: now,
+                    previousWeight: currentWeight,
+                    newWeight: newWeight,
+                });
             });
 
             setIsAddModalVisible(false);

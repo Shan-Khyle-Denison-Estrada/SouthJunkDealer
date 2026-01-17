@@ -1,6 +1,6 @@
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router"; // Added useLocalSearchParams
 import { Camera } from "lucide-react-native";
 import React, { useCallback, useState } from 'react';
 import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -46,6 +46,10 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items, enable
 };
 
 export default function ScannedInventory() {
+    // Get params
+    const params = useLocalSearchParams();
+    const passedBatchId = params.batchId;
+
     // State
     const [inventoryBatches, setInventoryBatches] = useState([]);
     const [selectedBatchId, setSelectedBatchId] = useState(null);
@@ -81,11 +85,21 @@ export default function ScannedInventory() {
             .from(inventory)
             .leftJoin(materials, eq(inventory.materialId, materials.id));
 
-            setInventoryBatches(result.map(b => ({
+            const formattedBatches = result.map(b => ({
                 label: b.batchId,
                 value: b.id,
                 ...b
-            })));
+            }));
+
+            setInventoryBatches(formattedBatches);
+
+            // AUTO SELECT if passedBatchId exists
+            if (passedBatchId) {
+                const target = formattedBatches.find(b => b.label === passedBatchId);
+                if (target) {
+                    handleBatchChange(target.value, formattedBatches);
+                }
+            }
         } catch (e) {
             Alert.alert("Error", "Failed to load inventory batches");
         }
@@ -94,7 +108,7 @@ export default function ScannedInventory() {
     useFocusEffect(
         useCallback(() => {
             loadBatches();
-        }, [])
+        }, [passedBatchId]) // Re-run if passedBatchId changes
     );
 
     // Load Line Items for Batch
@@ -119,12 +133,15 @@ export default function ScannedInventory() {
     };
 
     // Handle Batch Selection
-    const handleBatchChange = (val) => {
+    // Updated to accept optional explicit list to support auto-selection before state updates
+    const handleBatchChange = (val, explicitBatches = null) => {
         setSelectedBatchId(val);
         setEvidenceImage(null);
         setAdjustedWeight("");
         
-        const batch = inventoryBatches.find(b => b.value === val);
+        const sourceList = explicitBatches || inventoryBatches;
+        const batch = sourceList.find(b => b.value === val);
+        
         if (batch) {
             setScannedData({
                 material: batch.materialName || "Unknown",
