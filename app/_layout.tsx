@@ -83,6 +83,11 @@ export default function RootLayout() {
         name="scannedInventory"
         options={{ title: 'Inventory Check' }}
       />
+
+      <Stack.Screen
+        name="detailedAuditTrail"
+        options={{ title: 'Detailed Audit Trail' }}
+      />
     </Stack>
   );
 }
