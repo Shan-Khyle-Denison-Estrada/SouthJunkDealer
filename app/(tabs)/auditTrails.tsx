@@ -52,6 +52,7 @@ export default function AuditIndex() {
   const loadAuditData = async () => {
     try {
       // Updated query to join materials table
+      // Because we use Soft Delete for inventory, this JOIN still works even if the batch is marked "Deleted"
       const result = await db
         .select({
           id: auditTrails.id,
@@ -95,6 +96,8 @@ export default function AuditIndex() {
         return "text-blue-600";
       case "added":
         return "text-[#F2C94C]";
+      case "deleted": // --- NEW: Handle deleted action
+        return "text-gray-400 italic";
       default:
         return "text-gray-800";
     }
@@ -293,7 +296,9 @@ export default function AuditIndex() {
                 <Text className="flex-1 text-gray-800 text-center text-lg font-medium">
                   AUD-{item.id}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+                <Text
+                  className={`flex-1 text-center text-lg ${item.action === "Deleted" ? "text-gray-400 italic line-through" : "text-gray-600"}`}
+                >
                   {item.batchId}
                 </Text>
                 {/* Added Material Data Cell */}

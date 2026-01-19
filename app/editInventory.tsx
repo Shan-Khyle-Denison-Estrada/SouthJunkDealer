@@ -304,7 +304,6 @@ export default function EditInventory() {
     // PREPARE DATA FOR AUDIT TRAIL
     const currentWeight = parseFloat(inventoryRecord.netWeight || 0);
     const newWeight = currentWeight + val;
-    // UPDATED: Now removes the time portion, saving only YYYY-MM-DD
     const now = new Date().toISOString().split("T")[0];
 
     try {
@@ -346,7 +345,6 @@ export default function EditInventory() {
 
   const handleDeleteItem = async (linkId, allocatedAmount) => {
     try {
-      // UPDATE: Calculate new status based on weight change
       const currentWeight = parseFloat(inventoryRecord.netWeight || 0);
       const newWeight = Math.max(0, currentWeight - allocatedAmount);
       const newStatus = newWeight > 0.001 ? "In Stock" : "Sold Out";
@@ -382,12 +380,14 @@ export default function EditInventory() {
     ]);
   };
 
-  // --- DELETE BATCH LOGIC WITH CONSTRAINT ---
+  // --- SOFT DELETE BATCH LOGIC ---
   const handleDeleteBatch = async () => {
     if (!inventoryRecord) return;
 
     try {
-      // Check constraint: Are there linked transaction items?
+      // 1. Check Constraint: Are there linked transaction items?
+      // Even in a soft delete, we usually want to ensure 'active' weight allocations
+      // are cleared first so they don't sit in limbo.
       const dependencies = await db
         .select()
         .from(inventoryTransactionItems)
@@ -396,33 +396,49 @@ export default function EditInventory() {
       if (dependencies.length > 0) {
         Alert.alert(
           "Cannot Delete Batch",
-          "This batch currently has linked transaction items. You must remove all line items before deleting the batch itself.",
+          "This batch still has active weight allocations. Please remove all line items first to free up the material source.",
         );
         return;
       }
 
-      // Confirm deletion
+      // 2. Confirm Soft Deletion
       Alert.alert(
         "Delete Batch",
-        "Are you sure you want to delete this batch permanently? This action cannot be undone.",
+        "Are you sure you want to delete this batch? It will be removed from the active inventory list, but its history and audit trails will be preserved.",
         [
           { text: "Cancel", style: "cancel" },
           {
             text: "Delete",
             style: "destructive",
             onPress: async () => {
+              const now = new Date().toISOString().split("T")[0];
+              const currentWeight = parseFloat(inventoryRecord.netWeight || 0);
+
               try {
                 await db.transaction(async (tx) => {
-                  // Clean up audit trails first
+                  // A. Soft Delete: Update Status to 'Deleted' and set weight to 0
                   await tx
-                    .delete(auditTrails)
-                    .where(eq(auditTrails.inventoryId, inventoryRecord.id));
-                  // Delete the inventory record
-                  await tx
-                    .delete(inventory)
+                    .update(inventory)
+                    .set({
+                      status: "Deleted", // Mark as deleted
+                      netWeight: 0, // Ensure no weight is counted in stock
+                      notes: (inventoryRecord.notes || "") + " [DELETED]", // Optional flag in notes
+                    })
                     .where(eq(inventory.id, inventoryRecord.id));
+
+                  // B. Add "Deleted" Action to Audit Trail
+                  // Note: We DO NOT delete records from auditTrails table.
+                  await tx.insert(auditTrails).values({
+                    inventoryId: inventoryRecord.id,
+                    action: "Deleted", // New action type
+                    notes: "Batch soft deleted by user. History preserved.",
+                    date: now,
+                    previousWeight: currentWeight,
+                    newWeight: 0,
+                  });
                 });
-                // --- UPDATED: REDIRECT TO INVENTORY INDEX ---
+
+                // Redirect back to inventory list
                 router.replace("/inventory");
               } catch (error) {
                 Alert.alert(
