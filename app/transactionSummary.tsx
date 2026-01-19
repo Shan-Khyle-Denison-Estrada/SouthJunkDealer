@@ -1,17 +1,8 @@
 import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
-import * as Print from "expo-print";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import {
-  Camera,
-  Edit,
-  Eye,
-  Plus,
-  Printer,
-  Trash2,
-  X,
-} from "lucide-react-native";
-import React, { useCallback, useState } from "react";
+import { Camera, Eye, Plus, Trash2, X } from "lucide-react-native";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -28,8 +19,15 @@ import {
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
-import { eq } from "drizzle-orm";
-import { materials, transactionItems, transactions } from "../db/schema";
+import { and, asc, eq, gt, sum } from "drizzle-orm";
+import {
+  auditTrails,
+  inventory,
+  inventoryTransactionItems,
+  materials,
+  transactionItems,
+  transactions,
+} from "../db/schema";
 import { db } from "./_layout";
 
 const SummaryPicker = ({
@@ -65,247 +63,396 @@ const SummaryPicker = ({
 
 export default function TransactionSummary() {
   const params = useLocalSearchParams();
-  const transactionId = Number(params.transactionId);
+  const transactionId = params.transactionId
+    ? Number(params.transactionId)
+    : null;
 
+  // Data State
   const [lineItems, setLineItems] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
+
+  // Header State
   const [transactionType, setTransactionType] = useState();
   const [paymentMethod, setPaymentMethod] = useState();
-
-  // --- FORM STATE ---
   const [clientName, setClientName] = useState("");
   const [clientAffiliation, setClientAffiliation] = useState("");
-
-  // Logistics (Selling Only)
   const [driverName, setDriverName] = useState("");
   const [truckPlate, setTruckPlate] = useState("");
   const [truckWeight, setTruckWeight] = useState("");
   const [licenseImage, setLicenseImage] = useState(null);
 
-  // Modal State
+  // Modals
   const [isImageModalVisible, setImageModalVisible] = useState(false);
-  const [finishModalVisible, setFinishModalVisible] = useState(false); // NEW: Finish Modal
-  const [paidAmountInput, setPaidAmountInput] = useState(""); // Input for modal
+  const [finishModalVisible, setFinishModalVisible] = useState(false);
+  const [addItemModalVisible, setAddItemModalVisible] = useState(false);
+
+  // Inputs
+  const [paidAmountInput, setPaidAmountInput] = useState("");
+
+  // Add Item Modal Inputs
+  const [materialsList, setMaterialsList] = useState([]);
+  const [newItemMaterialId, setNewItemMaterialId] = useState(null);
+  const [newItemWeight, setNewItemWeight] = useState("");
+  const [newItemPrice, setNewItemPrice] = useState("");
+  const [newItemSubtotal, setNewItemSubtotal] = useState("0.00");
+  const [availableStock, setAvailableStock] = useState(0);
+
+  const loadMaterials = async () => {
+    const data = await db.select().from(materials);
+    setMaterialsList(
+      data.map((m) => ({ label: m.name, value: m.id, uom: m.uom })),
+    );
+  };
 
   const loadTransactionData = async () => {
-    if (!transactionId) return;
+    // If Editing an existing transaction
+    if (transactionId) {
+      const txHeader = await db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.id, transactionId));
+      if (txHeader.length > 0) {
+        const h = txHeader[0];
+        setTransactionType(h.type);
+        setPaymentMethod(h.paymentMethod);
+        setClientName(h.clientName || "");
+        setClientAffiliation(h.clientAffiliation || "");
+        setDriverName(h.driverName || "");
+        setTruckPlate(h.truckPlate || "");
+        setTruckWeight(h.truckWeight ? String(h.truckWeight) : "");
+        setLicenseImage(h.licenseImageUri || null);
+      }
+      const items = await db
+        .select({
+          id: transactionItems.id,
+          material: materials.name,
+          materialId: materials.id,
+          weight: transactionItems.weight,
+          price: transactionItems.price,
+          subtotal: transactionItems.subtotal,
+          uom: materials.uom,
+        })
+        .from(transactionItems)
+        .leftJoin(materials, eq(transactionItems.materialId, materials.id))
+        .where(eq(transactionItems.transactionId, transactionId));
 
-    const txHeader = await db
-      .select()
-      .from(transactions)
-      .where(eq(transactions.id, transactionId));
-
-    if (txHeader.length > 0) {
-      const h = txHeader[0];
-      setTransactionType(h.type);
-      setPaymentMethod(h.paymentMethod);
-      setClientName(h.clientName || "");
-      setClientAffiliation(h.clientAffiliation || "");
-      setDriverName(h.driverName || "");
-      setTruckPlate(h.truckPlate || "");
-      setTruckWeight(h.truckWeight ? String(h.truckWeight) : "");
-      setLicenseImage(h.licenseImageUri || null);
-      // We don't load paidAmount here because it's set at the end
+      setLineItems(items);
+      setGrandTotal(items.reduce((sum, item) => sum + item.subtotal, 0));
+    } else {
+      // New Transaction - Reset
+      setLineItems([]);
+      setGrandTotal(0);
+      setTransactionType(null);
+      setPaymentMethod(null);
+      setClientName("");
+      setClientAffiliation("");
+      setDriverName("");
+      setTruckPlate("");
+      setTruckWeight("");
+      setLicenseImage(null);
     }
-
-    const items = await db
-      .select({
-        id: transactionItems.id,
-        material: materials.name,
-        weight: transactionItems.weight,
-        price: transactionItems.price,
-        subtotal: transactionItems.subtotal,
-        uom: materials.uom,
-      })
-      .from(transactionItems)
-      .leftJoin(materials, eq(transactionItems.materialId, materials.id))
-      .where(eq(transactionItems.transactionId, transactionId));
-
-    setLineItems(items);
-    const total = items.reduce((sum, item) => sum + item.subtotal, 0);
-    setGrandTotal(total);
   };
 
   useFocusEffect(
     useCallback(() => {
+      loadMaterials();
       loadTransactionData();
     }, [transactionId]),
   );
+
+  // --- ACTIONS ---
 
   const updateHeader = async (field, value) => {
     if (field === "type") setTransactionType(value);
     if (field === "payment") setPaymentMethod(value);
 
-    try {
-      await db
-        .update(transactions)
-        .set({ [field === "type" ? "type" : "paymentMethod"]: value })
-        .where(eq(transactions.id, transactionId));
-    } catch (e) {
-      console.error("Failed to persist header", e);
+    if (transactionId) {
+      try {
+        await db
+          .update(transactions)
+          .set({ [field === "type" ? "type" : "paymentMethod"]: value })
+          .where(eq(transactions.id, transactionId));
+      } catch (e) {
+        console.error("Persist failed", e);
+      }
     }
   };
 
   const takeLicensePhoto = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (permissionResult.granted === false) {
-      Alert.alert("Permission Required", "Camera access is required.");
+    const res = await ImagePicker.requestCameraPermissionsAsync();
+    if (!res.granted) {
+      Alert.alert("Permission Required");
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.5,
     });
-    if (!result.canceled) {
-      setLicenseImage(result.assets[0].uri);
-    }
+    if (!result.canceled) setLicenseImage(result.assets[0].uri);
   };
+
+  // --- ITEM MANAGEMENT ---
+
+  // 1. Fetch Stock when Material changes in Modal
+  useEffect(() => {
+    const checkStock = async () => {
+      if (
+        addItemModalVisible &&
+        newItemMaterialId &&
+        transactionType === "Selling"
+      ) {
+        try {
+          const result = await db
+            .select({ total: sum(inventory.netWeight) })
+            .from(inventory)
+            .where(
+              and(
+                eq(inventory.materialId, newItemMaterialId),
+                eq(inventory.status, "In Stock"),
+                gt(inventory.netWeight, 0),
+              ),
+            );
+          setAvailableStock(result[0]?.total || 0);
+        } catch (e) {
+          console.error("Stock check failed", e);
+          setAvailableStock(0);
+        }
+      } else {
+        setAvailableStock(0);
+      }
+    };
+    checkStock();
+  }, [addItemModalVisible, newItemMaterialId, transactionType]);
+
+  // 2. Auto-Calculate Subtotal
+  useEffect(() => {
+    const w = parseFloat(newItemWeight) || 0;
+    const p = parseFloat(newItemPrice) || 0;
+    setNewItemSubtotal((w * p).toFixed(2));
+  }, [newItemWeight, newItemPrice]);
 
   const handleAddItem = () => {
     if (!transactionType || !paymentMethod) {
-      Alert.alert("Required", "Please select Type and Payment Method first.");
+      Alert.alert("Required", "Select Type and Payment Method first.");
       return;
     }
-    router.push({ pathname: "/newTransaction", params: { transactionId } });
+
+    // Open Local Modal
+    setNewItemMaterialId(null);
+    setNewItemWeight("");
+    setNewItemPrice("");
+    setNewItemSubtotal("0.00");
+    setAddItemModalVisible(true);
+  };
+
+  const saveNewItem = async () => {
+    if (!newItemMaterialId || !newItemWeight || !newItemPrice) {
+      Alert.alert("Error", "Fill all fields");
+      return;
+    }
+    const w = parseFloat(newItemWeight);
+    const p = parseFloat(newItemPrice);
+    const sub = w * p;
+
+    // VALIDATION: Check Stock if Selling
+    if (transactionType === "Selling" && w > availableStock) {
+      Alert.alert(
+        "Insufficient Stock",
+        `You requested ${w} kg but only ${availableStock} kg is available.`,
+      );
+      return;
+    }
+
+    const mat = materialsList.find((m) => m.value === newItemMaterialId);
+
+    if (transactionId) {
+      // EDIT MODE: Insert directly to DB
+      await db.insert(transactionItems).values({
+        transactionId,
+        materialId: newItemMaterialId,
+        weight: w,
+        price: p,
+        subtotal: sub,
+      });
+      loadTransactionData();
+    } else {
+      // NEW MODE: Add to local state
+      const newItem = {
+        id: Date.now(), // Temp ID
+        material: mat.label,
+        materialId: newItemMaterialId,
+        weight: w,
+        price: p,
+        subtotal: sub,
+        uom: mat.uom,
+      };
+      const newList = [...lineItems, newItem];
+      setLineItems(newList);
+      setGrandTotal(newList.reduce((s, i) => s + i.subtotal, 0));
+    }
+    setAddItemModalVisible(false);
   };
 
   const handleDeleteItem = async (itemId) => {
-    await db.delete(transactionItems).where(eq(transactionItems.id, itemId));
-    loadTransactionData();
+    if (transactionId) {
+      await db.delete(transactionItems).where(eq(transactionItems.id, itemId));
+      loadTransactionData();
+    } else {
+      const newList = lineItems.filter((i) => i.id !== itemId);
+      setLineItems(newList);
+      setGrandTotal(newList.reduce((s, i) => s + i.subtotal, 0));
+    }
   };
 
-  const handleEditItem = (itemId) => {
-    router.push({
-      pathname: "/newTransaction",
-      params: { transactionId, itemId },
-    });
-  };
+  // --- FINISH LOGIC ---
 
-  // 1. Initial Check (Opens Modal)
   const handleDone = () => {
     if (!transactionType || !paymentMethod) {
-      Alert.alert("Error", "Select Transaction Type and Payment Method");
+      Alert.alert("Error", "Select Type & Payment");
       return;
     }
     if (!clientName.trim()) {
-      Alert.alert("Error", "Client Name is required");
+      Alert.alert("Error", "Client Name required");
       return;
     }
-    if (transactionType === "Selling") {
-      if (!driverName.trim() || !truckPlate.trim() || !truckWeight) {
-        Alert.alert("Error", "All logistics fields are required for selling.");
-        return;
-      }
+    if (
+      transactionType === "Selling" &&
+      (!driverName || !truckPlate || !truckWeight)
+    ) {
+      Alert.alert("Error", "Logistics required");
+      return;
     }
 
-    // Open confirmation modal to ask for amount paid
-    setPaidAmountInput(""); // Reset or set default
+    setPaidAmountInput("");
     setFinishModalVisible(true);
   };
 
-  // 2. Final Save (Called from Modal)
   const confirmFinish = async () => {
     try {
       const now = new Date();
-      // Default to 0 if empty
       const finalPaidAmount = parseFloat(paidAmountInput) || 0;
+      const isoDate = now.toISOString().split("T")[0];
 
-      await db
-        .update(transactions)
-        .set({
-          totalAmount: grandTotal,
-          paidAmount: finalPaidAmount,
-          status: "Completed",
-          date: now.toISOString().split("T")[0],
-          clientName,
-          clientAffiliation: clientAffiliation || null,
-          driverName: transactionType === "Selling" ? driverName : null,
-          truckPlate: transactionType === "Selling" ? truckPlate : null,
-          truckWeight:
-            transactionType === "Selling" ? parseFloat(truckWeight) : null,
-          licenseImageUri: transactionType === "Selling" ? licenseImage : null,
-        })
-        .where(eq(transactions.id, transactionId));
+      let finalTxId = transactionId;
+
+      if (transactionId) {
+        // EDIT MODE: Update existing
+        await db
+          .update(transactions)
+          .set({
+            totalAmount: grandTotal,
+            paidAmount: finalPaidAmount,
+            status: "Completed",
+            clientName,
+            clientAffiliation,
+            driverName,
+            truckPlate,
+            truckWeight: parseFloat(truckWeight),
+            licenseImageUri: licenseImage,
+          })
+          .where(eq(transactions.id, transactionId));
+      } else {
+        // NEW MODE: Create Transaction
+        const result = await db
+          .insert(transactions)
+          .values({
+            type: transactionType,
+            paymentMethod,
+            totalAmount: grandTotal,
+            paidAmount: finalPaidAmount,
+            status: "Completed",
+            date: isoDate,
+            clientName,
+            clientAffiliation: clientAffiliation || null,
+            driverName: transactionType === "Selling" ? driverName : null,
+            truckPlate: transactionType === "Selling" ? truckPlate : null,
+            truckWeight:
+              transactionType === "Selling" ? parseFloat(truckWeight) : null,
+            licenseImageUri:
+              transactionType === "Selling" ? licenseImage : null,
+          })
+          .returning();
+
+        finalTxId = result[0].id;
+
+        // PROCESS ITEMS
+        for (const item of lineItems) {
+          // 1. Insert Transaction Item
+          const itemRes = await db
+            .insert(transactionItems)
+            .values({
+              transactionId: finalTxId,
+              materialId: item.materialId,
+              weight: item.weight,
+              price: item.price,
+              subtotal: item.subtotal,
+            })
+            .returning();
+          const newItemId = itemRes[0].id;
+
+          // 2. Handle Selling Inventory Logic (FIFO)
+          // Note: Buying logic for creating inventory batches has been removed per request.
+          if (transactionType === "Selling") {
+            let remainingQty = item.weight;
+
+            // Get available batches sorted by date (FIFO)
+            const batches = await db
+              .select()
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.materialId, item.materialId),
+                  eq(inventory.status, "In Stock"),
+                  gt(inventory.netWeight, 0),
+                ),
+              )
+              .orderBy(asc(inventory.date));
+
+            for (const batch of batches) {
+              if (remainingQty <= 0) break;
+
+              const take = Math.min(remainingQty, batch.netWeight);
+              const newWeight = batch.netWeight - take;
+
+              // Update Batch
+              await db
+                .update(inventory)
+                .set({
+                  netWeight: newWeight,
+                  status: newWeight === 0 ? "Depleted" : "In Stock",
+                })
+                .where(eq(inventory.id, batch.id));
+
+              // Link to Transaction Item
+              await db.insert(inventoryTransactionItems).values({
+                inventoryId: batch.id,
+                transactionItemId: newItemId,
+                allocatedWeight: take,
+              });
+
+              // Audit Trail (Stock Out)
+              await db.insert(auditTrails).values({
+                inventoryId: batch.id,
+                action: "Stock Out",
+                notes: `Sold in Tx #${finalTxId}`,
+                date: isoDate,
+                previousWeight: batch.netWeight,
+                newWeight: newWeight,
+              });
+
+              remainingQty -= take;
+            }
+          }
+        }
+      }
 
       setFinishModalVisible(false);
-      router.navigate("/(tabs)/transactions");
+      router.replace({
+        pathname: "/transactionDetailed",
+        params: { transactionId: finalTxId },
+      });
     } catch (error) {
       Alert.alert("Error", error.message);
-    }
-  };
-
-  const handlePrint = async () => {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString();
-    const timeStr = now.toLocaleTimeString();
-
-    // Note: Since we haven't saved paidAmount yet in the view,
-    // we can't display it accurately unless we fetch from DB or use local state if saved.
-    // For this summary view, we usually print BEFORE finishing, so Paid Amount might be unknown or 0.
-    // If you need it in print, you might need to ask for it earlier or accept 0 here.
-
-    const html = `
-        <html>
-          <body style="font-family: Helvetica Neue; padding: 20px;">
-            <h1 style="text-align: center;">Transaction Receipt</h1>
-            <p style="text-align: center; color: #555;">ID: #${transactionId}</p>
-            
-            <div style="margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px;">
-                <div><strong>Date:</strong> ${dateStr} ${timeStr}</div>
-                <div><strong>Type:</strong> ${transactionType || "-"}</div>
-                <div><strong>Payment:</strong> ${paymentMethod || "-"}</div>
-                <div style="margin-top:5px;"><strong>Client:</strong> ${clientName || "N/A"}</div>
-                ${clientAffiliation ? `<div><strong>Affiliation:</strong> ${clientAffiliation}</div>` : ""}
-            </div>
-
-            ${
-              transactionType === "Selling"
-                ? `
-            <div style="margin-bottom: 20px; border: 1px dashed #aaa; padding: 10px; background-color: #f9f9f9;">
-                <div style="font-weight:bold; margin-bottom:5px; text-decoration: underline;">Logistics Details</div>
-                <div><strong>Driver:</strong> ${driverName}</div>
-                <div><strong>Truck Plate:</strong> ${truckPlate}</div>
-                <div><strong>Weight:</strong> ${truckWeight} kg</div>
-            </div>
-            `
-                : ""
-            }
-
-            <table style="width: 100%; border-collapse: collapse;">
-              <thead>
-                <tr style="background-color: #f3f4f6;">
-                  <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Material</th>
-                  <th style="padding: 8px; text-align: center; border-bottom: 1px solid #ddd;">Weight</th>
-                  <th style="padding: 8px; text-align: right; border-bottom: 1px solid #ddd;">Price</th>
-                  <th style="padding: 8px; text-align: right; border-bottom: 1px solid #ddd;">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${lineItems
-                  .map(
-                    (item) => `
-                  <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.material}</td>
-                    <td style="padding: 8px; text-align: center; border-bottom: 1px solid #eee;">${item.weight} ${item.uom}</td>
-                    <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">₱${item.price}</td>
-                    <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">₱${item.subtotal.toFixed(2)}</td>
-                  </tr>`,
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-
-            <div style="margin-top: 30px; text-align: right;">
-                <h2 style="margin: 0;">Total: ₱${grandTotal.toFixed(2)}</h2>
-            </div>
-          </body>
-        </html>
-        `;
-
-    try {
-      await Print.printAsync({ html });
-    } catch (error) {
-      Alert.alert("Print Error", error.message);
     }
   };
 
@@ -316,9 +463,8 @@ export default function TransactionSummary() {
       keyboardVerticalOffset={100}
     >
       <View className="flex-1 bg-gray-50 p-3 gap-3">
-        {/* --- COMPACT HEADER FORM --- */}
+        {/* HEADER INPUTS */}
         <View className="bg-white p-3 rounded-lg border border-gray-200 gap-3 shadow-sm">
-          {/* Row 1: Type & Payment Method */}
           <View className="flex-row gap-3">
             <View className="flex-[0.8]">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
@@ -343,8 +489,6 @@ export default function TransactionSummary() {
               />
             </View>
           </View>
-
-          {/* Row 2: Client Info */}
           <View className="flex-row gap-3">
             <View className="flex-1">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
@@ -369,11 +513,8 @@ export default function TransactionSummary() {
               />
             </View>
           </View>
-
-          {/* Conditional Rows: Selling Logistics */}
           {transactionType === "Selling" && (
             <>
-              {/* Row 3: Driver & Plate */}
               <View className="flex-row gap-3 pt-2 border-t border-gray-100 mt-1">
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-orange-600 mb-1 uppercase">
@@ -398,8 +539,6 @@ export default function TransactionSummary() {
                   />
                 </View>
               </View>
-
-              {/* Row 4: Weight & Camera */}
               <View className="flex-row gap-3 items-end">
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-orange-600 mb-1 uppercase">
@@ -414,7 +553,6 @@ export default function TransactionSummary() {
                   />
                 </View>
                 <View className="flex-1 flex-row gap-2">
-                  {/* Camera Button */}
                   <Pressable
                     onPress={takeLicensePhoto}
                     className={`flex-1 h-12 rounded items-center justify-center flex-row gap-1 border ${licenseImage ? "bg-green-100 border-green-300" : "bg-gray-100 border-gray-300"}`}
@@ -424,8 +562,6 @@ export default function TransactionSummary() {
                       {licenseImage ? "Retake" : "License"}
                     </Text>
                   </Pressable>
-
-                  {/* View Button (Only if image exists) */}
                   {licenseImage && (
                     <Pressable
                       onPress={() => setImageModalVisible(true)}
@@ -440,7 +576,7 @@ export default function TransactionSummary() {
           )}
         </View>
 
-        {/* --- TOTAL & LIST --- */}
+        {/* ITEMS LIST */}
         <View className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
           <View className="flex-row bg-gray-100 p-2 border-b border-gray-200 justify-between items-center">
             <Text className="font-bold text-gray-700">Items List</Text>
@@ -451,7 +587,6 @@ export default function TransactionSummary() {
               </Text>
             </View>
           </View>
-
           <View className="flex-row bg-gray-800 p-2 items-center">
             <Text className="flex-[2] font-bold text-white text-xs">
               Material
@@ -469,7 +604,6 @@ export default function TransactionSummary() {
               Act
             </Text>
           </View>
-
           <FlatList
             data={lineItems}
             keyExtractor={(item) => item.id.toString()}
@@ -494,9 +628,6 @@ export default function TransactionSummary() {
                   ₱{item.subtotal.toFixed(0)}
                 </Text>
                 <View className="w-16 flex-row justify-center gap-2">
-                  <Pressable onPress={() => handleEditItem(item.id)}>
-                    <Edit size={18} color="#d97706" />
-                  </Pressable>
                   <Pressable onPress={() => handleDeleteItem(item.id)}>
                     <Trash2 size={18} color="#dc2626" />
                   </Pressable>
@@ -506,7 +637,7 @@ export default function TransactionSummary() {
           />
         </View>
 
-        {/* --- FOOTER BUTTONS --- */}
+        {/* FOOTER BUTTONS */}
         <View className="flex-row gap-2 h-14">
           <Pressable
             onPress={handleAddItem}
@@ -516,12 +647,6 @@ export default function TransactionSummary() {
             <Text className="text-white font-bold text-lg">Add Item</Text>
           </Pressable>
           <Pressable
-            onPress={handlePrint}
-            className="w-14 bg-amber-500 rounded-lg items-center justify-center"
-          >
-            <Printer size={22} color="white" />
-          </Pressable>
-          <Pressable
             onPress={handleDone}
             className="flex-1 bg-green-600 rounded-lg items-center justify-center"
           >
@@ -529,7 +654,7 @@ export default function TransactionSummary() {
           </Pressable>
         </View>
 
-        {/* --- IMAGE MODAL --- */}
+        {/* IMAGE MODAL */}
         <Modal
           visible={isImageModalVisible}
           transparent={true}
@@ -557,7 +682,106 @@ export default function TransactionSummary() {
           </SafeAreaView>
         </Modal>
 
-        {/* --- FINISH TRANSACTION MODAL (New) --- */}
+        {/* ADD ITEM MODAL */}
+        <Modal
+          visible={addItemModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setAddItemModalVisible(false)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center p-4">
+            <View className="bg-white w-full max-w-sm rounded-lg p-5 gap-4">
+              <Text className="text-lg font-bold">Add Item</Text>
+
+              {/* Material Picker */}
+              <View>
+                <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
+                  Material
+                </Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={newItemMaterialId}
+                    onValueChange={setNewItemMaterialId}
+                    style={{ width: "100%", height: "100%" }}
+                  >
+                    <Picker.Item
+                      label="Select Material"
+                      value={null}
+                      enabled={false}
+                    />
+                    {materialsList.map((m) => (
+                      <Picker.Item
+                        key={m.value}
+                        label={m.label}
+                        value={m.value}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+                {transactionType === "Selling" && newItemMaterialId && (
+                  <Text className="text-xs text-orange-600 mt-1 font-bold">
+                    Available Stock: {availableStock} kg
+                  </Text>
+                )}
+              </View>
+
+              {/* Inputs */}
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
+                    Weight
+                  </Text>
+                  <TextInput
+                    placeholder="0.0"
+                    keyboardType="numeric"
+                    className="border border-gray-300 rounded h-12 px-3 text-lg"
+                    value={newItemWeight}
+                    onChangeText={setNewItemWeight}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
+                    Price
+                  </Text>
+                  <TextInput
+                    placeholder="0.0"
+                    keyboardType="numeric"
+                    className="border border-gray-300 rounded h-12 px-3 text-lg"
+                    value={newItemPrice}
+                    onChangeText={setNewItemPrice}
+                  />
+                </View>
+              </View>
+
+              {/* Live Subtotal */}
+              <View className="items-end">
+                <Text className="text-xs text-gray-500 uppercase font-bold">
+                  Subtotal
+                </Text>
+                <Text className="text-xl font-bold text-blue-700">
+                  ₱{newItemSubtotal}
+                </Text>
+              </View>
+
+              <View className="flex-row gap-3 mt-2">
+                <Pressable
+                  onPress={() => setAddItemModalVisible(false)}
+                  className="flex-1 bg-gray-200 p-3 rounded items-center"
+                >
+                  <Text className="font-bold text-gray-700">Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={saveNewItem}
+                  className="flex-1 bg-blue-600 p-3 rounded items-center"
+                >
+                  <Text className="font-bold text-white">Add</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* FINISH MODAL */}
         <Modal
           visible={finishModalVisible}
           transparent={true}
@@ -570,10 +794,8 @@ export default function TransactionSummary() {
                 Finish Transaction
               </Text>
               <Text className="text-gray-600 mb-6">
-                Enter the amount paid by the client. Leave empty if no payment
-                has been made yet.
+                Enter the amount paid by the client.
               </Text>
-
               <View className="mb-6">
                 <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
                   Amount Paid (₱)
@@ -587,7 +809,6 @@ export default function TransactionSummary() {
                   className="border border-green-500 bg-green-50 rounded px-3 h-14 text-2xl font-bold text-green-800 text-center"
                 />
               </View>
-
               <View className="flex-row gap-3">
                 <Pressable
                   onPress={() => setFinishModalVisible(false)}
