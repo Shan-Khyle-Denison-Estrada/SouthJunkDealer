@@ -1,27 +1,27 @@
 import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect } from "expo-router";
 import {
-    ArrowDown,
-    ArrowUp,
-    ChevronLeft,
-    ChevronRight,
-    Filter,
-    Plus,
-    Search,
-    Trash2,
-    X,
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Plus,
+  Search,
+  Trash2,
+  X,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
@@ -240,10 +240,9 @@ export default function MaterialIndex() {
         Alert.alert("Error", "Material Name is required");
         return;
       }
-      if (!materialClass) {
-        Alert.alert("Error", "Class is required");
-        return;
-      }
+
+      // Removed class validation check to make it optional
+
       if (!uom) {
         Alert.alert("Error", "UoM is required");
         return;
@@ -251,7 +250,7 @@ export default function MaterialIndex() {
 
       await db.insert(materials).values({
         name: materialName,
-        class: materialClass,
+        class: materialClass, // Can be null
         uom: uom,
       });
 
@@ -344,7 +343,10 @@ export default function MaterialIndex() {
               </View>
               <View className="flex-row gap-4">
                 <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1">Class</Text>
+                  {/* Updated Label to indicate optional */}
+                  <Text className="text-gray-700 font-bold mb-1">
+                    Class (Optional)
+                  </Text>
                   <View className="h-12">
                     <CustomPicker
                       selectedValue={materialClass}
@@ -355,7 +357,9 @@ export default function MaterialIndex() {
                   </View>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1">UoM</Text>
+                  <Text className="text-gray-700 font-bold mb-1">
+                    Unit of Measurement
+                  </Text>
                   <View className="h-12">
                     <CustomPicker
                       selectedValue={uom}
@@ -417,7 +421,9 @@ export default function MaterialIndex() {
               </View>
               <View className="flex-row gap-4">
                 <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1">Class</Text>
+                  <Text className="text-gray-700 font-bold mb-1">
+                    Class (Optional)
+                  </Text>
                   <View className="h-12">
                     <CustomPicker
                       selectedValue={materialClass}

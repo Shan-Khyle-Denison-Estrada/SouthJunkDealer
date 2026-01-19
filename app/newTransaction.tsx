@@ -309,7 +309,7 @@ export default function NewTransaction() {
           <View className="flex-row gap-4">
             <View className="flex-1">
               <Text className="text-lg font-semibold mb-2 ml-1">
-                Weight (kg)
+                Weight
               </Text>
               <TextInput
                 className="bg-white rounded-md px-4 h-16 border border-gray-300 text-xl"
