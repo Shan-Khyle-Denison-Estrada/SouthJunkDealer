@@ -2,35 +2,35 @@ import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import {
-    ArrowDown,
-    ArrowUp,
-    Camera,
-    ChevronLeft,
-    ChevronRight,
-    Filter,
-    Plus,
-    Search,
-    X,
+  ArrowDown,
+  ArrowUp,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Plus,
+  Search,
+  X,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
-    inventory,
-    inventoryTransactionItems,
-    materials,
+  inventory,
+  inventoryTransactionItems,
+  materials,
 } from "../../db/schema";
 import { db } from "./_layout";
 
@@ -347,15 +347,15 @@ export default function InventoryIndex() {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "in stock":
-        return "text-green-600";
+        return "text-green-600"; // Green for available
+      case "depleted":
+        return "text-red-600"; // Red for empty/critical
+      case "deleted":
+        return "text-gray-400"; // Faded gray for removed items
       case "processing":
         return "text-blue-600";
       case "shipped":
-        return "text-gray-500";
-      case "sold":
-        return "text-red-500";
-      case "sold out":
-        return "text-red-500";
+        return "text-indigo-500";
       default:
         return "text-gray-800";
     }

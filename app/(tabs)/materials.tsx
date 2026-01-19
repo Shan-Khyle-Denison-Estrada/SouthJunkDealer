@@ -548,7 +548,7 @@ export default function MaterialIndex() {
             { label: "ID", key: "id", flex: 1 },
             { label: "Material Name", key: "name", flex: 2 },
             { label: "Class", key: "class", flex: 1 },
-            { label: "UoM", key: "uom", flex: 1 },
+            { label: "Unit of Measurement", key: "uom", flex: 1 },
             // Changed key to totalStock and label to Total Stock
             { label: "Total Stock", key: "totalStock", flex: 1 },
           ].map((col) => (
