@@ -25,8 +25,8 @@ import {
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
-import { desc, eq } from "drizzle-orm";
-// Added: inventory and transactionItems imports for dependency checking
+// Added 'sql' to imports for aggregation
+import { desc, eq, sql } from "drizzle-orm";
 import { inventory, materials, transactionItems } from "../../db/schema";
 import { db } from "./_layout";
 
@@ -123,10 +123,22 @@ export default function MaterialIndex() {
   // --- DATA FETCHING ---
   const loadData = async () => {
     try {
+      // Updated query to fetch materials AND sum of inventory weight
       const data = await db
-        .select()
+        .select({
+          id: materials.id,
+          name: materials.name,
+          class: materials.class,
+          uom: materials.uom,
+          // Calculate total stock by summing inventory netWeight
+          // COALESCE ensures we get 0 instead of null if no inventory exists
+          totalStock: sql`COALESCE(SUM(${inventory.netWeight}), 0)`,
+        })
         .from(materials)
+        .leftJoin(inventory, eq(materials.id, inventory.materialId))
+        .groupBy(materials.id)
         .orderBy(desc(materials.id));
+
       setMaterialsData(data);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -196,8 +208,8 @@ export default function MaterialIndex() {
       let valA = a[sortConfig.key];
       let valB = b[sortConfig.key];
 
-      // Numeric sorting for ID
-      if (sortConfig.key === "id") {
+      // Numeric sorting for ID and Total Stock
+      if (sortConfig.key === "id" || sortConfig.key === "totalStock") {
         valA = Number(valA || 0);
         valB = Number(valB || 0);
       } else {
@@ -281,7 +293,7 @@ export default function MaterialIndex() {
     }
   };
 
-  // --- UPDATED DELETE LOGIC ---
+  // --- DELETE LOGIC ---
   const handleDeleteMaterial = async () => {
     if (!selectedMaterial) return;
     try {
@@ -537,7 +549,8 @@ export default function MaterialIndex() {
             { label: "Material Name", key: "name", flex: 2 },
             { label: "Class", key: "class", flex: 1 },
             { label: "UoM", key: "uom", flex: 1 },
-            { label: "Total Load", key: "totalLoad", flex: 1 },
+            // Changed key to totalStock and label to Total Stock
+            { label: "Total Stock", key: "totalStock", flex: 1 },
           ].map((col) => (
             <Pressable
               key={col.key}
@@ -588,8 +601,9 @@ export default function MaterialIndex() {
                 <Text className="flex-1 text-gray-600 text-center text-lg">
                   {item.uom}
                 </Text>
+                {/* Display calculated total stock */}
                 <Text className="flex-1 text-blue-700 text-center text-lg font-bold">
-                  -
+                  {Number(item.totalStock).toFixed(2)}
                 </Text>
               </Pressable>
             )}
