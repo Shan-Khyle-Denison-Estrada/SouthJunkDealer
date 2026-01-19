@@ -84,6 +84,8 @@ export default function TransactionSummary() {
 
   // Modal State
   const [isImageModalVisible, setImageModalVisible] = useState(false);
+  const [finishModalVisible, setFinishModalVisible] = useState(false); // NEW: Finish Modal
+  const [paidAmountInput, setPaidAmountInput] = useState(""); // Input for modal
 
   const loadTransactionData = async () => {
     if (!transactionId) return;
@@ -103,6 +105,7 @@ export default function TransactionSummary() {
       setTruckPlate(h.truckPlate || "");
       setTruckWeight(h.truckWeight ? String(h.truckWeight) : "");
       setLicenseImage(h.licenseImageUri || null);
+      // We don't load paidAmount here because it's set at the end
     }
 
     const items = await db
@@ -178,7 +181,8 @@ export default function TransactionSummary() {
     });
   };
 
-  const handleDone = async () => {
+  // 1. Initial Check (Opens Modal)
+  const handleDone = () => {
     if (!transactionType || !paymentMethod) {
       Alert.alert("Error", "Select Transaction Type and Payment Method");
       return;
@@ -194,12 +198,23 @@ export default function TransactionSummary() {
       }
     }
 
+    // Open confirmation modal to ask for amount paid
+    setPaidAmountInput(""); // Reset or set default
+    setFinishModalVisible(true);
+  };
+
+  // 2. Final Save (Called from Modal)
+  const confirmFinish = async () => {
     try {
       const now = new Date();
+      // Default to 0 if empty
+      const finalPaidAmount = parseFloat(paidAmountInput) || 0;
+
       await db
         .update(transactions)
         .set({
           totalAmount: grandTotal,
+          paidAmount: finalPaidAmount,
           status: "Completed",
           date: now.toISOString().split("T")[0],
           clientName,
@@ -212,6 +227,7 @@ export default function TransactionSummary() {
         })
         .where(eq(transactions.id, transactionId));
 
+      setFinishModalVisible(false);
       router.navigate("/(tabs)/transactions");
     } catch (error) {
       Alert.alert("Error", error.message);
@@ -222,6 +238,11 @@ export default function TransactionSummary() {
     const now = new Date();
     const dateStr = now.toLocaleDateString();
     const timeStr = now.toLocaleTimeString();
+
+    // Note: Since we haven't saved paidAmount yet in the view,
+    // we can't display it accurately unless we fetch from DB or use local state if saved.
+    // For this summary view, we usually print BEFORE finishing, so Paid Amount might be unknown or 0.
+    // If you need it in print, you might need to ask for it earlier or accept 0 here.
 
     const html = `
         <html>
@@ -297,9 +318,9 @@ export default function TransactionSummary() {
       <View className="flex-1 bg-gray-50 p-3 gap-3">
         {/* --- COMPACT HEADER FORM --- */}
         <View className="bg-white p-3 rounded-lg border border-gray-200 gap-3 shadow-sm">
-          {/* Row 1: Type & Payment */}
+          {/* Row 1: Type & Payment Method */}
           <View className="flex-row gap-3">
-            <View className="flex-1">
+            <View className="flex-[0.8]">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
                 Type
               </Text>
@@ -312,7 +333,7 @@ export default function TransactionSummary() {
             </View>
             <View className="flex-1">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
-                Payment
+                Payment Method
               </Text>
               <SummaryPicker
                 selectedValue={paymentMethod}
@@ -338,10 +359,10 @@ export default function TransactionSummary() {
             </View>
             <View className="flex-1">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
-                Affiliation/Company
+                Affiliation
               </Text>
               <TextInput
-                placeholder="Optional"
+                placeholder="Company (Opt)"
                 value={clientAffiliation}
                 onChangeText={setClientAffiliation}
                 className="border border-gray-300 rounded px-2 h-12 bg-white text-base"
@@ -353,7 +374,7 @@ export default function TransactionSummary() {
           {transactionType === "Selling" && (
             <>
               {/* Row 3: Driver & Plate */}
-              <View className="flex-row gap-3">
+              <View className="flex-row gap-3 pt-2 border-t border-gray-100 mt-1">
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-orange-600 mb-1 uppercase">
                     Driver
@@ -423,9 +444,12 @@ export default function TransactionSummary() {
         <View className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
           <View className="flex-row bg-gray-100 p-2 border-b border-gray-200 justify-between items-center">
             <Text className="font-bold text-gray-700">Items List</Text>
-            <Text className="font-bold text-blue-700 text-lg">
-              Total: ₱{grandTotal.toFixed(2)}
-            </Text>
+            <View className="items-end">
+              <Text className="text-xs text-gray-500">Total Amount</Text>
+              <Text className="font-bold text-blue-700 text-lg">
+                ₱{grandTotal.toFixed(2)}
+              </Text>
+            </View>
           </View>
 
           <View className="flex-row bg-gray-800 p-2 items-center">
@@ -522,7 +546,6 @@ export default function TransactionSummary() {
               </Pressable>
             </View>
             <View className="flex-1 justify-center items-center p-4">
-              {/* MINIMIZED MODAL SIZE (w-3/4) */}
               <View className="w-3/4 aspect-square bg-white rounded-lg overflow-hidden">
                 <Image
                   source={{ uri: licenseImage }}
@@ -532,6 +555,55 @@ export default function TransactionSummary() {
               </View>
             </View>
           </SafeAreaView>
+        </Modal>
+
+        {/* --- FINISH TRANSACTION MODAL (New) --- */}
+        <Modal
+          visible={finishModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setFinishModalVisible(false)}
+        >
+          <View className="flex-1 bg-black/60 justify-center items-center p-4">
+            <View className="bg-white w-full max-w-sm rounded-xl p-6 shadow-xl">
+              <Text className="text-xl font-bold text-gray-800 mb-2">
+                Finish Transaction
+              </Text>
+              <Text className="text-gray-600 mb-6">
+                Enter the amount paid by the client. Leave empty if no payment
+                has been made yet.
+              </Text>
+
+              <View className="mb-6">
+                <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
+                  Amount Paid (₱)
+                </Text>
+                <TextInput
+                  placeholder="0.00"
+                  keyboardType="numeric"
+                  autoFocus={true}
+                  value={paidAmountInput}
+                  onChangeText={setPaidAmountInput}
+                  className="border border-green-500 bg-green-50 rounded px-3 h-14 text-2xl font-bold text-green-800 text-center"
+                />
+              </View>
+
+              <View className="flex-row gap-3">
+                <Pressable
+                  onPress={() => setFinishModalVisible(false)}
+                  className="flex-1 bg-gray-200 py-3 rounded-lg items-center"
+                >
+                  <Text className="font-bold text-gray-700">Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={confirmFinish}
+                  className="flex-1 bg-green-600 py-3 rounded-lg items-center"
+                >
+                  <Text className="font-bold text-white">Confirm</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
         </Modal>
       </View>
     </KeyboardAvoidingView>

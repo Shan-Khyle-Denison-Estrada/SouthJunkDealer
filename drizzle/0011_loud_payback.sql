@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `paid_amount` real DEFAULT 0;

@@ -1,6 +1,12 @@
 import * as Print from "expo-print";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Camera, ChevronLeft, Printer, X } from "lucide-react-native";
+import {
+  Camera,
+  CheckCircle,
+  ChevronLeft,
+  Printer,
+  X,
+} from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
   Alert,
@@ -62,10 +68,92 @@ export default function TransactionDetailed() {
     }, [transactionId]),
   );
 
+  // Helper to check if transaction is commercial (Buying/Selling)
+  const isCommercial =
+    header.type === "Buying" || header.type === "Selling";
+
+  const getStatusInfo = () => {
+    // If not commercial, status isn't really applicable in the financial sense,
+    // but we can default to something or just hide the badge.
+    // For now, we'll keep the logic but handle visibility in render.
+    const paid = header.paidAmount || 0;
+    const total = header.totalAmount || 0;
+    if (paid >= total && total > 0)
+      return {
+        label: "PAID",
+        color: "text-green-700 bg-green-100 border-green-200",
+      };
+    if (paid > 0)
+      return {
+        label: "PARTIAL",
+        color: "text-yellow-700 bg-yellow-100 border-yellow-200",
+      };
+    return {
+      label: "UNPAID",
+      color: "text-red-700 bg-red-100 border-red-200",
+    };
+  };
+
+  const statusInfo = getStatusInfo();
+  const isFullyPaid =
+    (header.paidAmount || 0) >= (header.totalAmount || 0) &&
+    header.totalAmount > 0;
+
+  const handleMarkAsPaid = () => {
+    Alert.alert(
+      "Confirm Full Payment",
+      `Mark transaction #${transactionId} as fully paid? This will set the paid amount to ₱${header.totalAmount?.toFixed(2)}.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          onPress: async () => {
+            try {
+              await db
+                .update(transactions)
+                .set({ paidAmount: header.totalAmount })
+                .where(eq(transactions.id, transactionId));
+              loadTransactionData(); // Refresh data
+            } catch (e) {
+              Alert.alert("Error", "Failed to update payment status");
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handlePrint = async () => {
     const now = new Date();
     const printDateStr = now.toLocaleDateString();
     const printTimeStr = now.toLocaleTimeString();
+
+    // Conditional HTML blocks
+    const financialRows = isCommercial
+      ? `
+        <tr><td style="padding: 4px;"><strong>Payment Method:</strong></td><td style="text-align: right;">${header.paymentMethod || "-"}</td></tr>
+        <tr><td style="padding: 4px;"><strong>Status:</strong></td><td style="text-align: right;">${statusInfo.label}</td></tr>
+        <tr><td style="padding: 4px;"><strong>Amount Paid:</strong></td><td style="text-align: right;">₱${(header.paidAmount || 0).toFixed(2)}</td></tr>
+        `
+      : "";
+
+    const clientRows = isCommercial
+      ? `
+        <tr><td style="border-top: 1px dashed #ddd; padding: 8px 4px 4px 4px;"><strong>Client Name:</strong></td><td style="border-top: 1px dashed #ddd; padding: 8px 4px 4px 4px; text-align: right;">${header.clientName || "-"}</td></tr>
+        <tr><td style="padding: 4px;"><strong>Company:</strong></td><td style="text-align: right;">${header.clientAffiliation || "N/A"}</td></tr>
+        `
+      : "";
+
+    const logisticsDiv =
+      header.type === "Selling"
+        ? `
+            <div style="margin-bottom: 20px; border: 1px dashed #333; padding: 10px;">
+                <h3 style="margin-top:0;">Logistics Details</h3>
+                <p style="margin: 5px 0;"><strong>Driver Name:</strong> ${header.driverName || "N/A"}</p>
+                <p style="margin: 5px 0;"><strong>Truck Plate:</strong> ${header.truckPlate || "N/A"}</p>
+                <p style="margin: 5px 0;"><strong>Truck Weight:</strong> ${header.truckWeight} kg</p>
+            </div>`
+        : "";
 
     const html = `
         <html>
@@ -77,23 +165,12 @@ export default function TransactionDetailed() {
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr><td style="padding: 4px;"><strong>Date:</strong></td><td style="text-align: right;">${header.date}</td></tr>
                     <tr><td style="padding: 4px;"><strong>Type:</strong></td><td style="text-align: right;">${header.type}</td></tr>
-                    <tr><td style="padding: 4px;"><strong>Payment:</strong></td><td style="text-align: right;">${header.paymentMethod}</td></tr>
-                    <tr><td style="border-top: 1px dashed #ddd; padding: 8px 4px 4px 4px;"><strong>Client Name:</strong></td><td style="border-top: 1px dashed #ddd; padding: 8px 4px 4px 4px; text-align: right;">${header.clientName || "-"}</td></tr>
-                    <tr><td style="padding: 4px;"><strong>Company:</strong></td><td style="text-align: right;">${header.clientAffiliation || "N/A"}</td></tr>
+                    ${financialRows}
+                    ${clientRows}
                 </table>
             </div>
 
-            ${
-              header.type === "Selling"
-                ? `
-            <div style="margin-bottom: 20px; border: 1px dashed #333; padding: 10px;">
-                <h3 style="margin-top:0;">Logistics Details</h3>
-                <p style="margin: 5px 0;"><strong>Driver Name:</strong> ${header.driverName || "N/A"}</p>
-                <p style="margin: 5px 0;"><strong>Truck Plate:</strong> ${header.truckPlate || "N/A"}</p>
-                <p style="margin: 5px 0;"><strong>Truck Weight:</strong> ${header.truckWeight} kg</p>
-            </div>`
-                : ""
-            }
+            ${logisticsDiv}
 
             <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
               <thead>
@@ -120,6 +197,11 @@ export default function TransactionDetailed() {
             </table>
             
             <div style="margin-top: 30px; text-align: right;">
+                ${
+                  isCommercial
+                    ? `<h3 style="margin: 5px 0; color: #555;">Amount Paid: ₱${(header.paidAmount || 0).toFixed(2)}</h3>`
+                    : ""
+                }
                 <h2 style="margin: 0; color: #2563eb;">Total: ₱${grandTotal.toFixed(2)}</h2>
             </div>
             <div style="margin-top: 30px; border-top: 1px solid #eee; text-align: center; font-size: 10px; color: #aaa; padding-top:5px">
@@ -140,8 +222,11 @@ export default function TransactionDetailed() {
     <View className="flex-1 bg-gray-100 p-4 gap-4">
       {/* --- HEADER CONTAINER --- */}
       <View className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm gap-4">
-        {/* LAYER 1: ID, Type, Payment, Date */}
-        <View className="flex-row justify-between items-center border-b border-gray-100 pb-3">
+        
+        {/* LAYER 1: ID, Type, Date, Status */}
+        <View
+          className={`flex-row justify-between items-center ${isCommercial ? "border-b border-gray-100 pb-3" : ""}`}
+        >
           <View>
             <Text className="text-[10px] text-gray-400 font-bold uppercase">
               Transaction ID
@@ -164,22 +249,72 @@ export default function TransactionDetailed() {
 
           <View>
             <Text className="text-[10px] text-gray-400 font-bold uppercase">
-              Method
-            </Text>
-            <Text className="font-medium text-gray-800">
-              {header.paymentMethod}
-            </Text>
-          </View>
-
-          <View className="items-end">
-            <Text className="text-[10px] text-gray-400 font-bold uppercase">
               Date
             </Text>
             <Text className="font-medium text-gray-800">{header.date}</Text>
           </View>
+
+          {/* Status Badge - Only for Commercial */}
+          {isCommercial ? (
+            <View className="items-end">
+              <View
+                className={`px-2 py-1 rounded border ${statusInfo.color.split(" ").filter((c) => c.startsWith("bg") || c.startsWith("border")).join(" ")}`}
+              >
+                <Text
+                  className={`text-xs font-bold ${statusInfo.color.split(" ")[0]}`}
+                >
+                  {statusInfo.label}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View className="items-end">
+              <View className="px-2 py-1 rounded border bg-gray-100 border-gray-200">
+                <Text className="text-xs font-bold text-gray-500">N/A</Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        {/* LAYER 2: CONDITIONAL LAYOUT */}
+        {/* FINANCIAL SUMMARY ROW (Only if Commercial) */}
+        {isCommercial && (
+          <View className="flex-row justify-between bg-gray-50 p-2 rounded border border-gray-100 items-center">
+            <View>
+              <Text className="text-[10px] text-gray-400 font-bold uppercase">
+                Payment Method
+              </Text>
+              <Text className="font-bold text-gray-700">
+                {header.paymentMethod}
+              </Text>
+            </View>
+
+            <View className="flex-row items-center gap-3">
+              <View className="items-end">
+                <Text className="text-[10px] text-gray-400 font-bold uppercase">
+                  Amount Paid
+                </Text>
+                <Text className="font-bold text-green-700">
+                  ₱{(header.paidAmount || 0).toFixed(2)}
+                </Text>
+              </View>
+
+              {/* Mark As Paid Button (Only visible if not fully paid) */}
+              {!isFullyPaid && (
+                <Pressable
+                  onPress={handleMarkAsPaid}
+                  className="bg-green-600 px-3 py-2 rounded-md flex-row items-center gap-1 active:bg-green-700"
+                >
+                  <CheckCircle size={14} color="white" />
+                  <Text className="text-white text-xs font-bold">
+                    Mark Full
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* LAYER 2: CLIENT / LOGISTICS (Conditional) */}
         {header.type === "Selling" ? (
           // --- SELLING: TWO COLUMNS (Client | Logistics) ---
           <View className="flex-row gap-4 h-32">
@@ -262,8 +397,8 @@ export default function TransactionDetailed() {
               </View>
             </View>
           </View>
-        ) : (
-          // --- OTHERS (Buying): WHOLE ROW FORMAT ---
+        ) : header.type === "Buying" ? (
+          // --- BUYING: WHOLE ROW FORMAT ---
           <View className="bg-gray-50 p-4 rounded border border-gray-200">
             <Text className="text-[10px] text-gray-500 font-bold uppercase mb-2 border-b border-gray-200 pb-1">
               Client Details
@@ -290,7 +425,7 @@ export default function TransactionDetailed() {
               </View>
             </View>
           </View>
-        )}
+        ) : null /* Other Types = Hide Client & Logistics */}
       </View>
 
       {/* --- TABLE --- */}

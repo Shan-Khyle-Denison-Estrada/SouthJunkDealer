@@ -22,11 +22,10 @@ import {
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { transactions } from "../../db/schema";
 import { db } from "../_layout";
 
-// Increased to 9 to fill more vertical space on standard screens
 const ITEMS_PER_PAGE = 9;
 
 export default function TransactionsIndex() {
@@ -46,15 +45,15 @@ export default function TransactionsIndex() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [selectedPaymentMethods, setSelectedPaymentMethods] = useState([]);
+  const [selectedStatuses, setSelectedStatuses] = useState([]); // NEW: Status Filter
 
-  const loadData = async () => {
+  // --- FETCH DATA ---
+  const loadTransactions = async () => {
     try {
       const data = await db
         .select()
         .from(transactions)
-        .where(eq(transactions.status, "Completed"))
         .orderBy(desc(transactions.id));
-
       setTransactionList(data);
     } catch (error) {
       console.error(error);
@@ -64,98 +63,79 @@ export default function TransactionsIndex() {
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadTransactions();
     }, []),
   );
 
-  // --- DERIVE FILTER OPTIONS DYNAMICALLY ---
-  const uniqueTypes = useMemo(
-    () => [
-      ...new Set(transactionList.map((item) => item.type).filter(Boolean)),
-    ],
-    [transactionList],
-  );
-  const uniquePaymentMethods = useMemo(
-    () => [
-      ...new Set(
-        transactionList.map((item) => item.paymentMethod).filter(Boolean),
-      ),
-    ],
-    [transactionList],
-  );
-
-  // --- HANDLE NEW TRANSACTION ---
-  const handleNewTransaction = async () => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const result = await db
-        .insert(transactions)
-        .values({
-          date: today,
-          status: "Draft",
-          totalAmount: 0,
-        })
-        .returning({ insertedId: transactions.id });
-
-      const newId = result[0].insertedId;
-
-      router.push({
-        pathname: "/transactionSummary",
-        params: { transactionId: newId },
-      });
-    } catch (error) {
-      Alert.alert("Error", "Could not initialize transaction");
+  // Helper to determine status (used in render and filter)
+  const getPaymentStatus = (item) => {
+    // If type is not Buying or Selling, status is N/A
+    if (item.type !== "Buying" && item.type !== "Selling") {
+      return {
+        label: "N/A",
+        color: "bg-gray-100 text-gray-500 border-gray-200",
+      };
     }
+
+    const paid = item.paidAmount || 0;
+    const total = item.totalAmount || 0;
+
+    if (paid >= total && total > 0)
+      return {
+        label: "Paid",
+        color: "bg-green-100 text-green-700 border-green-200",
+      };
+    if (paid > 0)
+      return {
+        label: "Partial",
+        color: "bg-yellow-100 text-yellow-700 border-yellow-200",
+      };
+    return { label: "Unpaid", color: "bg-red-100 text-red-700 border-red-200" };
   };
 
-  // --- SORTING LOGIC ---
-  const handleSort = (key) => {
-    let direction = "asc";
-    if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const renderSortIcon = (key) => {
-    if (sortConfig.key !== key) return null;
-    return sortConfig.direction === "asc" ? (
-      <ArrowUp size={16} color="white" />
-    ) : (
-      <ArrowDown size={16} color="white" />
-    );
-  };
-
-  // --- PROCESSING DATA (Filter -> Sort -> Paginate) ---
-  const processedData = useMemo(() => {
+  // --- FILTER & SORT LOGIC ---
+  const filteredData = useMemo(() => {
     let data = [...transactionList];
 
-    // 1. Search Filter
+    // Search
     if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
+      const lower = searchQuery.toLowerCase();
       data = data.filter(
-        (item) =>
-          item.id.toString().includes(lowerQuery) ||
-          (item.type && item.type.toLowerCase().includes(lowerQuery)),
+        (t) =>
+          t.id.toString().includes(lower) ||
+          (t.clientName && t.clientName.toLowerCase().includes(lower)) ||
+          (t.type && t.type.toLowerCase().includes(lower)),
       );
     }
 
-    // 2. Category Filters
+    // Filters
     if (selectedTypes.length > 0) {
-      data = data.filter((item) => selectedTypes.includes(item.type));
+      data = data.filter((t) => selectedTypes.includes(t.type));
     }
     if (selectedPaymentMethods.length > 0) {
-      data = data.filter((item) =>
-        selectedPaymentMethods.includes(item.paymentMethod),
+      data = data.filter((t) =>
+        selectedPaymentMethods.includes(t.paymentMethod),
       );
     }
 
-    // 3. Sorting
+    // NEW: Status Filter
+    if (selectedStatuses.length > 0) {
+      data = data.filter((t) => {
+        const status = getPaymentStatus(t);
+        return selectedStatuses.includes(status.label);
+      });
+    }
+
+    // Sort
     data.sort((a, b) => {
       let valA = a[sortConfig.key];
       let valB = b[sortConfig.key];
 
-      if (sortConfig.key === "id" || sortConfig.key === "totalAmount") {
+      if (
+        sortConfig.key === "id" ||
+        sortConfig.key === "totalAmount" ||
+        sortConfig.key === "paidAmount"
+      ) {
         valA = Number(valA || 0);
         valB = Number(valB || 0);
       } else {
@@ -175,18 +155,31 @@ export default function TransactionsIndex() {
     sortConfig,
     selectedTypes,
     selectedPaymentMethods,
+    selectedStatuses,
   ]);
 
-  // 4. Pagination
-  const totalPages = Math.ceil(processedData.length / ITEMS_PER_PAGE);
-  const paginatedList = processedData.slice(
+  // Pagination
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  const paginatedList = filteredData.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedTypes, selectedPaymentMethods]);
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const renderSortIcon = (key) => {
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp size={16} color="white" />
+    ) : (
+      <ArrowDown size={16} color="white" />
+    );
+  };
 
   const toggleSelection = (list, setList, value) => {
     if (list.includes(value)) {
@@ -196,29 +189,41 @@ export default function TransactionsIndex() {
     }
   };
 
+  const uniqueTypes = [
+    ...new Set(transactionList.map((t) => t.type).filter(Boolean)),
+  ];
+  const uniqueMethods = [
+    ...new Set(transactionList.map((t) => t.paymentMethod).filter(Boolean)),
+  ];
+  // const uniqueStatuses = ["Paid", "Unpaid"]; // Explicitly defined based on requirement
+
   return (
     <View className="flex-1 bg-gray-100 p-4 gap-4">
-      {/* --- TOP BAR (Fixed Height) --- */}
+      {/* --- TOP BAR --- */}
       <View className="h-14 flex-row items-center justify-between gap-2">
         <View className="flex-1 h-full flex-row items-center bg-white rounded-md px-3 border border-gray-200">
           <Search size={24} color="gray" />
           <TextInput
-            placeholder="Search ID or Type..."
+            placeholder="Search transactions..."
             className="flex-1 ml-2 text-lg text-gray-700 h-full"
-            style={{ textAlignVertical: "center" }}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(t) => {
+              setSearchQuery(t);
+              setCurrentPage(1);
+            }}
           />
         </View>
 
         <Pressable
           onPress={() => setFilterModalVisible(true)}
-          className={`h-full aspect-square items-center justify-center rounded-md border ${selectedTypes.length > 0 || selectedPaymentMethods.length > 0 ? "bg-blue-100 border-blue-500" : "bg-white border-gray-200"}`}
+          className={`h-full aspect-square items-center justify-center rounded-md border ${selectedTypes.length > 0 || selectedPaymentMethods.length > 0 || selectedStatuses.length > 0 ? "bg-blue-100 border-blue-500" : "bg-white border-gray-200"}`}
         >
           <Filter
             size={24}
             color={
-              selectedTypes.length > 0 || selectedPaymentMethods.length > 0
+              selectedTypes.length > 0 ||
+              selectedPaymentMethods.length > 0 ||
+              selectedStatuses.length > 0
                 ? "#2563eb"
                 : "gray"
             }
@@ -226,29 +231,50 @@ export default function TransactionsIndex() {
         </Pressable>
 
         <Pressable
-          onPress={handleNewTransaction}
-          className="h-full flex-row items-center justify-center bg-primary rounded-md px-6 active:bg-blue-700"
+          className="h-full flex-row items-center justify-center bg-primary rounded-md px-4 active:bg-blue-700"
+          onPress={async () => {
+            try {
+              const result = await db
+                .insert(transactions)
+                .values({
+                  date: new Date().toISOString().split("T")[0],
+                  status: "Draft",
+                  type: null,
+                  paymentMethod: null,
+                })
+                .returning();
+              if (result.length > 0) {
+                router.push({
+                  pathname: "/transactionSummary",
+                  params: { transactionId: result[0].id },
+                });
+              }
+            } catch (e) {
+              Alert.alert("Error", e.message);
+            }
+          }}
         >
           <Plus size={24} color="white" />
           <Text className="text-white text-lg font-bold ml-2">New</Text>
         </Pressable>
       </View>
 
-      {/* --- TABLE (Flex 1 - Fills Remaining Space) --- */}
+      {/* --- TABLE --- */}
       <View className="flex-1 bg-white rounded-lg overflow-hidden border border-gray-200">
-        {/* Header */}
         <View className="flex-row bg-gray-800 p-4">
           {[
-            { label: "ID", key: "id" },
-            { label: "Type", key: "type" },
-            { label: "Payment", key: "paymentMethod" },
-            { label: "Date", key: "date" },
-            { label: "Total", key: "totalAmount" },
+            { label: "ID", key: "id", flex: 0.5 },
+            { label: "Date", key: "date", flex: 1 },
+            { label: "Client", key: "clientName", flex: 1.5 },
+            { label: "Type", key: "type", flex: 0.8 },
+            { label: "Status", key: "paidAmount", flex: 1 },
+            { label: "Total", key: "totalAmount", flex: 1 },
           ].map((col) => (
             <Pressable
               key={col.key}
               onPress={() => handleSort(col.key)}
-              className="flex-1 flex-row items-center justify-center gap-2"
+              style={{ flex: col.flex }}
+              className="flex-row items-center justify-center gap-2"
             >
               <Text className="font-bold text-white text-lg">{col.label}</Text>
               {renderSortIcon(col.key)}
@@ -256,19 +282,13 @@ export default function TransactionsIndex() {
           ))}
         </View>
 
-        {/* List Content */}
-        {paginatedList.length === 0 ? (
-          <View
-            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-          >
-            <Text style={{ color: "#888" }}>No transactions found.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={paginatedList}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ flexGrow: 1 }} // Ensures list fills height
-            renderItem={({ item, index }) => (
+        <FlatList
+          data={paginatedList}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={{ flexGrow: 1 }}
+          renderItem={({ item, index }) => {
+            const status = getPaymentStatus(item);
+            return (
               <Pressable
                 onPress={() =>
                   router.push({
@@ -276,33 +296,69 @@ export default function TransactionsIndex() {
                     params: { transactionId: item.id },
                   })
                 }
-                // Use border-b on all items to separate rows clearly
-                className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} active:bg-blue-50`}
               >
-                <Text className="flex-1 text-gray-800 text-center text-lg font-medium">
-                  {item.id}
-                </Text>
+                {/* ID */}
                 <Text
-                  className={`flex-1 text-center text-lg font-bold ${item.type === "Selling" ? "text-green-600" : "text-blue-600"}`}
+                  style={{ flex: 0.5 }}
+                  className="text-gray-800 text-center text-lg font-medium"
                 >
-                  {item.type}
+                  #{item.id}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
-                  {item.paymentMethod}
-                </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+
+                {/* Date */}
+                <Text
+                  style={{ flex: 1 }}
+                  className="text-gray-600 text-center text-lg"
+                >
                   {item.date}
                 </Text>
-                <Text className="flex-1 text-blue-700 text-center text-lg font-bold">
-                  ₱{item.totalAmount?.toFixed(2)}
+
+                {/* Client */}
+                <Text
+                  style={{ flex: 1.5 }}
+                  className="text-gray-600 text-center text-lg"
+                  numberOfLines={1}
+                >
+                  {item.clientName || "-"}
+                </Text>
+
+                {/* Type */}
+                <Text
+                  style={{ flex: 0.8 }}
+                  className={`text-center text-lg font-bold ${item.type === "Selling" ? "text-green-600" : "text-blue-600"}`}
+                >
+                  {item.type || "-"}
+                </Text>
+
+                {/* Payment Status Badge */}
+                <View
+                  style={{ flex: 1 }}
+                  className="items-center justify-center"
+                >
+                  <View className={`px-2 py-1 rounded border ${status.color}`}>
+                    <Text
+                      className={`text-xs font-bold uppercase ${status.color.split(" ")[1]}`}
+                    >
+                      {status.label}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Total */}
+                <Text
+                  style={{ flex: 1 }}
+                  className="text-blue-700 text-center text-lg font-bold"
+                >
+                  ₱{item.totalAmount ? item.totalAmount.toFixed(2) : "0.00"}
                 </Text>
               </Pressable>
-            )}
-          />
-        )}
+            );
+          }}
+        />
       </View>
 
-      {/* --- PAGINATION CONTROLS (Fixed Height) --- */}
+      {/* --- PAGINATION --- */}
       <View className="h-14 flex-row items-center justify-center gap-3">
         <Pressable
           onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -311,13 +367,11 @@ export default function TransactionsIndex() {
         >
           <ChevronLeft size={24} color={currentPage === 1 ? "gray" : "black"} />
         </Pressable>
-
         <View className="h-full px-6 items-center justify-center bg-blue-600 rounded-md">
           <Text className="text-white text-xl font-bold">
             {currentPage} / {totalPages || 1}
           </Text>
         </View>
-
         <Pressable
           onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
           disabled={currentPage >= totalPages}
@@ -346,6 +400,34 @@ export default function TransactionsIndex() {
               <Pressable onPress={() => setFilterModalVisible(false)}>
                 <X size={24} color="gray" />
               </Pressable>
+            </View>
+
+            {/* Filter Section: Status (Paid/Unpaid only) */}
+            <View>
+              <Text className="text-gray-600 font-bold mb-2">
+                Payment Status
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {["Paid", "Unpaid"].map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    onPress={() =>
+                      toggleSelection(
+                        selectedStatuses,
+                        setSelectedStatuses,
+                        status,
+                      )
+                    }
+                    className={`px-4 py-2 rounded-full border ${selectedStatuses.includes(status) ? "bg-blue-100 border-blue-500" : "bg-gray-50 border-gray-200"}`}
+                  >
+                    <Text
+                      className={`${selectedStatuses.includes(status) ? "text-blue-700 font-bold" : "text-gray-600"}`}
+                    >
+                      {status}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
 
             {/* Filter Section: Transaction Type */}
@@ -378,7 +460,7 @@ export default function TransactionsIndex() {
                 Payment Method
               </Text>
               <View className="flex-row flex-wrap gap-2">
-                {uniquePaymentMethods.map((method) => (
+                {uniqueMethods.map((method) => (
                   <TouchableOpacity
                     key={method}
                     onPress={() =>
@@ -400,12 +482,12 @@ export default function TransactionsIndex() {
               </View>
             </View>
 
-            {/* Modal Footer */}
             <View className="flex-row justify-end gap-3 mt-4">
               <Pressable
                 onPress={() => {
                   setSelectedTypes([]);
                   setSelectedPaymentMethods([]);
+                  setSelectedStatuses([]);
                 }}
                 className="px-4 py-2"
               >

@@ -28,11 +28,14 @@ export const transactions = sqliteTable("transactions", {
   date: text("date").notNull(),
   status: text("status").default("Draft"),
 
-  // --- NEW CLIENT FIELDS ---
+  // --- NEW FIELD: PAYMENT TRACKING ---
+  paidAmount: real("paid_amount").default(0),
+
+  // --- CLIENT FIELDS ---
   clientName: text("client_name"),
   clientAffiliation: text("client_affiliation"),
 
-  // --- NEW LOGISTICS FIELDS (Selling Only) ---
+  // --- LOGISTICS FIELDS (Selling Only) ---
   driverName: text("driver_name"),
   truckPlate: text("truck_plate"),
   truckWeight: real("truck_weight"),
@@ -62,7 +65,6 @@ export const inventoryTransactionItems = sqliteTable(
   },
 );
 
-// --- UPDATED AUDIT TRAILS TABLE ---
 export const auditTrails = sqliteTable("audit_trails", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   inventoryId: integer("inventory_id")
@@ -71,7 +73,7 @@ export const auditTrails = sqliteTable("audit_trails", {
   action: text("action").notNull(),
   notes: text("notes"),
   date: text("date").notNull(),
-  evidenceImageUri: text("evidence_image_uri"), // New: Photo Evidence
-  previousWeight: real("previous_weight"), // New: For adjustments
-  newWeight: real("new_weight"), // New: For adjustments
+  evidenceImageUri: text("evidence_image_uri"),
+  previousWeight: real("previous_weight"),
+  newWeight: real("new_weight"),
 });
