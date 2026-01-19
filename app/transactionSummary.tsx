@@ -4,12 +4,12 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Edit, Plus, Printer, Trash2 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
@@ -56,7 +56,6 @@ export default function TransactionSummary() {
   const [grandTotal, setGrandTotal] = useState(0);
   const [transactionType, setTransactionType] = useState();
   const [paymentMethod, setPaymentMethod] = useState();
-  // Default to current date for the state
   const [transactionDate, setTransactionDate] = useState(new Date());
 
   const loadTransactionData = async () => {
@@ -70,7 +69,6 @@ export default function TransactionSummary() {
       setTransactionType(txHeader[0].type);
       setPaymentMethod(txHeader[0].paymentMethod);
       if (txHeader[0].date) {
-        // Attempt to parse DB date, fallback to now if invalid
         const dbDate = new Date(txHeader[0].date);
         if (!isNaN(dbDate.getTime())) {
           setTransactionDate(dbDate);
@@ -156,12 +154,13 @@ export default function TransactionSummary() {
     });
   };
 
-  // --- PRINT FUNCTIONALITY WITH EXPLICIT TIME FORMATTING ---
+  // --- PRINT FUNCTIONALITY ---
+  // This generates the time for the RECEIPT ONLY, ensuring it appears on paper.
+  // This does NOT save the time to the database.
   const handlePrint = async () => {
-    // Force use of current time for the receipt timestamp
     const now = new Date();
     const dateStr = now.toLocaleDateString();
-    const timeStr = now.toLocaleTimeString();
+    const timeStr = now.toLocaleTimeString(); // Prints time on receipt
     const fullDateTime = `${dateStr} ${timeStr}`;
 
     const html = `
@@ -180,7 +179,7 @@ export default function TransactionSummary() {
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                     <strong>Time:</strong>
-                    <span>${timeStr}</span>
+                    <span>${timeStr}</span> 
                 </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                     <strong>Type:</strong>
@@ -242,14 +241,17 @@ export default function TransactionSummary() {
       return;
     }
     try {
-      // Save the current timestamp to DB as a string
       const now = new Date();
+      // FIX: Save ONLY the date part (YYYY-MM-DD) to the database.
+      // This fixes the conflict with index.tsx/Dashboard which expects YYYY-MM-DD for grouping/sorting.
+      const isoDate = now.toISOString().split("T")[0];
+
       await db
         .update(transactions)
         .set({
           totalAmount: grandTotal,
           status: "Completed",
-          date: now.toLocaleString(), // Save full date and time string
+          date: isoDate,
         })
         .where(eq(transactions.id, transactionId));
 
