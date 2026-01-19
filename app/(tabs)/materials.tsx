@@ -26,7 +26,8 @@ import {
 
 // --- DATABASE IMPORTS ---
 import { desc, eq } from "drizzle-orm";
-import { materials } from "../../db/schema";
+// Added: inventory and transactionItems imports for dependency checking
+import { inventory, materials, transactionItems } from "../../db/schema";
 import { db } from "./_layout";
 
 const ITEMS_PER_PAGE = 9;
@@ -241,8 +242,6 @@ export default function MaterialIndex() {
         return;
       }
 
-      // Removed class validation check to make it optional
-
       if (!uom) {
         Alert.alert("Error", "UoM is required");
         return;
@@ -250,7 +249,7 @@ export default function MaterialIndex() {
 
       await db.insert(materials).values({
         name: materialName,
-        class: materialClass, // Can be null
+        class: materialClass,
         uom: uom,
       });
 
@@ -282,9 +281,34 @@ export default function MaterialIndex() {
     }
   };
 
+  // --- UPDATED DELETE LOGIC ---
   const handleDeleteMaterial = async () => {
     if (!selectedMaterial) return;
     try {
+      // 1. Check Constraint: Is this material used in Inventory?
+      const inInventory = await db
+        .select()
+        .from(inventory)
+        .where(eq(inventory.materialId, selectedMaterial.id))
+        .limit(1);
+
+      // 2. Check Constraint: Is this material used in Transactions?
+      const inTransactions = await db
+        .select()
+        .from(transactionItems)
+        .where(eq(transactionItems.materialId, selectedMaterial.id))
+        .limit(1);
+
+      // If either check returns a result, block deletion
+      if (inInventory.length > 0 || inTransactions.length > 0) {
+        Alert.alert(
+          "Restricted",
+          `Cannot delete "${selectedMaterial.name}". It is currently referenced by existing Inventory batches or Transaction records. You must delete those records first.`,
+        );
+        return;
+      }
+
+      // 3. Proceed if safe
       await db.delete(materials).where(eq(materials.id, selectedMaterial.id));
       setEditModalVisible(false);
       resetForm();
@@ -343,7 +367,6 @@ export default function MaterialIndex() {
               </View>
               <View className="flex-row gap-4">
                 <View className="flex-1">
-                  {/* Updated Label to indicate optional */}
                   <Text className="text-gray-700 font-bold mb-1">
                     Class (Optional)
                   </Text>
@@ -514,7 +537,7 @@ export default function MaterialIndex() {
             { label: "Material Name", key: "name", flex: 2 },
             { label: "Class", key: "class", flex: 1 },
             { label: "UoM", key: "uom", flex: 1 },
-            { label: "Total Load", key: "totalLoad", flex: 1 }, // sorting for this might not be needed if always '-', but kept for consistency
+            { label: "Total Load", key: "totalLoad", flex: 1 },
           ].map((col) => (
             <Pressable
               key={col.key}
