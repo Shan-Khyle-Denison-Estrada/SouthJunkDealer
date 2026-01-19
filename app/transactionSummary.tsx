@@ -329,9 +329,15 @@ export default function TransactionSummary() {
 
   const confirmFinish = async () => {
     try {
-      const now = new Date();
       const finalPaidAmount = parseFloat(paidAmountInput) || 0;
-      const isoDate = now.toISOString().split("T")[0];
+
+      // --- FIX: Use Local Date instead of ISO (UTC) ---
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const localDate = `${year}-${month}-${day}`;
+      // ------------------------------------------------
 
       let finalTxId = transactionId;
 
@@ -361,7 +367,7 @@ export default function TransactionSummary() {
             totalAmount: grandTotal,
             paidAmount: finalPaidAmount,
             status: "Completed",
-            date: isoDate,
+            date: localDate, // Uses local date
             clientName,
             clientAffiliation: clientAffiliation || null,
             driverName: transactionType === "Selling" ? driverName : null,
@@ -435,7 +441,7 @@ export default function TransactionSummary() {
                 inventoryId: batch.id,
                 action: "Stock Out",
                 notes: `Sold in Tx #${finalTxId}`,
-                date: isoDate,
+                date: localDate, // Uses local date
                 previousWeight: batch.netWeight,
                 newWeight: newWeight,
               });

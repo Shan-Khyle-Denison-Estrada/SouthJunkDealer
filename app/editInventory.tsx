@@ -3,28 +3,28 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Plus, Trash2, X } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-    auditTrails,
-    inventory,
-    inventoryTransactionItems,
-    materials,
-    transactionItems,
-    transactions,
+  auditTrails,
+  inventory,
+  inventoryTransactionItems,
+  materials,
+  transactionItems,
+  transactions,
 } from "../db/schema";
 import { db } from "./_layout";
 
@@ -304,7 +304,14 @@ export default function EditInventory() {
     // PREPARE DATA FOR AUDIT TRAIL
     const currentWeight = parseFloat(inventoryRecord.netWeight || 0);
     const newWeight = currentWeight + val;
-    const now = new Date().toISOString().split("T")[0];
+
+    // --- FIX: Use Local System Time ---
+    const nowObj = new Date();
+    const year = nowObj.getFullYear();
+    const month = String(nowObj.getMonth() + 1).padStart(2, "0");
+    const day = String(nowObj.getDate()).padStart(2, "0");
+    const now = `${year}-${month}-${day}`;
+    // ----------------------------------
 
     try {
       await db.transaction(async (tx) => {
@@ -329,7 +336,7 @@ export default function EditInventory() {
           inventoryId: inventoryRecord.id,
           action: "Batch Update",
           notes: `Added ${val}kg from Transaction Item #${selectedSourceId}`,
-          date: now,
+          date: now, // Uses local date
           previousWeight: currentWeight,
           newWeight: newWeight,
         });
@@ -411,7 +418,14 @@ export default function EditInventory() {
             text: "Delete",
             style: "destructive",
             onPress: async () => {
-              const now = new Date().toISOString().split("T")[0];
+              // --- FIX: Use Local System Time ---
+              const nowObj = new Date();
+              const year = nowObj.getFullYear();
+              const month = String(nowObj.getMonth() + 1).padStart(2, "0");
+              const day = String(nowObj.getDate()).padStart(2, "0");
+              const now = `${year}-${month}-${day}`;
+              // ----------------------------------
+
               const currentWeight = parseFloat(inventoryRecord.netWeight || 0);
 
               try {
@@ -432,7 +446,7 @@ export default function EditInventory() {
                     inventoryId: inventoryRecord.id,
                     action: "Deleted", // New action type
                     notes: "Batch soft deleted by user. History preserved.",
-                    date: now,
+                    date: now, // Uses local date
                     previousWeight: currentWeight,
                     newWeight: 0,
                   });

@@ -315,7 +315,14 @@ export default function InventoryIndex() {
     try {
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const generatedBatchId = `BATCH-${randomSuffix}-A`;
-      const today = new Date().toISOString().split("T")[0];
+
+      // --- FIX: Use Local System Time instead of UTC (toISOString) ---
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const today = `${year}-${month}-${day}`;
+      // -------------------------------------------------------------
 
       const qrData = JSON.stringify({
         type: "inventory",
@@ -328,7 +335,7 @@ export default function InventoryIndex() {
         batchId: generatedBatchId,
         materialId: selectedMaterialId,
         netWeight: 0,
-        date: today,
+        date: today, // Uses local date
         status: "In Stock",
         imageUri: imageUri,
         qrContent: qrData,

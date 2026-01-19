@@ -124,7 +124,12 @@ export default function Index() {
           startDate.setDate(startDate.getDate() - 7);
           break;
       }
-      const dateStr = startDate.toISOString().split("T")[0];
+
+      // FIXED: Adjust for local timezone before ISO conversion
+      const localStartDate = new Date(
+        startDate.getTime() - startDate.getTimezoneOffset() * 60000,
+      );
+      const dateStr = localStartDate.toISOString().split("T")[0];
 
       const rawTxns = await db
         .select({
@@ -154,7 +159,13 @@ export default function Index() {
       setProfitData(profitArray);
 
       // 4. Today's Metrics
-      const todayIsoStr = new Date().toISOString().split("T")[0];
+      // FIXED: Use local timezone adjusted date instead of UTC
+      const now = new Date();
+      const localNow = new Date(
+        now.getTime() - now.getTimezoneOffset() * 60000,
+      );
+      const todayIsoStr = localNow.toISOString().split("T")[0];
+
       const todayTxns = await db
         .select({ type: transactions.type, amount: transactions.totalAmount })
         .from(transactions)

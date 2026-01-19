@@ -4,28 +4,28 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Camera, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Image,
-    Keyboard,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  Keyboard,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
 import {
-    auditTrails,
-    inventory,
-    inventoryTransactionItems,
-    materials,
-    transactionItems,
-    transactions,
+  auditTrails,
+  inventory,
+  inventoryTransactionItems,
+  materials,
+  transactionItems,
+  transactions,
 } from "../db/schema";
 import { db } from "./_layout";
 
@@ -289,7 +289,14 @@ export default function ScannedInventory() {
 
   const handleConfirmModal = async () => {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      // --- FIX: Use Local System Time instead of UTC (toISOString) ---
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const today = `${year}-${month}-${day}`;
+      // -------------------------------------------------------------
+
       const currentWeight = parseFloat(scannedData.netWeight);
       const newWeightVal =
         status === "Adjusted" ? parseFloat(adjustedWeight) : null;
@@ -304,7 +311,7 @@ export default function ScannedInventory() {
           inventoryId: selectedBatchId,
           action: status,
           notes: notes,
-          date: today,
+          date: today, // Uses local date
           evidenceImageUri: evidenceJson, // Saving as JSON string
           previousWeight: status === "Adjusted" ? currentWeight : null,
           newWeight: newWeightVal,
@@ -331,7 +338,7 @@ export default function ScannedInventory() {
               .insert(transactions)
               .values({
                 type: type,
-                date: today,
+                date: today, // Uses local date
                 status: "Completed",
                 totalAmount: 0, // No financial exchange for adjustments usually
               })

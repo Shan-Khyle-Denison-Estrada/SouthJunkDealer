@@ -16,7 +16,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import "../global.css";
 
@@ -147,5 +147,5 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  buttonText: { color: "#333", fontWeight: "bold", fontSize: 14 },
+  buttonText: { color: "#ffffff", fontWeight: "bold", fontSize: 14 },
 });
