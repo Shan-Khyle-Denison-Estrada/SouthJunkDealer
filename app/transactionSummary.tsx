@@ -472,7 +472,7 @@ export default function TransactionSummary() {
         {/* HEADER INPUTS */}
         <View className="bg-white p-3 rounded-lg border border-gray-200 gap-3 shadow-sm">
           <View className="flex-row gap-3">
-            <View className="flex-[0.8]">
+            <View className="flex-1">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
                 Type
               </Text>
@@ -704,7 +704,8 @@ export default function TransactionSummary() {
                 <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
                   Material
                 </Text>
-                <View style={styles.pickerContainer}>
+                {/* CHANGED: Added inline style array to increase height to 60 */}
+                <View style={[styles.pickerContainer, { height: 60 }]}>
                   <Picker
                     selectedValue={newItemMaterialId}
                     onValueChange={setNewItemMaterialId}
