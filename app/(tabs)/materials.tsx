@@ -1,8 +1,9 @@
-import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect } from "expo-router";
 import {
   ArrowDown,
   ArrowUp,
+  Check,
+  ChevronDown, // Imported ChevronDown
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -25,56 +26,87 @@ import {
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
-// Added 'sql' to imports for aggregation
 import { desc, eq, sql } from "drizzle-orm";
 import { inventory, materials, transactionItems } from "../../db/schema";
 import { db } from "./_layout";
 
 const ITEMS_PER_PAGE = 9;
 
-// --- REUSABLE PICKER ---
+// --- CUSTOM PICKER COMPONENT ---
 const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const truncate = (str, n) =>
-    str?.length > n ? str.substr(0, n - 1) + "..." : str;
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const selectedItem = items.find((i) => i.value === selectedValue);
+  const displayLabel = selectedItem ? selectedItem.label : placeholder;
 
   return (
-    <View style={[styles.pickerContainer, isFocused && styles.pickerFocused]}>
-      <View style={styles.visualContainer}>
+    <>
+      {/* 1. The Trigger Field - Fully Clickable */}
+      <Pressable
+        onPress={() => setModalVisible(true)}
+        style={styles.pickerTrigger}
+      >
         <Text
           style={[styles.pickerText, !selectedValue && styles.placeholderText]}
           numberOfLines={1}
         >
-          {selectedValue
-            ? items.find((i) => i.value === selectedValue)?.label ||
-              selectedValue
-            : placeholder}
+          {displayLabel}
         </Text>
-        <View style={styles.arrowContainer}>
-          <View style={[styles.roundedArrow, isFocused && styles.arrowOpen]} />
-        </View>
-      </View>
-      <Picker
-        selectedValue={selectedValue}
-        onValueChange={(v) => {
-          onValueChange(v);
-          setIsFocused(false);
-        }}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        style={styles.invisiblePicker}
-        mode="dropdown"
+        {/* CHANGED: Used ChevronDown for a simple arrowhead without tail */}
+        <ChevronDown size={20} color="gray" />
+      </Pressable>
+
+      {/* 2. The Options Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
       >
-        <Picker.Item label={placeholder} value={null} enabled={false} />
-        {items.map((item, index) => (
-          <Picker.Item
-            key={index}
-            label={truncate(item.label, 25)}
-            value={item.value}
-          />
-        ))}
-      </Picker>
-    </View>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.pickerOptionsContainer}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>{placeholder}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <X size={24} color="gray" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={items}
+              keyExtractor={(item) => item.value}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerOption,
+                    selectedValue === item.value && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => {
+                    onValueChange(item.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerOptionText,
+                      selectedValue === item.value &&
+                        styles.pickerOptionTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {selectedValue === item.value && (
+                    <Check size={20} color="#2563eb" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 };
 
@@ -123,15 +155,12 @@ export default function MaterialIndex() {
   // --- DATA FETCHING ---
   const loadData = async () => {
     try {
-      // Updated query to fetch materials AND sum of inventory weight
       const data = await db
         .select({
           id: materials.id,
           name: materials.name,
           class: materials.class,
           uom: materials.uom,
-          // Calculate total stock by summing inventory netWeight
-          // COALESCE ensures we get 0 instead of null if no inventory exists
           totalStock: sql`COALESCE(SUM(${inventory.netWeight}), 0)`,
         })
         .from(materials)
@@ -180,11 +209,10 @@ export default function MaterialIndex() {
     );
   };
 
-  // --- PROCESSING DATA (Filter -> Sort -> Paginate) ---
+  // --- PROCESSING DATA ---
   const processedData = useMemo(() => {
     let data = [...materialsData];
 
-    // 1. Search Filter
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       data = data.filter(
@@ -195,7 +223,6 @@ export default function MaterialIndex() {
       );
     }
 
-    // 2. Category Filters
     if (selectedClasses.length > 0) {
       data = data.filter((item) => selectedClasses.includes(item.class));
     }
@@ -203,17 +230,14 @@ export default function MaterialIndex() {
       data = data.filter((item) => selectedUoms.includes(item.uom));
     }
 
-    // 3. Sorting
     data.sort((a, b) => {
       let valA = a[sortConfig.key];
       let valB = b[sortConfig.key];
 
-      // Numeric sorting for ID and Total Stock
       if (sortConfig.key === "id" || sortConfig.key === "totalStock") {
         valA = Number(valA || 0);
         valB = Number(valB || 0);
       } else {
-        // String sorting
         valA = valA ? valA.toString().toLowerCase() : "";
         valB = valB ? valB.toString().toLowerCase() : "";
       }
@@ -226,14 +250,12 @@ export default function MaterialIndex() {
     return data;
   }, [materialsData, searchQuery, sortConfig, selectedClasses, selectedUoms]);
 
-  // 4. Pagination
   const totalPages = Math.ceil(processedData.length / ITEMS_PER_PAGE);
   const paginatedList = processedData.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
 
-  // Reset page on filter change
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedClasses, selectedUoms]);
@@ -253,18 +275,15 @@ export default function MaterialIndex() {
         Alert.alert("Error", "Material Name is required");
         return;
       }
-
       if (!uom) {
         Alert.alert("Error", "UoM is required");
         return;
       }
-
       await db.insert(materials).values({
         name: materialName,
         class: materialClass,
         uom: uom,
       });
-
       setAddModalVisible(false);
       resetForm();
       loadData();
@@ -284,7 +303,6 @@ export default function MaterialIndex() {
           uom: uom,
         })
         .where(eq(materials.id, selectedMaterial.id));
-
       setEditModalVisible(false);
       resetForm();
       loadData();
@@ -293,25 +311,21 @@ export default function MaterialIndex() {
     }
   };
 
-  // --- DELETE LOGIC ---
   const handleDeleteMaterial = async () => {
     if (!selectedMaterial) return;
     try {
-      // 1. Check Constraint: Is this material used in Inventory?
       const inInventory = await db
         .select()
         .from(inventory)
         .where(eq(inventory.materialId, selectedMaterial.id))
         .limit(1);
 
-      // 2. Check Constraint: Is this material used in Transactions?
       const inTransactions = await db
         .select()
         .from(transactionItems)
         .where(eq(transactionItems.materialId, selectedMaterial.id))
         .limit(1);
 
-      // If either check returns a result, block deletion
       if (inInventory.length > 0 || inTransactions.length > 0) {
         Alert.alert(
           "Restricted",
@@ -320,7 +334,6 @@ export default function MaterialIndex() {
         return;
       }
 
-      // 3. Proceed if safe
       await db.delete(materials).where(eq(materials.id, selectedMaterial.id));
       setEditModalVisible(false);
       resetForm();
@@ -354,8 +367,11 @@ export default function MaterialIndex() {
         visible={addModalVisible}
         onRequestClose={() => setAddModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setAddModalVisible(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={() => {}}>
             <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
               <Text className="text-xl font-bold text-gray-800">
                 New Material
@@ -421,8 +437,8 @@ export default function MaterialIndex() {
                 <Text className="font-bold text-white">Save</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {/* --- EDIT MODAL --- */}
@@ -432,8 +448,11 @@ export default function MaterialIndex() {
         visible={editModalVisible}
         onRequestClose={() => setEditModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setEditModalVisible(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={() => {}}>
             <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
               <Text className="text-xl font-bold text-gray-800">
                 Edit Material: {selectedMaterial?.id}
@@ -497,11 +516,11 @@ export default function MaterialIndex() {
                 <Text className="font-bold text-white">Update</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
-      {/* --- TOP BAR (Fixed Height) --- */}
+      {/* --- TOP BAR --- */}
       <View className="h-14 flex-row items-center justify-between gap-2">
         <View className="flex-1 h-full flex-row items-center bg-white rounded-md px-3 border border-gray-200">
           <Search size={24} color="gray" />
@@ -514,7 +533,6 @@ export default function MaterialIndex() {
           />
         </View>
 
-        {/* Filter Button */}
         <Pressable
           onPress={() => setFilterModalVisible(true)}
           className={`h-full aspect-square items-center justify-center rounded-md border ${selectedClasses.length > 0 || selectedUoms.length > 0 ? "bg-blue-100 border-blue-500" : "bg-white border-gray-200"}`}
@@ -541,7 +559,7 @@ export default function MaterialIndex() {
         </Pressable>
       </View>
 
-      {/* --- TABLE (Flex 1) --- */}
+      {/* --- TABLE --- */}
       <View className="flex-1 bg-white rounded-lg overflow-hidden border border-gray-200">
         <View className="flex-row bg-gray-800 p-4">
           {[
@@ -549,7 +567,6 @@ export default function MaterialIndex() {
             { label: "Material Name", key: "name", flex: 2 },
             { label: "Class", key: "class", flex: 1 },
             { label: "Unit of Measurement", key: "uom", flex: 1 },
-            // Changed key to totalStock and label to Total Stock
             { label: "Total Stock", key: "totalStock", flex: 1 },
           ].map((col) => (
             <Pressable
@@ -601,7 +618,6 @@ export default function MaterialIndex() {
                 <Text className="flex-1 text-gray-600 text-center text-lg">
                   {item.uom}
                 </Text>
-                {/* Display calculated total stock */}
                 <Text className="flex-1 text-blue-700 text-center text-lg font-bold">
                   {Number(item.totalStock).toFixed(2)}
                 </Text>
@@ -611,7 +627,7 @@ export default function MaterialIndex() {
         )}
       </View>
 
-      {/* --- PAGINATION (Fixed Height) --- */}
+      {/* --- PAGINATION --- */}
       <View className="h-14 flex-row items-center justify-center gap-3">
         <Pressable
           onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -646,8 +662,11 @@ export default function MaterialIndex() {
         animationType="fade"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white w-full max-w-md rounded-lg p-6 gap-4 shadow-xl">
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setFilterModalVisible(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={() => {}}>
             <View className="flex-row justify-between items-center">
               <Text className="text-xl font-bold text-gray-800">
                 Filter Materials
@@ -721,63 +740,84 @@ export default function MaterialIndex() {
                 <Text className="text-white font-bold">Apply Filters</Text>
               </Pressable>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  pickerContainer: {
-    flex: 1,
-    backgroundColor: "white",
-    borderRadius: 6,
-    justifyContent: "center",
-    position: "relative",
-    overflow: "hidden",
-    width: "100%",
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  pickerFocused: { borderColor: "#F2C94C" },
-  visualContainer: {
+  // New Styles for the Custom Picker
+  pickerTrigger: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: "#f3f4f6", // Matched input bg
+    borderWidth: 1,
+    borderColor: "#d1d5db", // Matched input border
+    borderRadius: 6,
     paddingHorizontal: 12,
-    height: "100%",
+    height: "100%", // Inherit height from parent View
     width: "100%",
   },
-  pickerText: { fontSize: 16, color: "black", flex: 1, marginRight: 10 },
-  placeholderText: { color: "#9ca3af" },
-  arrowContainer: {
-    justifyContent: "center",
+  pickerText: {
+    fontSize: 16,
+    color: "black",
+    flex: 1,
+  },
+  placeholderText: {
+    color: "#9ca3af",
+  },
+  // Modal Styles for Picker
+  pickerOptionsContainer: {
+    backgroundColor: "white",
+    width: "40%", // Narrower than main modal
+    maxHeight: "50%",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 10,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    width: 20,
-    height: 20,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingBottom: 8,
   },
-  roundedArrow: {
-    width: 10,
-    height: 10,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    borderColor: "black",
-    transform: [{ rotate: "45deg" }],
-    marginTop: -4,
-    borderRadius: 2,
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#374151",
   },
-  arrowOpen: { transform: [{ rotate: "225deg" }], marginTop: 4 },
-  invisiblePicker: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    width: "100%",
-    height: "100%",
+  pickerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f9fafb",
   },
+  pickerOptionSelected: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 6,
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: "#4b5563",
+  },
+  pickerOptionTextSelected: {
+    color: "#2563eb",
+    fontWeight: "bold",
+  },
+  // Main Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

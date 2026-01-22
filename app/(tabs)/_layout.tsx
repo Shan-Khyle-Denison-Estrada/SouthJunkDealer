@@ -45,9 +45,9 @@ function CustomDrawerContent(props: any) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.button}
-          onPress={() => router.push("/inventory")}
+          onPress={() => router.push("/scanQR")}
         >
-          <Text style={styles.buttonText}>Check Inventory</Text>
+          <Text style={styles.buttonText}>Scan QR</Text>
         </TouchableOpacity>
       </View>
       <DrawerItemList {...props} />
