@@ -1,7 +1,15 @@
-import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Camera, X } from "lucide-react-native";
+import {
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Images,
+  Trash2,
+  X,
+  XCircle,
+} from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -9,11 +17,13 @@ import {
   Image,
   Keyboard,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -29,7 +39,7 @@ import {
 } from "../db/schema";
 import { db } from "./_layout";
 
-// --- REUSABLE COMPONENT: Standard Picker (Kept for Status) ---
+// --- REUSABLE COMPONENT: Custom Modal Picker ---
 const CustomPicker = ({
   selectedValue,
   onValueChange,
@@ -37,19 +47,17 @@ const CustomPicker = ({
   items,
   enabled = true,
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const truncate = (str, n) =>
-    str?.length > n ? str.substr(0, n - 1) + "..." : str;
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const selectedItem = items.find((i) => i.value === selectedValue);
+  const displayLabel = selectedItem ? selectedItem.label : placeholder;
 
   return (
-    <View
-      style={[
-        styles.pickerContainer,
-        isFocused && styles.pickerFocused,
-        !enabled && styles.pickerDisabled,
-      ]}
-    >
-      <View style={styles.visualContainer}>
+    <>
+      <Pressable
+        onPress={() => enabled && setModalVisible(true)}
+        style={[styles.pickerTrigger, !enabled && styles.pickerDisabled]}
+      >
         <Text
           style={[
             styles.pickerText,
@@ -58,43 +66,61 @@ const CustomPicker = ({
           ]}
           numberOfLines={1}
         >
-          {selectedValue
-            ? items.find((i) => i.value === selectedValue)?.label ||
-              selectedValue
-            : placeholder}
+          {displayLabel}
         </Text>
-        {enabled && (
-          <View style={styles.arrowContainer}>
-            <View
-              style={[styles.roundedArrow, isFocused && styles.arrowOpen]}
+        <ChevronDown size={20} color={enabled ? "gray" : "#9ca3af"} />
+      </Pressable>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.pickerOptionsContainer}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>{placeholder}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <X size={24} color="gray" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={items}
+              keyExtractor={(item) => String(item.value)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerOption,
+                    selectedValue === item.value && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => {
+                    onValueChange(item.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerOptionText,
+                      selectedValue === item.value &&
+                        styles.pickerOptionTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {selectedValue === item.value && (
+                    <Check size={20} color="#2563eb" />
+                  )}
+                </TouchableOpacity>
+              )}
             />
           </View>
-        )}
-      </View>
-      <Picker
-        selectedValue={selectedValue}
-        onValueChange={(v) => {
-          if (enabled) {
-            onValueChange(v);
-            setIsFocused(false);
-          }
-        }}
-        onFocus={() => enabled && setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        style={styles.invisiblePicker}
-        enabled={enabled}
-        mode="dropdown"
-      >
-        <Picker.Item label={placeholder} value={null} enabled={false} />
-        {items.map((item, index) => (
-          <Picker.Item
-            key={index}
-            label={truncate(item.label, 35)}
-            value={item.value}
-          />
-        ))}
-      </Picker>
-    </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 };
 
@@ -102,6 +128,7 @@ export default function ScannedInventory() {
   // Get params
   const params = useLocalSearchParams();
   const passedBatchId = params.batchId;
+  const { width } = useWindowDimensions(); // Get screen width for carousel
 
   // State
   const [inventoryBatches, setInventoryBatches] = useState([]);
@@ -125,8 +152,10 @@ export default function ScannedInventory() {
   const [status, setStatus] = useState("Verified");
   const [notes, setNotes] = useState("");
 
-  // Changed to Array for Multiple Images
+  // Evidence Images
   const [evidenceImages, setEvidenceImages] = useState([]);
+  const [galleryModalVisible, setGalleryModalVisible] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0); // Track carousel index
 
   const [adjustedWeight, setAdjustedWeight] = useState("");
   const [isModalVisible, setModalVisible] = useState(false);
@@ -147,7 +176,7 @@ export default function ScannedInventory() {
         .leftJoin(materials, eq(inventory.materialId, materials.id));
 
       const formattedBatches = result.map((b) => ({
-        label: `${b.batchId} - ${b.materialName}`, // Combined for searchability
+        label: `${b.batchId} - ${b.materialName}`,
         displayLabel: b.batchId,
         value: b.id,
         ...b,
@@ -156,7 +185,6 @@ export default function ScannedInventory() {
       setInventoryBatches(formattedBatches);
       setFilteredBatches(formattedBatches);
 
-      // AUTO SELECT if passedBatchId exists
       if (passedBatchId) {
         const target = formattedBatches.find(
           (b) => b.displayLabel === passedBatchId,
@@ -217,10 +245,9 @@ export default function ScannedInventory() {
     }
   };
 
-  // Handle Batch Selection (Updated for Searchable Dropdown)
   const handleBatchChange = (batchItem) => {
     setSelectedBatchId(batchItem.value);
-    setBatchSearchQuery(batchItem.label); // Set input to selected label
+    setBatchSearchQuery(batchItem.label);
     setIsBatchDropdownOpen(false);
     Keyboard.dismiss();
 
@@ -240,14 +267,30 @@ export default function ScannedInventory() {
     }
   };
 
-  // Handle Numeric Input Only
+  const handleClearBatch = () => {
+    setBatchSearchQuery("");
+    setSelectedBatchId(null);
+    setFilteredBatches(inventoryBatches);
+    setScannedData({
+      material: "",
+      netWeight: "",
+      uom: "",
+      supplier: "",
+      location: "",
+      materialId: null,
+    });
+    setLineItems([]);
+    setEvidenceImages([]);
+    setAdjustedWeight("");
+    setIsBatchDropdownOpen(true);
+  };
+
   const handleNumericInput = (text, setter) => {
     if (text === "" || /^\d*\.?\d*$/.test(text)) {
       setter(text);
     }
   };
 
-  // Take Photo (Multiple)
   const handleTakePhoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (permissionResult.granted === false) {
@@ -263,13 +306,30 @@ export default function ScannedInventory() {
     });
 
     if (!result.canceled) {
-      // Append new image to array
       setEvidenceImages((prev) => [...prev, result.assets[0].uri]);
     }
   };
 
-  const removeImage = (indexToRemove) => {
-    setEvidenceImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  const removeImage = () => {
+    // Remove the currently visible image
+    setEvidenceImages((prev) =>
+      prev.filter((_, idx) => idx !== currentImageIndex),
+    );
+    // Adjust index if we deleted the last image
+    if (currentImageIndex >= evidenceImages.length - 1) {
+      setCurrentImageIndex(Math.max(0, evidenceImages.length - 2));
+    }
+    // If no images left, close modal automatically (optional, but good UX)
+    if (evidenceImages.length === 1) {
+      setGalleryModalVisible(false);
+    }
+  };
+
+  // Carousel Scroll Handler
+  const handleScroll = (event) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollPosition / width);
+    setCurrentImageIndex(index);
   };
 
   const handleSubmit = () => {
@@ -289,37 +349,31 @@ export default function ScannedInventory() {
 
   const handleConfirmModal = async () => {
     try {
-      // --- FIX: Use Local System Time instead of UTC (toISOString) ---
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const day = String(now.getDate()).padStart(2, "0");
       const today = `${year}-${month}-${day}`;
-      // -------------------------------------------------------------
 
       const currentWeight = parseFloat(scannedData.netWeight);
       const newWeightVal =
         status === "Adjusted" ? parseFloat(adjustedWeight) : null;
 
-      // Serialize images array to string for DB
       const evidenceJson =
         evidenceImages.length > 0 ? JSON.stringify(evidenceImages) : null;
 
       await db.transaction(async (tx) => {
-        // 1. Create Audit Record
         await tx.insert(auditTrails).values({
           inventoryId: selectedBatchId,
           action: status,
           notes: notes,
-          date: today, // Uses local date
-          evidenceImageUri: evidenceJson, // Saving as JSON string
+          date: today,
+          evidenceImageUri: evidenceJson,
           previousWeight: status === "Adjusted" ? currentWeight : null,
           newWeight: newWeightVal,
         });
 
-        // 2. Handle Adjustments
         if (status === "Adjusted" && newWeightVal !== null) {
-          // Update Physical Inventory Weight
           await tx
             .update(inventory)
             .set({ netWeight: newWeightVal })
@@ -328,24 +382,21 @@ export default function ScannedInventory() {
           const weightDiff = currentWeight - newWeightVal;
 
           if (weightDiff !== 0) {
-            // Determine Type: Loss (Positive diff) or Gain (Negative diff)
             const isLoss = weightDiff > 0;
             const type = isLoss ? "Adjustment-Loss" : "Adjustment-Gain";
             const absWeight = Math.abs(weightDiff);
 
-            // Create System Transaction
             const txRes = await tx
               .insert(transactions)
               .values({
                 type: type,
-                date: today, // Uses local date
+                date: today,
                 status: "Completed",
-                totalAmount: 0, // No financial exchange for adjustments usually
+                totalAmount: 0,
               })
               .returning();
             const newTxId = txRes[0].id;
 
-            // Create Transaction Item
             const txItemRes = await tx
               .insert(transactionItems)
               .values({
@@ -358,7 +409,6 @@ export default function ScannedInventory() {
               .returning();
             const newTxItemId = txItemRes[0].id;
 
-            // Link to Inventory (Crucial for FIFO!)
             await tx.insert(inventoryTransactionItems).values({
               inventoryId: selectedBatchId,
               transactionItemId: newTxItemId,
@@ -379,6 +429,7 @@ export default function ScannedInventory() {
         uom: "",
         supplier: "",
         location: "",
+        materialId: null,
       });
       setEvidenceImages([]);
       setAdjustedWeight("");
@@ -395,6 +446,17 @@ export default function ScannedInventory() {
 
   return (
     <View className="flex-1 bg-gray-100 p-4 gap-4" style={{ zIndex: 1 }}>
+      {/* CLICK OUTSIDE OVERLAY */}
+      {isBatchDropdownOpen && (
+        <Pressable
+          className="absolute top-0 left-0 right-0 bottom-0 z-40"
+          onPress={() => {
+            setIsBatchDropdownOpen(false);
+            Keyboard.dismiss();
+          }}
+        />
+      )}
+
       {/* HEADER ROW with SEARCHABLE DROPDOWN */}
       <View className="items-center justify-center z-50">
         <Text className="text-gray-500 font-bold mb-2 uppercase tracking-widest">
@@ -407,27 +469,34 @@ export default function ScannedInventory() {
               onChangeText={(text) => {
                 setBatchSearchQuery(text);
                 setIsBatchDropdownOpen(true);
-                setSelectedBatchId(null); // Clear selection if typing new
+                setSelectedBatchId(null);
               }}
               onFocus={() => setIsBatchDropdownOpen(true)}
               placeholder="Type to filter Batch ID..."
               className="flex-1 text-base text-black h-full"
             />
-            {isBatchDropdownOpen && (
-              <TouchableOpacity onPress={() => setIsBatchDropdownOpen(false)}>
-                <View style={[styles.roundedArrow, styles.arrowOpen]} />
+            {batchSearchQuery.length > 0 && (
+              <TouchableOpacity onPress={handleClearBatch} className="mr-2">
+                <XCircle size={18} color="gray" />
               </TouchableOpacity>
             )}
-            {!isBatchDropdownOpen && (
-              <TouchableOpacity onPress={() => setIsBatchDropdownOpen(true)}>
-                <View style={styles.roundedArrow} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              onPress={() => setIsBatchDropdownOpen(!isBatchDropdownOpen)}
+            >
+              {isBatchDropdownOpen ? (
+                <ChevronUp size={20} color="gray" />
+              ) : (
+                <ChevronDown size={20} color="gray" />
+              )}
+            </TouchableOpacity>
           </View>
 
           {/* ABSOLUTE DROPDOWN LIST */}
           {isBatchDropdownOpen && (
-            <View className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded-b-md max-h-48 shadow-lg z-50 elevation-5">
+            <View
+              className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded-b-md shadow-lg z-50 elevation-5"
+              style={{ maxHeight: 400 }}
+            >
               <FlatList
                 data={filteredBatches}
                 keyExtractor={(item) => item.value.toString()}
@@ -497,7 +566,6 @@ export default function ScannedInventory() {
           />
         </View>
 
-        {/* SHOW ADJUST INPUT ONLY IF STATUS IS ADJUSTED */}
         {status === "Adjusted" && (
           <View className="flex-1">
             <Text className="text-blue-600 font-bold mb-1">
@@ -516,7 +584,7 @@ export default function ScannedInventory() {
         )}
       </View>
 
-      {/* ROW 4: Photo Evidence & Notes (BIGGER) */}
+      {/* ROW 4: Photo Evidence & Notes */}
       <View className="flex-row gap-4 -z-10">
         <View className="flex-1">
           <Text className="text-gray-700 font-bold mb-1">
@@ -524,10 +592,9 @@ export default function ScannedInventory() {
           </Text>
 
           <View className="h-48 border-2 border-dashed border-gray-300 bg-gray-50 rounded-md p-2">
-            {/* Camera Button */}
             <TouchableOpacity
               onPress={handleTakePhoto}
-              className="flex-row items-center justify-center p-2 bg-white border border-gray-300 rounded mb-2 shadow-sm"
+              className="flex-row items-center justify-center p-3 bg-white border border-gray-300 rounded shadow-sm"
             >
               <Camera size={20} color="#4b5563" />
               <Text className="text-gray-700 font-bold ml-2 text-xs">
@@ -535,37 +602,31 @@ export default function ScannedInventory() {
               </Text>
             </TouchableOpacity>
 
-            {/* Image Gallery */}
-            <ScrollView contentContainerStyle={{ gap: 8 }}>
-              {evidenceImages.map((uri, idx) => (
-                <View key={idx} className="relative w-full h-32 mb-2">
-                  <Image
-                    source={{ uri: uri }}
-                    className="w-full h-full rounded-md"
-                    resizeMode="cover"
-                  />
-                  <TouchableOpacity
-                    onPress={() => removeImage(idx)}
-                    className="absolute top-1 right-1 bg-red-500 rounded-full p-1"
-                  >
-                    <X size={14} color="white" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {evidenceImages.length === 0 && (
-                <View className="items-center justify-center h-20">
-                  <Text className="text-gray-400 text-xs italic">
-                    No photos added
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
+            {evidenceImages.length === 0 ? (
+              <View className="flex-1 justify-center items-center">
+                <Text className="text-gray-400 text-xs italic">
+                  No photos added
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => {
+                  setCurrentImageIndex(0);
+                  setGalleryModalVisible(true);
+                }}
+                className="flex-1 mt-2 bg-blue-50 border border-blue-200 rounded-md items-center justify-center flex-row gap-2"
+              >
+                <Images size={24} color="#2563eb" />
+                <Text className="text-blue-700 font-bold text-sm">
+                  View Captured ({evidenceImages.length})
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
         <View className="flex-[1.5]">
           <Text className="text-black font-bold mb-1">Scan Notes</Text>
-          {/* Height h-48 */}
           <TextInput
             className="bg-white h-48 rounded-md p-3 border border-gray-200"
             multiline
@@ -577,7 +638,7 @@ export default function ScannedInventory() {
         </View>
       </View>
 
-      {/* TABLE SECTION: Real Data (FLEX-1 to fill space, SCROLLABLE inside) */}
+      {/* TABLE SECTION */}
       <View className="mt-4 bg-white rounded-md border border-gray-200 overflow-hidden flex-1 -z-10">
         <View className="bg-gray-100 p-3 border-b border-gray-200">
           <Text className="text-gray-700 font-bold text-xs uppercase">
@@ -641,6 +702,74 @@ export default function ScannedInventory() {
           Confirm Audit
         </Text>
       </TouchableOpacity>
+
+      {/* GALLERY CAROUSEL MODAL */}
+      <Modal
+        visible={galleryModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setGalleryModalVisible(false)}
+      >
+        <View className="flex-1 bg-black">
+          {/* Top Bar */}
+          <View className="flex-row justify-between items-center p-4 mt-8 z-10">
+            <Text className="text-white font-bold text-xl">
+              Evidence Gallery
+            </Text>
+            <TouchableOpacity
+              onPress={() => setGalleryModalVisible(false)}
+              className="bg-gray-800 p-2 rounded-full"
+            >
+              <X size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Carousel */}
+          <View className="flex-1 justify-center items-center">
+            {evidenceImages.length > 0 ? (
+              <FlatList
+                data={evidenceImages}
+                keyExtractor={(_, index) => index.toString()}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16} // smooth updates
+                renderItem={({ item }) => (
+                  <View style={{ width, justifyContent: "center" }}>
+                    <Image
+                      source={{ uri: item }}
+                      style={{ width: width, height: "80%" }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                )}
+              />
+            ) : (
+              <Text className="text-gray-500">No images available</Text>
+            )}
+          </View>
+
+          {/* Bottom Bar: Counter & Delete */}
+          {evidenceImages.length > 0 && (
+            <View className="absolute bottom-10 left-0 right-0 items-center justify-center gap-4">
+              <View className="bg-gray-800 px-4 py-1 rounded-full">
+                <Text className="text-white font-bold">
+                  {currentImageIndex + 1} / {evidenceImages.length}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={removeImage}
+                className="bg-red-600 flex-row items-center gap-2 px-6 py-3 rounded-full shadow-lg"
+              >
+                <Trash2 size={20} color="white" />
+                <Text className="text-white font-bold">Delete Image</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
 
       {/* CONFIRMATION MODAL */}
       <Modal
@@ -707,59 +836,89 @@ export default function ScannedInventory() {
 }
 
 const styles = StyleSheet.create({
-  pickerContainer: {
-    flex: 1,
-    backgroundColor: "white",
+  // New Styles for the Custom Picker
+  pickerTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
     borderRadius: 6,
-    justifyContent: "center",
-    position: "relative",
-    overflow: "hidden",
+    paddingHorizontal: 12,
+    height: "100%",
     width: "100%",
-    borderWidth: 2,
-    borderColor: "transparent",
   },
   pickerDisabled: {
     backgroundColor: "#e5e7eb",
     borderColor: "#d1d5db",
     borderWidth: 1,
   },
-  pickerFocused: { borderColor: "#F2C94C" },
-  visualContainer: {
+  pickerText: {
+    fontSize: 16,
+    color: "black",
+    flex: 1,
+  },
+  textDisabled: {
+    color: "#9ca3af",
+  },
+  placeholderText: {
+    color: "#9ca3af",
+  },
+  // Modal Styles for Picker
+  pickerOptionsContainer: {
+    backgroundColor: "white",
+    width: "40%",
+    maxHeight: "50%",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 10,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingBottom: 8,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#374151",
+  },
+  pickerOption: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    height: "100%",
-    width: "100%",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f9fafb",
   },
-  pickerText: { fontSize: 16, color: "black", flex: 1, marginRight: 10 },
-  textDisabled: { color: "#6b7280" },
-  placeholderText: { color: "#9ca3af" },
-  arrowContainer: {
+  pickerOptionSelected: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 6,
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: "#4b5563",
+  },
+  pickerOptionTextSelected: {
+    color: "#2563eb",
+    fontWeight: "bold",
+  },
+  // Main Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    width: 20,
-    height: 20,
-  },
-  roundedArrow: {
-    width: 10,
-    height: 10,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    borderColor: "black",
-    transform: [{ rotate: "45deg" }],
-    marginTop: -4,
-    borderRadius: 2,
-  },
-  arrowOpen: { transform: [{ rotate: "225deg" }], marginTop: 4 },
-  invisiblePicker: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    width: "100%",
-    height: "100%",
+    padding: 20,
   },
 });
