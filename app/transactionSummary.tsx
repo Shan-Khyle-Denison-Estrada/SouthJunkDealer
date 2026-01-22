@@ -1,7 +1,13 @@
-import { Picker } from "@react-native-picker/picker";
-import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Camera, Eye, Plus, Trash2, X } from "lucide-react-native";
+import {
+  Camera,
+  Check,
+  ChevronDown,
+  Eye,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -15,6 +21,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -30,36 +37,83 @@ import {
 } from "../db/schema";
 import { db } from "./_layout";
 
-const SummaryPicker = ({
-  selectedValue,
-  onValueChange,
-  placeholder,
-  items,
-}) => (
-  <View style={styles.pickerContainer}>
-    <View style={styles.visualContainer}>
-      <Text
-        style={[styles.pickerText, !selectedValue && styles.placeholderText]}
-        numberOfLines={1}
+// --- CUSTOM PICKER COMPONENT ---
+// Replaces the native picker with a robust Modal-based implementation
+const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const selectedItem = items.find((i) => i.value === selectedValue);
+  const displayLabel = selectedItem ? selectedItem.label : placeholder;
+
+  return (
+    <>
+      {/* 1. The Trigger Field - Fully Clickable */}
+      <Pressable
+        onPress={() => setModalVisible(true)}
+        style={styles.pickerTrigger}
       >
-        {selectedValue || placeholder}
-      </Text>
-      <View style={styles.arrowContainer}>
-        <View style={styles.roundedArrow} />
-      </View>
-    </View>
-    <Picker
-      selectedValue={selectedValue}
-      onValueChange={onValueChange}
-      style={styles.invisiblePicker}
-    >
-      <Picker.Item label={placeholder} value={null} enabled={false} />
-      {items.map((i, idx) => (
-        <Picker.Item key={idx} label={i} value={i} />
-      ))}
-    </Picker>
-  </View>
-);
+        <Text
+          style={[styles.pickerText, !selectedValue && styles.placeholderText]}
+          numberOfLines={1}
+        >
+          {displayLabel}
+        </Text>
+        <ChevronDown size={20} color="gray" />
+      </Pressable>
+
+      {/* 2. The Options Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.pickerOptionsContainer}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>{placeholder}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <X size={24} color="gray" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={items}
+              keyExtractor={(item) => String(item.value)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerOption,
+                    selectedValue === item.value && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => {
+                    onValueChange(item.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerOptionText,
+                      selectedValue === item.value &&
+                        styles.pickerOptionTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {selectedValue === item.value && (
+                    <Check size={20} color="#2563eb" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+    </>
+  );
+};
 
 export default function TransactionSummary() {
   const params = useLocalSearchParams();
@@ -179,13 +233,25 @@ export default function TransactionSummary() {
   };
 
   const takeLicensePhoto = async () => {
-    const res = await ImagePicker.requestCameraPermissionsAsync();
+    // Note: Expo ImagePicker setup required in actual device
+    // import * as ImagePicker from "expo-image-picker";
+    // For brevity, assuming imports are handled or this is a stub
+    // The user provided code imported ImagePicker, so we keep using it if available.
+    // However, it wasn't in the provided imports block above, so I'll skip implementation details to avoid errors if package missing.
+    // Re-adding logic assuming package exists based on previous file context:
+    const {
+      requestCameraPermissionsAsync,
+      launchCameraAsync,
+      MediaTypeOptions,
+    } = require("expo-image-picker");
+
+    const res = await requestCameraPermissionsAsync();
     if (!res.granted) {
       Alert.alert("Permission Required");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    const result = await launchCameraAsync({
+      mediaTypes: MediaTypeOptions.Images,
       quality: 0.5,
     });
     if (!result.canceled) setLicenseImage(result.assets[0].uri);
@@ -397,11 +463,9 @@ export default function TransactionSummary() {
           const newItemId = itemRes[0].id;
 
           // 2. Handle Selling Inventory Logic (FIFO)
-          // Note: Buying logic for creating inventory batches has been removed per request.
           if (transactionType === "Selling") {
             let remainingQty = item.weight;
 
-            // Get available batches sorted by date (FIFO)
             const batches = await db
               .select()
               .from(inventory)
@@ -420,7 +484,6 @@ export default function TransactionSummary() {
               const take = Math.min(remainingQty, batch.netWeight);
               const newWeight = batch.netWeight - take;
 
-              // Update Batch
               await db
                 .update(inventory)
                 .set({
@@ -429,19 +492,17 @@ export default function TransactionSummary() {
                 })
                 .where(eq(inventory.id, batch.id));
 
-              // Link to Transaction Item
               await db.insert(inventoryTransactionItems).values({
                 inventoryId: batch.id,
                 transactionItemId: newItemId,
                 allocatedWeight: take,
               });
 
-              // Audit Trail (Stock Out)
               await db.insert(auditTrails).values({
                 inventoryId: batch.id,
                 action: "Stock Out",
                 notes: `Sold in Tx #${finalTxId}`,
-                date: localDate, // Uses local date
+                date: localDate,
                 previousWeight: batch.netWeight,
                 newWeight: newWeight,
               });
@@ -476,23 +537,34 @@ export default function TransactionSummary() {
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
                 Type
               </Text>
-              <SummaryPicker
-                selectedValue={transactionType}
-                onValueChange={(v) => updateHeader("type", v)}
-                placeholder="Type"
-                items={["Buying", "Selling"]}
-              />
+              <View className="h-12">
+                <CustomPicker
+                  selectedValue={transactionType}
+                  onValueChange={(v) => updateHeader("type", v)}
+                  placeholder="Type"
+                  items={[
+                    { label: "Buying", value: "Buying" },
+                    { label: "Selling", value: "Selling" },
+                  ]}
+                />
+              </View>
             </View>
             <View className="flex-1">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
                 Payment Method
               </Text>
-              <SummaryPicker
-                selectedValue={paymentMethod}
-                onValueChange={(v) => updateHeader("payment", v)}
-                placeholder="Method"
-                items={["Cash", "G-Cash", "Bank Transfer"]}
-              />
+              <View className="h-12">
+                <CustomPicker
+                  selectedValue={paymentMethod}
+                  onValueChange={(v) => updateHeader("payment", v)}
+                  placeholder="Method"
+                  items={[
+                    { label: "Cash", value: "Cash" },
+                    { label: "G-Cash", value: "G-Cash" },
+                    { label: "Bank Transfer", value: "Bank Transfer" },
+                  ]}
+                />
+              </View>
             </View>
           </View>
           <View className="flex-row gap-3">
@@ -704,26 +776,13 @@ export default function TransactionSummary() {
                 <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
                   Material
                 </Text>
-                {/* CHANGED: Added inline style array to increase height to 60 */}
-                <View style={[styles.pickerContainer, { height: 60 }]}>
-                  <Picker
+                <View className="h-14">
+                  <CustomPicker
                     selectedValue={newItemMaterialId}
                     onValueChange={setNewItemMaterialId}
-                    style={{ width: "100%", height: "100%" }}
-                  >
-                    <Picker.Item
-                      label="Select Material"
-                      value={null}
-                      enabled={false}
-                    />
-                    {materialsList.map((m) => (
-                      <Picker.Item
-                        key={m.value}
-                        label={m.label}
-                        value={m.value}
-                      />
-                    ))}
-                  </Picker>
+                    placeholder="Select Material"
+                    items={materialsList}
+                  />
                 </View>
                 {transactionType === "Selling" && newItemMaterialId && (
                   <Text className="text-xs text-orange-600 mt-1 font-bold">
@@ -839,40 +898,92 @@ export default function TransactionSummary() {
 }
 
 const styles = StyleSheet.create({
-  pickerContainer: {
-    height: 48,
-    backgroundColor: "white",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    justifyContent: "center",
-  },
-  visualContainer: {
+  // New Styles for the Custom Picker
+  pickerTrigger: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f3f4f6", // Matched input bg
+    borderWidth: 1,
+    borderColor: "#d1d5db", // Matched input border
+    borderRadius: 6,
     paddingHorizontal: 12,
-  },
-  pickerText: { flex: 1, fontSize: 16, color: "black" },
-  placeholderText: { color: "#9ca3af" },
-  invisiblePicker: {
-    position: "absolute",
+    height: "100%", // Inherit height from parent View
     width: "100%",
-    height: "100%",
-    opacity: 0,
   },
-  arrowContainer: {
-    width: 12,
-    height: 12,
+  pickerText: {
+    fontSize: 16,
+    color: "black",
+    flex: 1,
+  },
+  placeholderText: {
+    color: "#9ca3af",
+  },
+  // Modal Styles for Picker
+  pickerOptionsContainer: {
+    backgroundColor: "white",
+    width: "40%", // Narrower than main modal
+    maxHeight: "50%",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 10,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingBottom: 8,
   },
-  roundedArrow: {
-    width: 8,
-    height: 8,
-    borderBottomWidth: 1.5,
-    borderRightWidth: 1.5,
-    borderColor: "#6b7280",
-    transform: [{ rotate: "45deg" }],
-    marginTop: -3,
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#374151",
+  },
+  pickerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f9fafb",
+  },
+  pickerOptionSelected: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 6,
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: "#4b5563",
+  },
+  pickerOptionTextSelected: {
+    color: "#2563eb",
+    fontWeight: "bold",
+  },
+  // Main Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    width: "50%",
+    borderRadius: 12,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });
