@@ -8,6 +8,7 @@ import {
   Plus,
   Search,
   X,
+  XCircle, // Added XCircle for the clear button
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -175,6 +176,17 @@ export default function TransactionsIndex() {
               setCurrentPage(1);
             }}
           />
+          {/* Clear Button */}
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchQuery("");
+                setCurrentPage(1);
+              }}
+            >
+              <XCircle size={20} color="gray" />
+            </TouchableOpacity>
+          )}
         </View>
         <Pressable
           onPress={() => setFilterModalVisible(true)}
