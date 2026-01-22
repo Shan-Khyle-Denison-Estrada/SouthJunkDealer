@@ -569,7 +569,9 @@ export default function MaterialIndex() {
           }}
         >
           <Plus size={24} color="white" />
-          <Text className="text-white text-lg font-bold ml-2">New</Text>
+          <Text className="text-white text-lg font-bold ml-2">
+            New Material
+          </Text>
         </Pressable>
       </View>
 
