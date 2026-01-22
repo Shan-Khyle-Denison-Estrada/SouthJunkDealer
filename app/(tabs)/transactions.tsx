@@ -333,8 +333,14 @@ export default function TransactionsIndex() {
         animationType="fade"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white w-full max-w-md rounded-lg p-6 gap-4 shadow-xl">
+        <Pressable
+          className="flex-1 bg-black/50 justify-center items-center p-4"
+          onPress={() => setFilterModalVisible(false)}
+        >
+          <Pressable
+            className="bg-white w-full max-w-md rounded-lg p-6 gap-4 shadow-xl"
+            onPress={() => {}}
+          >
             <View className="flex-row justify-between items-center">
               <Text className="text-xl font-bold text-gray-800">
                 Filter Transactions
@@ -435,8 +441,8 @@ export default function TransactionsIndex() {
                 <Text className="text-white font-bold">Apply Filters</Text>
               </Pressable>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

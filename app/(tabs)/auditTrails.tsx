@@ -8,6 +8,7 @@ import {
   Plus,
   Search,
   X,
+  XCircle,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -217,6 +218,17 @@ export default function AuditIndex() {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {/* Added Clear Button */}
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchQuery("");
+                setCurrentPage(1);
+              }}
+            >
+              <XCircle size={20} color="gray" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Filter Button */}
@@ -360,8 +372,15 @@ export default function AuditIndex() {
         animationType="fade"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white w-full max-w-md rounded-lg p-6 gap-4 shadow-xl">
+        {/* CHANGED: Wrappers are now Pressable to handle background close */}
+        <Pressable
+          className="flex-1 bg-black/50 justify-center items-center p-4"
+          onPress={() => setFilterModalVisible(false)}
+        >
+          <Pressable
+            className="bg-white w-full max-w-md rounded-lg p-6 gap-4 shadow-xl"
+            onPress={() => {}} // Swallows press to prevent closing
+          >
             <View className="flex-row justify-between items-center">
               <Text className="text-xl font-bold text-gray-800">
                 Filter Audits
@@ -441,8 +460,8 @@ export default function AuditIndex() {
                 <Text className="text-white font-bold">Apply Filters</Text>
               </Pressable>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );

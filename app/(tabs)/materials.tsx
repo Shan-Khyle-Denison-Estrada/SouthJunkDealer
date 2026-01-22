@@ -11,6 +11,7 @@ import {
   Search,
   Trash2,
   X,
+  XCircle,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -488,7 +489,9 @@ export default function MaterialIndex() {
                   </View>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1">UoM</Text>
+                  <Text className="text-gray-700 font-bold mb-1">
+                    Unit of Measurement
+                  </Text>
                   <View className="h-12">
                     <CustomPicker
                       selectedValue={uom}
@@ -531,6 +534,17 @@ export default function MaterialIndex() {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {/* Added Clear Button */}
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchQuery("");
+                setCurrentPage(1);
+              }}
+            >
+              <XCircle size={20} color="gray" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <Pressable

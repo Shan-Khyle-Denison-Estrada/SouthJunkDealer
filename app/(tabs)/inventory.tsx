@@ -1,16 +1,18 @@
-import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import {
   ArrowDown,
   ArrowUp,
   Camera,
+  Check, // Added
+  ChevronDown, // Added
   ChevronLeft,
   ChevronRight,
   Filter,
   Plus,
   Search,
   X,
+  XCircle,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -36,48 +38,80 @@ import { db } from "./_layout";
 
 const ITEMS_PER_PAGE = 9;
 
+// --- CUSTOM PICKER COMPONENT (Ported from Materials Page) ---
 const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const truncate = (str, n) =>
-    str?.length > n ? str.substr(0, n - 1) + "..." : str;
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const selectedItem = items.find((i) => i.value === selectedValue);
+  const displayLabel = selectedItem ? selectedItem.label : placeholder;
 
   return (
-    <View style={[styles.pickerContainer, isFocused && styles.pickerFocused]}>
-      <View style={styles.visualContainer}>
+    <>
+      {/* 1. The Trigger Field - Fully Clickable */}
+      <Pressable
+        onPress={() => setModalVisible(true)}
+        style={styles.pickerTrigger}
+      >
         <Text
           style={[styles.pickerText, !selectedValue && styles.placeholderText]}
           numberOfLines={1}
         >
-          {selectedValue
-            ? items.find((i) => i.value === selectedValue)?.label ||
-              selectedValue
-            : placeholder}
+          {displayLabel}
         </Text>
-        <View style={styles.arrowContainer}>
-          <View style={[styles.roundedArrow, isFocused && styles.arrowOpen]} />
-        </View>
-      </View>
-      <Picker
-        selectedValue={selectedValue}
-        onValueChange={(v) => {
-          onValueChange(v);
-          setIsFocused(false);
-        }}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        style={styles.invisiblePicker}
-        mode="dropdown"
+        <ChevronDown size={20} color="gray" />
+      </Pressable>
+
+      {/* 2. The Options Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
       >
-        <Picker.Item label={placeholder} value={null} enabled={false} />
-        {items.map((item, index) => (
-          <Picker.Item
-            key={index}
-            label={truncate(item.label, 25)}
-            value={item.value}
-          />
-        ))}
-      </Picker>
-    </View>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.pickerOptionsContainer}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>{placeholder}</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <X size={24} color="gray" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={items}
+              keyExtractor={(item) => item.value?.toString()} // Ensure key is string
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerOption,
+                    selectedValue === item.value && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => {
+                    onValueChange(item.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerOptionText,
+                      selectedValue === item.value &&
+                        styles.pickerOptionTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {selectedValue === item.value && (
+                    <Check size={20} color="#2563eb" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 };
 
@@ -111,7 +145,7 @@ export default function InventoryIndex() {
   // --- DATA FETCHING ---
   const loadData = async () => {
     try {
-      // 1. REPAIR DATA: Fix "In Stock" batches with 0 weight (if they have items)
+      // 1. REPAIR DATA
       const zeroBatches = await db
         .select()
         .from(inventory)
@@ -175,7 +209,7 @@ export default function InventoryIndex() {
     }, []),
   );
 
-  // --- DERIVE FILTER OPTIONS DYNAMICALLY ---
+  // --- DERIVE FILTER OPTIONS ---
   const uniqueStatuses = useMemo(
     () => [
       ...new Set(inventoryData.map((item) => item.status).filter(Boolean)),
@@ -209,7 +243,7 @@ export default function InventoryIndex() {
     );
   };
 
-  // --- PROCESSING DATA (Filter -> Sort -> Paginate) ---
+  // --- PROCESSING DATA ---
   const processedData = useMemo(() => {
     let data = [...inventoryData];
 
@@ -240,12 +274,10 @@ export default function InventoryIndex() {
       let valA = a[sortConfig.key];
       let valB = b[sortConfig.key];
 
-      // Numeric sorting for ID and Weight
       if (sortConfig.key === "id" || sortConfig.key === "netWeight") {
         valA = Number(valA || 0);
         valB = Number(valB || 0);
       } else {
-        // String sorting
         valA = valA ? valA.toString().toLowerCase() : "";
         valB = valB ? valB.toString().toLowerCase() : "";
       }
@@ -271,7 +303,6 @@ export default function InventoryIndex() {
     currentPage * ITEMS_PER_PAGE,
   );
 
-  // Reset page on filter change
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedStatuses, selectedMaterials]);
@@ -316,13 +347,11 @@ export default function InventoryIndex() {
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const generatedBatchId = `BATCH-${randomSuffix}-A`;
 
-      // --- FIX: Use Local System Time instead of UTC (toISOString) ---
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const day = String(now.getDate()).padStart(2, "0");
       const today = `${year}-${month}-${day}`;
-      // -------------------------------------------------------------
 
       const qrData = JSON.stringify({
         type: "inventory",
@@ -335,7 +364,7 @@ export default function InventoryIndex() {
         batchId: generatedBatchId,
         materialId: selectedMaterialId,
         netWeight: 0,
-        date: today, // Uses local date
+        date: today,
         status: "In Stock",
         imageUri: imageUri,
         qrContent: qrData,
@@ -354,11 +383,11 @@ export default function InventoryIndex() {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "in stock":
-        return "text-green-600"; // Green for available
+        return "text-green-600";
       case "depleted":
-        return "text-red-600"; // Red for empty/critical
+        return "text-red-600";
       case "deleted":
-        return "text-gray-400"; // Faded gray for removed items
+        return "text-gray-400";
       case "processing":
         return "text-blue-600";
       case "shipped":
@@ -377,8 +406,11 @@ export default function InventoryIndex() {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={() => {}}>
             <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
               <Text className="text-xl font-bold text-gray-800">
                 New Inventory Batch
@@ -438,11 +470,11 @@ export default function InventoryIndex() {
                 <Text className="font-bold text-white">Save</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
-      {/* --- TOP BAR (Fixed Height) --- */}
+      {/* --- TOP BAR --- */}
       <View className="h-14 flex-row items-center justify-between gap-2">
         <View className="flex-1 h-full flex-row items-center bg-white rounded-md px-3 border border-gray-200">
           <Search size={20} color="gray" />
@@ -453,6 +485,17 @@ export default function InventoryIndex() {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {/* Added Clear Button */}
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchQuery("");
+                setCurrentPage(1);
+              }}
+            >
+              <XCircle size={20} color="gray" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Filter Button */}
@@ -484,7 +527,7 @@ export default function InventoryIndex() {
         </View>
       </View>
 
-      {/* --- TABLE (Flex 1) --- */}
+      {/* --- TABLE --- */}
       <View className="flex-1 bg-white rounded-lg overflow-hidden border border-gray-200">
         {/* Header with Sort */}
         <View className="flex-row bg-gray-800 p-4">
@@ -550,7 +593,7 @@ export default function InventoryIndex() {
         )}
       </View>
 
-      {/* --- PAGINATION (Fixed Height) --- */}
+      {/* --- PAGINATION --- */}
       <View className="h-14 flex-row items-center justify-center gap-3">
         <Pressable
           onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -585,8 +628,11 @@ export default function InventoryIndex() {
         animationType="fade"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white w-full max-w-md rounded-lg p-6 gap-4 shadow-xl">
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setFilterModalVisible(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={() => {}}>
             <View className="flex-row justify-between items-center">
               <Text className="text-xl font-bold text-gray-800">
                 Filter Inventory
@@ -666,63 +712,83 @@ export default function InventoryIndex() {
                 <Text className="text-white font-bold">Apply Filters</Text>
               </Pressable>
             </View>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  pickerContainer: {
-    flex: 1,
-    backgroundColor: "white",
-    borderRadius: 6,
-    justifyContent: "center",
-    position: "relative",
-    overflow: "hidden",
-    width: "100%",
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  pickerFocused: { borderColor: "#F2C94C" },
-  visualContainer: {
+  // --- New Styles for Custom Picker (Matched to Materials page) ---
+  pickerTrigger: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: "#f3f4f6",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 6,
     paddingHorizontal: 12,
     height: "100%",
     width: "100%",
   },
-  pickerText: { fontSize: 16, color: "black", flex: 1, marginRight: 10 },
-  placeholderText: { color: "#9ca3af" },
-  arrowContainer: {
-    justifyContent: "center",
+  pickerText: {
+    fontSize: 16,
+    color: "black",
+    flex: 1,
+  },
+  placeholderText: {
+    color: "#9ca3af",
+  },
+  pickerOptionsContainer: {
+    backgroundColor: "white",
+    width: "40%",
+    maxHeight: "50%",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 10,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    width: 20,
-    height: 20,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingBottom: 8,
   },
-  roundedArrow: {
-    width: 10,
-    height: 10,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    borderColor: "black",
-    transform: [{ rotate: "45deg" }],
-    marginTop: -4,
-    borderRadius: 2,
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#374151",
   },
-  arrowOpen: { transform: [{ rotate: "225deg" }], marginTop: 4 },
-  invisiblePicker: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    width: "100%",
-    height: "100%",
+  pickerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f9fafb",
   },
+  pickerOptionSelected: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 6,
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: "#4b5563",
+  },
+  pickerOptionTextSelected: {
+    color: "#2563eb",
+    fontWeight: "bold",
+  },
+  // --- Main Modal Styles ---
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
