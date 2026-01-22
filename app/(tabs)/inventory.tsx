@@ -480,7 +480,7 @@ export default function InventoryIndex() {
           <Search size={20} color="gray" />
           <TextInput
             placeholder="Search Batch..."
-            className="flex-1 ml-2 text-base text-gray-700 h-full"
+            className="flex-1 ml-2 text-lg text-gray-700 h-full"
             style={{ textAlignVertical: "center" }}
             value={searchQuery}
             onChangeText={setSearchQuery}
