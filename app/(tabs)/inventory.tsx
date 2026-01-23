@@ -423,7 +423,7 @@ export default function InventoryIndex() {
             <View className="gap-4">
               <View>
                 <Text className="text-gray-700 font-bold mb-1">
-                  Material Category
+                  Material Category <Text className="text-red-500">*</Text>
                 </Text>
                 <View className="h-12">
                   <CustomPicker
