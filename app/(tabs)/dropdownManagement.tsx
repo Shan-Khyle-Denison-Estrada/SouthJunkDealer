@@ -206,7 +206,7 @@ const UomSection = ({ data, onRefresh }) => {
             <View className="gap-4">
               <View>
                 <Text className="text-gray-700 font-bold mb-1">
-                  Unit Symbol (e.g., kg)
+                  Unit Symbol (e.g., kg) <Text className="text-red-500">*</Text>
                 </Text>
                 <TextInput
                   className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
@@ -216,7 +216,7 @@ const UomSection = ({ data, onRefresh }) => {
               </View>
               <View>
                 <Text className="text-gray-700 font-bold mb-1">
-                  Full Name (e.g., Kilograms)
+                  Full Name (e.g., Kilograms) <Text className="text-red-500">*</Text>
                 </Text>
                 <TextInput
                   className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
@@ -379,7 +379,7 @@ const PaymentSection = ({ data, onRefresh }) => {
             <View className="gap-4">
               <View>
                 <Text className="text-gray-700 font-bold mb-1">
-                  Payment Method Text
+                  Payment Method <Text className="text-red-500">*</Text>
                 </Text>
                 <TextInput
                   className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
