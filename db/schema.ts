@@ -1,6 +1,6 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-// --- EXISTING TABLES ---
+// --- EXISTING TABLES (Keep these as they were) ---
 export const materials = sqliteTable("materials", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -27,15 +27,9 @@ export const transactions = sqliteTable("transactions", {
   totalAmount: real("total_amount").default(0),
   date: text("date").notNull(),
   status: text("status").default("Draft"),
-
-  // --- NEW FIELD: PAYMENT TRACKING ---
   paidAmount: real("paid_amount").default(0),
-
-  // --- CLIENT FIELDS ---
   clientName: text("client_name"),
   clientAffiliation: text("client_affiliation"),
-
-  // --- LOGISTICS FIELDS (Selling Only) ---
   driverName: text("driver_name"),
   truckPlate: text("truck_plate"),
   truckWeight: real("truck_weight"),
@@ -76,4 +70,17 @@ export const auditTrails = sqliteTable("audit_trails", {
   evidenceImageUri: text("evidence_image_uri"),
   previousWeight: real("previous_weight"),
   newWeight: real("new_weight"),
+});
+
+// --- NEW SETTINGS TABLES (UPDATED) ---
+
+export const unitOfMeasurements = sqliteTable("unit_of_measurements", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  unit: text("unit").notNull(), // e.g. "kg", "lbs"
+  name: text("name").notNull(), // e.g. "Kilograms", "Pounds"
+});
+
+export const paymentMethods = sqliteTable("payment_methods", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull().unique(), // e.g. "Bank Transfer", "Cash"
 });

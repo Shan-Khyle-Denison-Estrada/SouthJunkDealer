@@ -10,6 +10,7 @@ import {
   FileClock,
   LayoutDashboard,
   Package,
+  Settings, // <--- NEW IMPORT
 } from "lucide-react-native";
 import {
   ActivityIndicator,
@@ -36,7 +37,6 @@ function CustomDrawerContent(props: any) {
     <DrawerContentScrollView {...props}>
       <View style={styles.buttonsContainer}>
         <Text style={styles.sectionTitle}>Quick Access</Text>
-        {/* LOGIC FIX: Directly navigate to Summary without creating a transaction */}
         <TouchableOpacity
           style={styles.button}
           onPress={() => router.push("/transactionSummary")}
@@ -75,10 +75,7 @@ export default function Layout() {
   }
 
   return (
-    <Drawer
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      // REVERTED: Removed custom screenOptions/styling to restore default look
-    >
+    <Drawer drawerContent={(props) => <CustomDrawerContent {...props} />}>
       <Drawer.Screen
         name="index"
         options={{
@@ -119,6 +116,16 @@ export default function Layout() {
           title: "Audit Trails",
           drawerIcon: ({ color, size }) => (
             <FileClock size={size} color={color} />
+          ),
+        }}
+      />
+      {/* --- NEW DRAWER ITEM --- */}
+      <Drawer.Screen
+        name="dropdownManagement"
+        options={{
+          title: "Manage Dropdowns",
+          drawerIcon: ({ color, size }) => (
+            <Settings size={size} color={color} />
           ),
         }}
       />
