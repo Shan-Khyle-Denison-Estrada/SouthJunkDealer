@@ -1,11 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import {
-  Edit2,
-  Plus,
-  Search,
-  Trash2,
-  X
-} from "lucide-react-native";
+import { Edit2, Plus, Search, Trash2, X } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
   Alert,
@@ -150,7 +144,7 @@ const UomSection = ({ data, onRefresh }) => {
             <Text className="text-white font-bold ml-1">Add</Text>
           </TouchableOpacity>
         </View>
-        <View className="flex-row items-center bg-gray-50 rounded-md px-3 border border-gray-200 h-10">
+        <View className="flex-row items-center bg-gray-50 rounded-md px-3 border border-gray-200 h-12">
           <Search size={20} color="gray" />
           <TextInput
             placeholder="Search Units..."
@@ -325,7 +319,7 @@ const PaymentSection = ({ data, onRefresh }) => {
             <Text className="text-white font-bold ml-1">Add</Text>
           </TouchableOpacity>
         </View>
-        <View className="flex-row items-center bg-gray-50 rounded-md px-3 border border-gray-200 h-10">
+        <View className="flex-row items-center bg-gray-50 rounded-md px-3 border border-gray-200 h-12">
           <Search size={20} color="gray" />
           <TextInput
             placeholder="Search Methods..."
