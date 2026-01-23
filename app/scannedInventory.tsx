@@ -460,7 +460,7 @@ export default function ScannedInventory() {
       {/* HEADER ROW with SEARCHABLE DROPDOWN */}
       <View className="items-center justify-center z-50">
         <Text className="text-gray-500 font-bold mb-2 uppercase tracking-widest">
-          Scanned Item Details
+          Item Details
         </Text>
         <View className="w-[80%] relative z-50">
           <View className="flex-row items-center bg-white border-2 border-gray-300 rounded-md h-12 px-2">
@@ -626,7 +626,7 @@ export default function ScannedInventory() {
         </View>
 
         <View className="flex-[1.5]">
-          <Text className="text-black font-bold mb-1">Scan Notes</Text>
+          <Text className="text-black font-bold mb-1">Notes</Text>
           <TextInput
             className="bg-white h-48 rounded-md p-3 border border-gray-200"
             multiline
