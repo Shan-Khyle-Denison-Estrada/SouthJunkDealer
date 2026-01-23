@@ -32,6 +32,7 @@ import {
   inventory,
   inventoryTransactionItems,
   materials,
+  paymentMethods, // Imported paymentMethods table
   transactionItems,
   transactions,
 } from "../db/schema";
@@ -145,6 +146,7 @@ export default function TransactionSummary() {
 
   // Add Item Modal Inputs
   const [materialsList, setMaterialsList] = useState([]);
+  const [paymentMethodList, setPaymentMethodList] = useState([]); // State for dynamic payment methods
   const [newItemMaterialId, setNewItemMaterialId] = useState(null);
   const [newItemWeight, setNewItemWeight] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
@@ -156,6 +158,19 @@ export default function TransactionSummary() {
     setMaterialsList(
       data.map((m) => ({ label: m.name, value: m.id, uom: m.uom })),
     );
+  };
+
+  // Load Payment Methods from DB
+  const loadPaymentMethods = async () => {
+    try {
+      const data = await db.select().from(paymentMethods);
+      // Mapping name to value because transactions table stores the string name
+      setPaymentMethodList(
+        data.map((pm) => ({ label: pm.name, value: pm.name })),
+      );
+    } catch (e) {
+      console.error("Failed to load payment methods", e);
+    }
   };
 
   const loadTransactionData = async () => {
@@ -210,6 +225,7 @@ export default function TransactionSummary() {
   useFocusEffect(
     useCallback(() => {
       loadMaterials();
+      loadPaymentMethods(); // Fetch payment methods on focus
       loadTransactionData();
     }, [transactionId]),
   );
@@ -377,13 +393,17 @@ export default function TransactionSummary() {
       Alert.alert("Error", "Select Type & Payment");
       return;
     }
+    if (lineItems.length === 0) {
+      Alert.alert("Error", "Please add at least one item to the list.");
+      return;
+    }
     if (!clientName.trim()) {
       Alert.alert("Error", "Client Name required");
       return;
     }
     if (
       transactionType === "Selling" &&
-      (!driverName || !truckPlate || !truckWeight)
+      (!driverName || !truckPlate || !truckWeight || !licenseImage)
     ) {
       Alert.alert("Error", "Logistics required");
       return;
@@ -535,7 +555,7 @@ export default function TransactionSummary() {
           <View className="flex-row gap-3">
             <View className="flex-1">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
-                Type
+                Type <Text className="text-red-500">*</Text>
               </Text>
               <View className="h-12">
                 <CustomPicker
@@ -551,18 +571,14 @@ export default function TransactionSummary() {
             </View>
             <View className="flex-1">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
-                Payment Method
+                Payment Method <Text className="text-red-500">*</Text>
               </Text>
               <View className="h-12">
                 <CustomPicker
                   selectedValue={paymentMethod}
                   onValueChange={(v) => updateHeader("payment", v)}
                   placeholder="Method"
-                  items={[
-                    { label: "Cash", value: "Cash" },
-                    { label: "G-Cash", value: "G-Cash" },
-                    { label: "Bank Transfer", value: "Bank Transfer" },
-                  ]}
+                  items={paymentMethodList} // Replaced hardcoded items with DB data
                 />
               </View>
             </View>
@@ -570,7 +586,7 @@ export default function TransactionSummary() {
           <View className="flex-row gap-3">
             <View className="flex-1">
               <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
-                Client Name
+                Client Name <Text className="text-red-500">*</Text>
               </Text>
               <TextInput
                 placeholder="Full Name"
@@ -596,7 +612,7 @@ export default function TransactionSummary() {
               <View className="flex-row gap-3 pt-2 border-t border-gray-100 mt-1">
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-orange-600 mb-1 uppercase">
-                    Driver
+                    Driver <Text className="text-red-500">*</Text>
                   </Text>
                   <TextInput
                     placeholder="Driver Name"
@@ -607,7 +623,7 @@ export default function TransactionSummary() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-orange-600 mb-1 uppercase">
-                    Plate #
+                    Plate # <Text className="text-red-500">*</Text>
                   </Text>
                   <TextInput
                     placeholder="ABC-123"
@@ -620,7 +636,7 @@ export default function TransactionSummary() {
               <View className="flex-row gap-3 items-end">
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-orange-600 mb-1 uppercase">
-                    Truck Weight (kg)
+                    Truck Weight (kg) <Text className="text-red-500">*</Text>
                   </Text>
                   <TextInput
                     placeholder="0.00"
@@ -637,7 +653,13 @@ export default function TransactionSummary() {
                   >
                     <Camera size={18} color="black" />
                     <Text className="text-xs font-bold">
-                      {licenseImage ? "Retake" : "License"}
+                      {licenseImage ? (
+                        "Retake"
+                      ) : (
+                        <>
+                          License<Text className="text-red-500">*</Text>
+                        </>
+                      )}
                     </Text>
                   </Pressable>
                   {licenseImage && (
@@ -774,7 +796,7 @@ export default function TransactionSummary() {
               {/* Material Picker */}
               <View>
                 <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
-                  Material
+                  Material <Text className="text-red-500">*</Text>
                 </Text>
                 <View className="h-14">
                   <CustomPicker
@@ -795,7 +817,7 @@ export default function TransactionSummary() {
               <View className="flex-row gap-3">
                 <View className="flex-1">
                   <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
-                    Weight
+                    Weight <Text className="text-red-500">*</Text>
                   </Text>
                   <TextInput
                     placeholder="0.0"
@@ -807,7 +829,7 @@ export default function TransactionSummary() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
-                    Price
+                    Price <Text className="text-red-500">*</Text>
                   </Text>
                   <TextInput
                     placeholder="0.0"
