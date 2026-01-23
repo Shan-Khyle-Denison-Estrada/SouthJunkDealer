@@ -1,8 +1,16 @@
+import * as ImagePicker from "expo-image-picker"; // Added
 import * as Print from "expo-print";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Check, Edit, Printer } from "lucide-react-native";
+import { Camera, Check, Edit, Printer } from "lucide-react-native"; // Added Camera
 import React, { useCallback, useRef, useState } from "react";
-import { Alert, Image, Pressable, Text, View } from "react-native";
+import {
+  Alert,
+  Image,
+  Pressable,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native"; // Added TouchableOpacity
 import QRCode from "react-native-qrcode-svg";
 
 // --- DATABASE IMPORTS ---
@@ -52,6 +60,47 @@ export default function InventoryDetailed() {
       loadBatchDetails();
     }, [batchId]),
   );
+
+  // --- IMAGE UPLOAD HANDLER (NEW) ---
+  const handleUpdatePhoto = async () => {
+    // 1. Request Permission
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert(
+        "Permission Required",
+        "Camera access is required to update the photo.",
+      );
+      return;
+    }
+
+    // 2. Launch Camera
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.5,
+    });
+
+    // 3. Save to Database if successful
+    if (!result.canceled) {
+      try {
+        const newUri = result.assets[0].uri;
+
+        await db
+          .update(inventory)
+          .set({ imageUri: newUri })
+          .where(eq(inventory.batchId, batchId));
+
+        // Refresh the view
+        loadBatchDetails();
+        Alert.alert("Success", "Batch photo updated successfully.");
+      } catch (error) {
+        console.error("Update photo error:", error);
+        Alert.alert("Database Error", "Failed to save the new photo.");
+      }
+    }
+  };
 
   // --- PRINT FUNCTIONALITY ---
   const handlePrint = async () => {
@@ -196,21 +245,37 @@ export default function InventoryDetailed() {
 
       {/* 2. MIDDLE SECTION (Image & QR) */}
       <View className="flex-[10] flex-row gap-4">
-        <View className="flex-[3] bg-white rounded-lg border border-gray-200 p-2 items-center justify-center overflow-hidden">
+        {/* UPDATED: Image Container is now Touchable for updates */}
+        <TouchableOpacity
+          onPress={handleUpdatePhoto}
+          className="flex-[3] bg-white rounded-lg border border-gray-200 p-2 items-center justify-center overflow-hidden relative"
+        >
           {batchData.imageUri ? (
-            <Image
-              source={{ uri: batchData.imageUri }}
-              style={{
-                width: "100%",
-                height: "100%",
-                resizeMode: "cover",
-                borderRadius: 8,
-              }}
-            />
+            <>
+              <Image
+                source={{ uri: batchData.imageUri }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  resizeMode: "cover",
+                  borderRadius: 8,
+                  opacity: 0.9,
+                }}
+              />
+              {/* Overlay Icon for Edit indication */}
+              <View className="absolute bottom-2 right-2 bg-black/50 p-2 rounded-full">
+                <Camera size={20} color="white" />
+              </View>
+            </>
           ) : (
-            <Text className="text-gray-400">No Image Available</Text>
+            <View className="items-center justify-center gap-2">
+              <Camera size={40} color="#9ca3af" />
+              <Text className="text-gray-400 font-semibold">
+                Tap to Add Photo
+              </Text>
+            </View>
           )}
-        </View>
+        </TouchableOpacity>
 
         <View
           className="flex-1 bg-white rounded-lg border border-gray-200 items-center justify-center p-2"
