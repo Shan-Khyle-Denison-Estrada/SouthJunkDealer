@@ -401,7 +401,7 @@ export default function MaterialIndex() {
             <View className="gap-4">
               <View>
                 <Text className="text-gray-700 font-bold mb-1">
-                  Material Name
+                  Material Name <Text className="text-red-500">*</Text>
                 </Text>
                 <TextInput
                   className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
@@ -426,7 +426,7 @@ export default function MaterialIndex() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-gray-700 font-bold mb-1">
-                    Unit of Measurement
+                    Unit of Measurement <Text className="text-red-500">*</Text>
                   </Text>
                   <View className="h-12">
                     {/* CHANGED: Passing dynamic uomOptions instead of hardcoded list */}
