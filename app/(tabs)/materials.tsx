@@ -3,7 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
-  ChevronDown, // Imported ChevronDown
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -28,7 +28,13 @@ import {
 
 // --- DATABASE IMPORTS ---
 import { desc, eq, sql } from "drizzle-orm";
-import { inventory, materials, transactionItems } from "../../db/schema";
+// Added unitOfMeasurements to imports
+import {
+  inventory,
+  materials,
+  transactionItems,
+  unitOfMeasurements,
+} from "../../db/schema";
 import { db } from "./_layout";
 
 const ITEMS_PER_PAGE = 9;
@@ -42,7 +48,6 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
 
   return (
     <>
-      {/* 1. The Trigger Field - Fully Clickable */}
       <Pressable
         onPress={() => setModalVisible(true)}
         style={styles.pickerTrigger}
@@ -53,11 +58,9 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
         >
           {displayLabel}
         </Text>
-        {/* CHANGED: Used ChevronDown for a simple arrowhead without tail */}
         <ChevronDown size={20} color="gray" />
       </Pressable>
 
-      {/* 2. The Options Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -140,23 +143,22 @@ export default function MaterialIndex() {
   const [materialClass, setMaterialClass] = useState(null);
   const [uom, setUom] = useState(null);
 
+  // --- DYNAMIC DATA OPTIONS ---
+  const [uomOptions, setUomOptions] = useState([]); // State for dynamic UoM options
+
   const classOptions = [
     { label: "Class A (High Value)", value: "A" },
     { label: "Class B (Mid Value)", value: "B" },
     { label: "Class C (Low Value)", value: "C" },
   ];
 
-  const uomOptions = [
-    { label: "Kilograms (kg)", value: "kg" },
-    { label: "Pounds (lbs)", value: "lbs" },
-    { label: "Tons", value: "ton" },
-    { label: "Units / Pieces", value: "units" },
-  ];
+  // REMOVED: Hardcoded uomOptions
 
   // --- DATA FETCHING ---
   const loadData = async () => {
     try {
-      const data = await db
+      // 1. Fetch Materials
+      const matData = await db
         .select({
           id: materials.id,
           name: materials.name,
@@ -169,10 +171,21 @@ export default function MaterialIndex() {
         .groupBy(materials.id)
         .orderBy(desc(materials.id));
 
-      setMaterialsData(data);
+      setMaterialsData(matData);
+
+      // 2. Fetch Unit of Measurements (NEW)
+      const uomData = await db.select().from(unitOfMeasurements);
+
+      // Map DB data to Picker format: { label: "Kilograms (kg)", value: "kg" }
+      const formattedUoms = uomData.map((item) => ({
+        label: `${item.name} (${item.unit})`,
+        value: item.unit,
+      }));
+
+      setUomOptions(formattedUoms);
     } catch (error) {
       console.error("Error fetching data:", error);
-      Alert.alert("Error", "Failed to load materials");
+      Alert.alert("Error", "Failed to load materials or settings");
     }
   };
 
@@ -187,6 +200,9 @@ export default function MaterialIndex() {
     () => [...new Set(materialsData.map((item) => item.class).filter(Boolean))],
     [materialsData],
   );
+
+  // NOTE: uniqueUoms is still derived from actual material usage for the *Filter* logic,
+  // ensuring the filter only shows UoMs that are actually in use.
   const uniqueUoms = useMemo(
     () => [...new Set(materialsData.map((item) => item.uom).filter(Boolean))],
     [materialsData],
@@ -413,6 +429,7 @@ export default function MaterialIndex() {
                     Unit of Measurement
                   </Text>
                   <View className="h-12">
+                    {/* CHANGED: Passing dynamic uomOptions instead of hardcoded list */}
                     <CustomPicker
                       selectedValue={uom}
                       onValueChange={setUom}
@@ -493,6 +510,7 @@ export default function MaterialIndex() {
                     Unit of Measurement
                   </Text>
                   <View className="h-12">
+                    {/* CHANGED: Passing dynamic uomOptions instead of hardcoded list */}
                     <CustomPicker
                       selectedValue={uom}
                       onValueChange={setUom}
@@ -534,7 +552,6 @@ export default function MaterialIndex() {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {/* Added Clear Button */}
           {searchQuery.length > 0 && (
             <TouchableOpacity
               onPress={() => {
