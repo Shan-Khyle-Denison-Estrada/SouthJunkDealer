@@ -24,8 +24,8 @@ import {
 
 // --- DATABASE IMPORTS ---
 import { desc } from "drizzle-orm";
+import { db } from "../../db/client";
 import { transactions } from "../../db/schema";
-import { db } from "../_layout";
 
 const ITEMS_PER_PAGE = 9;
 

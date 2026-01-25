@@ -25,6 +25,7 @@ import Svg, {
 
 // --- DATABASE IMPORTS ---
 import { desc, eq, gte, sql } from "drizzle-orm";
+import { db } from "../../db/client";
 import {
   inventory,
   inventoryTransactionItems,
@@ -32,7 +33,6 @@ import {
   transactionItems,
   transactions,
 } from "../../db/schema";
-import { db } from "./_layout";
 
 export default function Index() {
   const [unallocatedItems, setUnallocatedItems] = useState([]);

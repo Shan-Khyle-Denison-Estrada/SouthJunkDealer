@@ -14,6 +14,8 @@ import m0009 from './0009_aberrant_human_torch.sql';
 import m0010 from './0010_yielding_starjammers.sql';
 import m0011 from './0011_loud_payback.sql';
 import m0012 from './0012_ordinary_vulture.sql';
+import m0013 from './0013_normal_kang.sql';
+import m0014 from './0014_melodic_hydra.sql';
 
   export default {
     journal,
@@ -30,7 +32,9 @@ m0008,
 m0009,
 m0010,
 m0011,
-m0012
+m0012,
+m0013,
+m0014
     }
   }
   

@@ -16,7 +16,7 @@ import QRCode from "react-native-qrcode-svg";
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
 import { inventory, materials } from "../db/schema";
-import { db } from "./_layout";
+import { db } from "../db/client";
 
 export default function InventoryDetailed() {
   const params = useLocalSearchParams();

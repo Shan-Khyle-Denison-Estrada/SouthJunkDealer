@@ -2,29 +2,29 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Camera, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
 // Added 'materials' back to the imports
 import {
-    auditTrails,
-    inventory,
-    inventoryTransactionItems,
-    materials,
-    transactionItems,
-    transactions,
+  auditTrails,
+  inventory,
+  inventoryTransactionItems,
+  materials,
+  transactionItems,
+  transactions,
 } from "../db/schema";
-import { db } from "./_layout";
+import { db } from "../db/client";
 
 const { width } = Dimensions.get("window");
 

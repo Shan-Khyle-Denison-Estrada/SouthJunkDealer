@@ -26,7 +26,7 @@ import {
   transactionItems,
   transactions,
 } from "../db/schema";
-import { db } from "./_layout";
+import { db } from "../db/client";
 
 // --- REUSABLE PICKER ---
 const CustomPicker = ({

@@ -1,6 +1,6 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-// --- EXISTING TABLES (Keep these as they were) ---
+// --- EXISTING TABLES ---
 export const materials = sqliteTable("materials", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -72,15 +72,24 @@ export const auditTrails = sqliteTable("audit_trails", {
   newWeight: real("new_weight"),
 });
 
-// --- NEW SETTINGS TABLES (UPDATED) ---
-
 export const unitOfMeasurements = sqliteTable("unit_of_measurements", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  unit: text("unit").notNull(), // e.g. "kg", "lbs"
-  name: text("name").notNull(), // e.g. "Kilograms", "Pounds"
+  unit: text("unit").notNull(),
+  name: text("name").notNull(),
 });
 
 export const paymentMethods = sqliteTable("payment_methods", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull().unique(), // e.g. "Bank Transfer", "Cash"
+  name: text("name").notNull().unique(),
+});
+
+// --- NEW AUTH TABLE ---
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  firstName: text("first_name").notNull(),
+  middleName: text("middle_name"),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(), // Hash this in production
+  photoUri: text("photo_uri"),
 });

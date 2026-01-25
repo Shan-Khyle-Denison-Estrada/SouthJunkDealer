@@ -26,7 +26,7 @@ import {
 import { desc, eq } from "drizzle-orm";
 // Added 'materials' to imports
 import { auditTrails, inventory, materials } from "../../db/schema";
-import { db } from "./_layout";
+import { db } from "../../db/client";
 
 // Limit items per page to fill the screen nicely
 const ITEMS_PER_PAGE = 9;

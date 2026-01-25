@@ -36,7 +36,7 @@ import {
   transactionItems,
   transactions,
 } from "../db/schema";
-import { db } from "./_layout";
+import { db } from "../db/client";
 
 // --- CUSTOM PICKER COMPONENT ---
 // Replaces the native picker with a robust Modal-based implementation

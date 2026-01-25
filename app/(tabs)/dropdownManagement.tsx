@@ -16,7 +16,7 @@ import {
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
 import { paymentMethods, unitOfMeasurements } from "../../db/schema";
-import { db } from "./_layout";
+import { db } from "../../db/client";
 
 export default function DropdownManagement() {
   const [uomData, setUomData] = useState([]);

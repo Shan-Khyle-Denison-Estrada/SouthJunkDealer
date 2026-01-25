@@ -10,149 +10,165 @@ import {
   FileClock,
   LayoutDashboard,
   Package,
-  Settings, // <--- NEW IMPORT
+  Plus,
+  QrCode,
+  Settings,
+  User,
 } from "lucide-react-native";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import "../global.css";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-// --- DATABASE IMPORTS ---
-import { drizzle } from "drizzle-orm/expo-sqlite";
-import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
-import { openDatabaseSync } from "expo-sqlite";
-import migrations from "../../drizzle/migrations";
-
-// 1. Initialize DB Instance
-const expoDb = openDatabaseSync("db.db");
-export const db = drizzle(expoDb);
-
-// 2. Custom Drawer Content
+// --- CUSTOM DRAWER COMPONENT ---
 function CustomDrawerContent(props: any) {
   return (
     <DrawerContentScrollView {...props}>
+      {/* 1. Quick Access Section */}
       <View style={styles.buttonsContainer}>
         <Text style={styles.sectionTitle}>Quick Access</Text>
+
         <TouchableOpacity
           style={styles.button}
-          onPress={() => router.push("/transactionSummary")}
+          onPress={() => router.push("/transactionSummary")} // Adjust route if needed
         >
-          <Text style={styles.buttonText}>New Transaction</Text>
+          <View style={styles.buttonContent}>
+            <Plus size={18} color="#ffffff" />
+            <Text style={styles.buttonText}>New Transaction</Text>
+          </View>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("/scanQR")}
+          style={[styles.button, { marginTop: 8 }]}
+          onPress={() => router.push("/scanQR")} // Ensure you have a 'scan.tsx' route or adjust this
         >
-          <Text style={styles.buttonText}>Scan QR</Text>
+          <View style={styles.buttonContent}>
+            <QrCode size={18} color="#ffffff" />
+            <Text style={styles.buttonText}>Scan QR Code</Text>
+          </View>
         </TouchableOpacity>
       </View>
-      <DrawerItemList {...props} />
+
+      {/* 2. Standard Drawer Items (Dashboard, Inventory, etc.) */}
+      <View style={{ marginTop: 10 }}>
+        <DrawerItemList {...props} />
+      </View>
     </DrawerContentScrollView>
   );
 }
 
-export default function Layout() {
-  const { success, error } = useMigrations(db, migrations);
-
-  if (error) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Migration Error: {error.message}</Text>
-      </View>
-    );
-  }
-
-  if (!success) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#F2C94C" />
-      </View>
-    );
-  }
-
+export default function DrawerLayout() {
   return (
-    <Drawer drawerContent={(props) => <CustomDrawerContent {...props} />}>
-      <Drawer.Screen
-        name="index"
-        options={{
-          title: "Dashboard",
-          drawerIcon: ({ color, size }) => (
-            <LayoutDashboard size={size} color={color} />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Drawer
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenOptions={{
+          drawerActiveTintColor: "#F2C94C",
+          drawerType: "slide",
+          headerShown: true,
+          // HEADER LOGO (Right Side)
+          headerRight: () => (
+            <View style={{ paddingRight: 15 }}>
+              <Image
+                source={require("../../assets/images/icon.png")}
+                style={{ width: 60, height: 60, resizeMode: "contain" }}
+              />
+            </View>
           ),
         }}
-      />
-      <Drawer.Screen
-        name="transactions"
-        options={{
-          title: "Transactions",
-          drawerIcon: ({ color, size }) => (
-            <ArrowRightLeft size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="inventory"
-        options={{
-          title: "Inventory",
-          drawerIcon: ({ color, size }) => (
-            <Package size={size} color={color} />
-          ),
-        }}
-      />
-      <Drawer.Screen
-        name="materials"
-        options={{
-          title: "Materials",
-          drawerIcon: ({ color, size }) => <Blocks size={size} color={color} />,
-        }}
-      />
-      <Drawer.Screen
-        name="auditTrails"
-        options={{
-          title: "Audit Trails",
-          drawerIcon: ({ color, size }) => (
-            <FileClock size={size} color={color} />
-          ),
-        }}
-      />
-      {/* --- NEW DRAWER ITEM --- */}
-      <Drawer.Screen
-        name="dropdownManagement"
-        options={{
-          title: "Manage Dropdowns",
-          drawerIcon: ({ color, size }) => (
-            <Settings size={size} color={color} />
-          ),
-        }}
-      />
-    </Drawer>
+      >
+        <Drawer.Screen
+          name="index"
+          options={{
+            drawerLabel: "Dashboard",
+            title: "Dashboard",
+            drawerIcon: ({ color }) => (
+              <LayoutDashboard color={color} size={24} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="transactions"
+          options={{
+            drawerLabel: "Transactions",
+            title: "Transactions",
+            drawerIcon: ({ color }) => (
+              <ArrowRightLeft color={color} size={24} />
+            ),
+          }}
+        />
+        <Drawer.Screen
+          name="inventory"
+          options={{
+            drawerLabel: "Inventory",
+            title: "Inventory",
+            drawerIcon: ({ color }) => <Package color={color} size={24} />,
+          }}
+        />
+        <Drawer.Screen
+          name="materials"
+          options={{
+            drawerLabel: "Materials",
+            title: "Materials",
+            drawerIcon: ({ color }) => <Blocks color={color} size={24} />,
+          }}
+        />
+        <Drawer.Screen
+          name="auditTrails"
+          options={{
+            drawerLabel: "Audit Trails",
+            title: "Audit Trails",
+            drawerIcon: ({ color }) => <FileClock color={color} size={24} />,
+          }}
+        />
+        <Drawer.Screen
+          name="dropdownManagement"
+          options={{
+            drawerLabel: "Dropdown Settings",
+            title: "Dropdown Settings",
+            drawerIcon: ({ color }) => <Settings color={color} size={24} />,
+          }}
+        />
+        <Drawer.Screen
+          name="profile"
+          options={{
+            drawerLabel: "Admin Account",
+            title: "Admin Account",
+            drawerIcon: ({ color }) => <User color={color} size={24} />,
+          }}
+        />
+      </Drawer>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  buttonsContainer: { padding: 20, gap: 10 },
+  buttonsContainer: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 12,
     color: "#888",
-    marginBottom: 5,
+    marginBottom: 10,
     fontWeight: "600",
     textTransform: "uppercase",
   },
   button: {
     backgroundColor: "#F2C94C",
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
     borderRadius: 8,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  buttonText: { color: "#ffffff", fontWeight: "bold", fontSize: 14 },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  buttonText: {
+    color: "#ffffff",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
 });

@@ -22,7 +22,7 @@ import {
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
 import { materials, transactionItems, transactions } from "../db/schema";
-import { db } from "./_layout";
+import { db } from "../db/client";
 
 export default function TransactionDetailed() {
   const params = useLocalSearchParams();
