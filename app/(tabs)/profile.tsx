@@ -85,12 +85,21 @@ export default function Profile() {
       return;
     }
 
-    // 2. Validation
-    if (!firstName || !lastName || !email) {
+    // 2. Validation with Rollback Logic
+    // Using .trim() ensures spaces aren't counted as valid input
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       showModal(
         "error",
         "Missing Fields",
         "First Name, Last Name, and Email are required.",
+        // ROLLBACK CALLBACK: Resets fields to original user values
+        () => {
+          setFirstName(user?.firstName || "");
+          setMiddleName(user?.middleName || "");
+          setLastName(user?.lastName || "");
+          setEmail(user?.email || "");
+          setPhotoUri(user?.photoUri || null);
+        },
       );
       return;
     }
@@ -289,7 +298,11 @@ export default function Profile() {
         <TouchableWithoutFeedback
           onPress={() => {
             // Only close on background click if NOT loading
-            if (modalConfig.type !== "loading") setModalVisible(false);
+            if (modalConfig.type !== "loading") {
+              setModalVisible(false);
+              // ALSO EXECUTE CALLBACK HERE (To Fix Rollback Issue)
+              if (modalConfig.onConfirm) modalConfig.onConfirm();
+            }
           }}
         >
           <View style={styles.modalOverlay}>
@@ -365,7 +378,11 @@ export default function Profile() {
                                 : "#2F80ED",
                         },
                       ]}
-                      onPress={() => setModalVisible(false)}
+                      onPress={() => {
+                        setModalVisible(false);
+                        // Execute callback (reset fields)
+                        if (modalConfig.onConfirm) modalConfig.onConfirm();
+                      }}
                     >
                       <Text style={styles.modalButtonText}>OK</Text>
                     </TouchableOpacity>
