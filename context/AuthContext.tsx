@@ -7,7 +7,7 @@ type User = typeof users.$inferSelect;
 
 interface AuthContextType {
   user: User | null;
-  hasUsers: boolean; // <--- NEW FLAG
+  hasUsers: boolean | null; // Changed to null initially to distinguish "loading" from "false"
   isLoading: boolean;
   signIn: (email: string, pass: string) => Promise<boolean>;
   signUp: (userData: typeof users.$inferInsert) => Promise<boolean>;
@@ -19,25 +19,33 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [hasUsers, setHasUsers] = useState<boolean>(false);
+  const [hasUsers, setHasUsers] = useState<boolean | null>(null); // Start as null
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Check if ANY user exists on app start
   useEffect(() => {
     const checkUsers = async () => {
       try {
+        console.log("[Auth] Checking database for users...");
+
+        // Check for ANY user
         const result = await db.select().from(users).limit(1);
+
         if (result.length > 0) {
+          console.log("[Auth] Users exist.");
           setHasUsers(true);
         } else {
+          console.log("[Auth] No users found. System needs setup.");
           setHasUsers(false);
         }
       } catch (e) {
-        console.error("Error checking users:", e);
+        console.error("[Auth] Error checking users:", e);
+        // If DB fails, assume no users to force safe state (or handle error UI)
+        setHasUsers(false);
       } finally {
         setIsLoading(false);
       }
     };
+
     checkUsers();
   }, []);
 
@@ -61,15 +69,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (userData: typeof users.$inferInsert) => {
     try {
       await db.insert(users).values(userData);
-
-      // Auto-login the new user
       const newUser = await db
         .select()
         .from(users)
         .where(eq(users.email, userData.email));
-      if (newUser.length > 0) setUser(newUser[0]);
 
-      setHasUsers(true); // Mark that the app now has an owner
+      if (newUser.length > 0) setUser(newUser[0]);
+      setHasUsers(true);
       return true;
     } catch (e) {
       console.error(e);

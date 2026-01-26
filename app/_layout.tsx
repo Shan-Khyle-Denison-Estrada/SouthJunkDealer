@@ -1,4 +1,5 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { useEffect } from "react";
 import { ActivityIndicator, Image, Text, View } from "react-native";
 import "./global.css";
 
@@ -10,11 +11,45 @@ import migrations from "../drizzle/migrations";
 // --- AUTH IMPORT ---
 import { AuthProvider, useAuth } from "../context/AuthContext";
 
-// 1. Inner Navigation Component (Consumes Auth)
 function RootLayoutNav() {
   const { user, hasUsers, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
-  // If AuthContext is still loading its initial state check
+  useEffect(() => {
+    if (isLoading) return;
+
+    // Logic: Identify where the user is trying to go
+    const inAuthGroup =
+      segments[0] === "(auth)" ||
+      segments.includes("login") ||
+      segments.includes("register");
+    const isRegister = segments.includes("register");
+    const isLogin = segments.includes("login");
+
+    console.log(
+      `[Nav Guard] hasUsers: ${hasUsers}, user: ${user?.email}, segment: ${segments}`,
+    );
+
+    // CASE 1: No users exist? Force them to Register.
+    if (hasUsers === false) {
+      if (!isRegister) {
+        router.replace("/register");
+      }
+    }
+    // CASE 2: Users exist, but not logged in? Force Login.
+    else if (!user) {
+      if (!isLogin) {
+        router.replace("/login");
+      }
+    }
+    // CASE 3: Logged in, but trying to access Auth screens? Send to Dashboard.
+    else if (user && inAuthGroup) {
+      router.replace("/(tabs)");
+    }
+  }, [user, hasUsers, isLoading, segments]);
+
+  // Loading State
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -23,42 +58,34 @@ function RootLayoutNav() {
     );
   }
 
-  // 2. FIRST LAUNCH: No users exist? Force Registration.
-  if (!hasUsers) {
-    return (
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen
-          name="register"
-          options={{ headerShown: false, title: "System Setup" }}
-        />
-      </Stack>
-    );
-  }
-
-  // 3. LOGGED OUT: Users exist but not signed in? Show Login.
-  if (!user) {
-    return (
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="login" />
-      </Stack>
-    );
-  }
-
-  // 4. LOGGED IN: Show Main App
+  // RETURN ONE SINGLE STACK (The Navigation Guard handles where they go)
   return (
     <Stack
       screenOptions={{
-        headerRight: () => (
-          <View style={{ paddingRight: 10 }}>
-            <Image
-              source={require("../assets/images/icon.png")}
-              style={{ width: 40, height: 40, resizeMode: "contain" }}
-            />
-          </View>
-        ),
+        headerRight: () =>
+          // Only show icon if logged in (user exists)
+          user ? (
+            <View style={{ paddingRight: 10 }}>
+              <Image
+                source={require("../assets/images/icon.png")}
+                style={{ width: 40, height: 40, resizeMode: "contain" }}
+              />
+            </View>
+          ) : null,
       }}
     >
+      {/* Main App */}
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+      {/* Auth Screens (Hidden Headers) */}
+      <Stack.Screen
+        name="register"
+        options={{ headerShown: false, title: "Setup" }}
+      />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="forgotPassword" options={{ headerShown: false }} />
+
+      {/* Transaction Screens */}
       <Stack.Screen
         name="newTransaction"
         options={{ title: "New Transaction Item" }}
@@ -87,14 +114,11 @@ function RootLayoutNav() {
         name="detailedAuditTrail"
         options={{ title: "Detailed Audit Trail" }}
       />
-      <Stack.Screen name="forgotPassword" options={{ headerShown: false }} />
     </Stack>
   );
 }
 
-// 5. Main Layout Wrapper (Handles DB Initialization)
 export default function RootLayout() {
-  // MOVED MIGRATIONS HERE: Only render AuthProvider AFTER migrations succeed
   const { success, error } = useMigrations(db, migrations);
 
   if (error) {
@@ -108,10 +132,6 @@ export default function RootLayout() {
         }}
       >
         <Text>Migration Error: {error.message}</Text>
-        <Text style={{ fontSize: 12, color: "#666", marginTop: 10 }}>
-          Try deleting the app and reinstalling if this persists during
-          development.
-        </Text>
       </View>
     );
   }
@@ -125,7 +145,6 @@ export default function RootLayout() {
     );
   }
 
-  // Only now is it safe to initialize AuthProvider
   return (
     <AuthProvider>
       <RootLayoutNav />
