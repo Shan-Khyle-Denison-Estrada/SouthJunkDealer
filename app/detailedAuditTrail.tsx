@@ -1,10 +1,11 @@
-import * as Print from "expo-print"; // Added import for printing
+import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
 import { router, useLocalSearchParams } from "expo-router";
 import { Camera, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert, // Added Alert for error handling
+  Alert,
   Dimensions,
   Image,
   Modal,
@@ -18,7 +19,6 @@ import {
 
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
-// Added 'materials' back to the imports
 import { db } from "../db/client";
 import {
   auditTrails,
@@ -40,29 +40,26 @@ export default function DetailedAuditTrail() {
   const theme = {
     background: isDark ? "#121212" : "#f3f4f6",
     card: isDark ? "#1E1E1E" : "#ffffff",
-    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
-    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
-    border: isDark ? "#333333" : "#d1d5db", // Gray-300
-    subtleBorder: isDark ? "#2C2C2C" : "#f3f4f6", // Gray-100
-    inputBg: isDark ? "#2C2C2C" : "#e5e7eb", // Gray-200
-    inputText: isDark ? "#FFFFFF" : "#374151", // Gray-700
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937",
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563",
+    border: isDark ? "#333333" : "#d1d5db",
+    subtleBorder: isDark ? "#2C2C2C" : "#f3f4f6",
+    inputBg: isDark ? "#2C2C2C" : "#e5e7eb",
+    inputText: isDark ? "#FFFFFF" : "#374151",
     placeholder: isDark ? "#888888" : "#9ca3af",
     rowEven: isDark ? "#1E1E1E" : "#ffffff",
-    rowOdd: isDark ? "#252525" : "#f9fafb", // Gray-50
-    headerBg: isDark ? "#0f0f0f" : "#1f2937", // Gray-800
+    rowOdd: isDark ? "#252525" : "#f9fafb",
+    headerBg: isDark ? "#0f0f0f" : "#1f2937",
     primary: "#2563eb",
-    // Specific colors for status/highlights
     success: isDark ? "#4ade80" : "#16a34a",
     danger: isDark ? "#f87171" : "#dc2626",
     info: isDark ? "#60a5fa" : "#2563eb",
-    warningBg: isDark ? "#422006" : "#fffbeb", // Yellow-50 equivalent
-    warningBorder: isDark ? "#a16207" : "#facc15", // Yellow-400 equivalent
+    warningBg: isDark ? "#422006" : "#fffbeb",
+    warningBorder: isDark ? "#a16207" : "#facc15",
   };
 
   const [loading, setLoading] = useState(true);
   const [imageModalVisible, setImageModalVisible] = useState(false);
-
-  // State for Data
   const [auditDetails, setAuditDetails] = useState(null);
   const [lineItems, setLineItems] = useState([]);
 
@@ -70,12 +67,11 @@ export default function DetailedAuditTrail() {
     try {
       if (!id) return;
 
-      // 1. Fetch Audit Details + Inventory Batch Info + Material Name
       const auditResult = await db
         .select({
           auditId: auditTrails.id,
           batchId: inventory.batchId,
-          materialName: materials.name, // Fetch Material Name
+          materialName: materials.name,
           status: auditTrails.action,
           notes: auditTrails.notes,
           date: auditTrails.date,
@@ -86,14 +82,12 @@ export default function DetailedAuditTrail() {
         })
         .from(auditTrails)
         .leftJoin(inventory, eq(auditTrails.inventoryId, inventory.id))
-        // Re-added join to materials table
         .leftJoin(materials, eq(inventory.materialId, materials.id))
         .where(eq(auditTrails.id, Number(id)));
 
       if (auditResult.length > 0) {
         const record = auditResult[0];
 
-        // --- PARSE EVIDENCE IMAGES ---
         let images = [];
         if (record.evidenceUri) {
           try {
@@ -107,7 +101,6 @@ export default function DetailedAuditTrail() {
 
         setAuditDetails({ ...record, evidenceImages: images });
 
-        // 2. Fetch Line Items
         const invId = record.inventoryId;
         const items = await db
           .select({
@@ -157,7 +150,6 @@ export default function DetailedAuditTrail() {
     }
   };
 
-  // Helper to fix URI issues on Android
   const getCleanUri = (uri) => {
     if (!uri) return null;
     if (
@@ -170,12 +162,30 @@ export default function DetailedAuditTrail() {
     return `file://${uri}`;
   };
 
+  // --- HELPER: Convert Image to Base64 ---
+  const convertImageToBase64 = async (uri) => {
+    try {
+      if (!uri) return null;
+      if (uri.startsWith("http")) return uri;
+
+      const cleanUri = getCleanUri(uri);
+      const base64 = await FileSystem.readAsStringAsync(cleanUri, {
+        encoding: "base64",
+      });
+
+      return `data:image/jpeg;base64,${base64}`;
+    } catch (error) {
+      console.warn("Failed to convert image to base64:", error);
+      return uri;
+    }
+  };
+
   // --- PRINT FUNCTIONALITY ---
   const handlePrint = async () => {
     if (!auditDetails) return;
 
     try {
-      // Create HTML Table rows from lineItems
+      // 1. Generate Rows for Table
       const tableRows = lineItems
         .map(
           (item) => `
@@ -189,33 +199,143 @@ export default function DetailedAuditTrail() {
         )
         .join("");
 
-      // Construct the HTML Page
+      // 2. Prepare Images
+      let imagesHtml = "";
+      if (
+        auditDetails.evidenceImages &&
+        auditDetails.evidenceImages.length > 0
+      ) {
+        const imagePromises = auditDetails.evidenceImages.map((uri) =>
+          convertImageToBase64(uri),
+        );
+        const processedImages = await Promise.all(imagePromises);
+
+        imagesHtml = `
+          <div class="section" style="page-break-inside: avoid;">
+            <div class="section-title">Evidence Photos</div>
+            <div class="image-grid">
+              ${processedImages
+                .filter((src) => src !== null)
+                .map(
+                  (src, index) => `
+                <div class="image-card">
+                   <img src="${src}" />
+                   <div class="image-caption">Evidence #${index + 1}</div>
+                </div>
+              `,
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      // 3. Construct Full HTML
+      // OPTIMIZATIONS: Tighter margins, smaller fonts, compact padding
       const html = `
         <html>
           <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
             <style>
-              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #333; }
-              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-              .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
-              .header p { margin: 5px 0 0; color: #666; }
+              @page {
+                margin: 10mm; /* Reduced from 20mm to save space */
+                size: A4;
+              }
+              body { 
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+                color: #333; 
+                margin: 0;
+                padding: 0;
+                font-size: 12px; /* Slightly smaller base font */
+                -webkit-print-color-adjust: exact;
+              }
               
-              .section { margin-bottom: 25px; }
-              .section-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-left: 4px solid #2563eb; padding-left: 10px; text-transform: uppercase; }
+              /* COMPACT HEADER */
+              .header { 
+                text-align: center; 
+                margin-bottom: 15px; 
+                border-bottom: 1px solid #333; 
+                padding-bottom: 5px; 
+              }
+              .header h1 { margin: 0; font-size: 20px; text-transform: uppercase; }
+              .header p { margin: 2px 0 0; color: #666; font-size: 10px; }
               
-              .grid { display: flex; flex-wrap: wrap; gap: 20px; }
-              .grid-item { flex: 1; min-width: 150px; }
-              .label { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 4px; }
-              .value { font-size: 16px; font-weight: bold; }
+              /* COMPACT SECTIONS */
+              .section { margin-bottom: 15px; page-break-inside: avoid; }
+              .section-title { 
+                font-size: 14px; 
+                font-weight: bold; 
+                margin-bottom: 8px; 
+                border-left: 3px solid #2563eb; 
+                padding-left: 8px; 
+                text-transform: uppercase; 
+                background-color: #f9fafb;
+                padding-top: 2px;
+                padding-bottom: 2px;
+              }
               
-              .status-box { display: inline-block; padding: 4px 12px; border-radius: 4px; border: 1px solid #333; }
+              /* GRID LAYOUT */
+              .grid { display: flex; flex-wrap: wrap; gap: 15px; }
+              .grid-item { flex: 1; min-width: 120px; }
+              .label { font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 2px; }
+              .value { font-size: 13px; font-weight: bold; }
               
-              table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
-              th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-              th { background-color: #f3f4f6; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+              .status-box { 
+                display: inline-block; 
+                padding: 2px 8px; 
+                border-radius: 4px; 
+                border: 1px solid #333; 
+                font-size: 12px;
+              }
+              
+              /* COMPACT TABLE */
+              table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11px; }
+              th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+              th { background-color: #f3f4f6; font-weight: bold; text-transform: uppercase; font-size: 10px; }
               tr:nth-child(even) { background-color: #f9fafb; }
               
-              .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+              /* COMPACT IMAGE GRID */
+              .image-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                margin-top: 5px;
+              }
+              .image-card {
+                background: #fff;
+                border: 1px solid #e5e7eb;
+                padding: 5px;
+                border-radius: 6px;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                page-break-inside: avoid;
+              }
+              .image-card img {
+                width: 100%;
+                height: 160px; /* Reduced height to fit more */
+                object-fit: contain;
+                border-radius: 3px;
+                background-color: #f9fafb;
+              }
+              .image-caption {
+                margin-top: 4px;
+                font-size: 10px;
+                font-weight: bold;
+                color: #6b7280;
+                text-transform: uppercase;
+              }
+
+              /* FOOTER */
+              .footer { 
+                margin-top: 20px; 
+                text-align: center; 
+                font-size: 9px; 
+                color: #999; 
+                border-top: 1px solid #eee; 
+                padding-top: 5px; 
+              }
             </style>
           </head>
           <body>
@@ -266,10 +386,12 @@ export default function DetailedAuditTrail() {
 
             <div class="section">
               <div class="section-title">Auditor Notes</div>
-              <div style="background: #f9fafb; padding: 15px; border-radius: 6px; border: 1px solid #eee;">
+              <div style="background: #f9fafb; padding: 10px; border-radius: 4px; border: 1px solid #eee; min-height: 40px; font-size: 12px;">
                 ${auditDetails.notes || "No notes recorded."}
               </div>
             </div>
+            
+            ${imagesHtml}
 
             <div class="section">
               <div class="section-title">Source Transaction History</div>
@@ -290,7 +412,7 @@ export default function DetailedAuditTrail() {
                   </tbody>
                 </table>
               `
-                  : '<p style="font-style: italic; color: #666;">No source transactions found.</p>'
+                  : '<p style="font-style: italic; color: #666; font-size: 11px;">No source transactions found.</p>'
               }
             </div>
 
@@ -301,7 +423,6 @@ export default function DetailedAuditTrail() {
         </html>
       `;
 
-      // Execute Print
       await Print.printAsync({
         html,
       });
@@ -310,7 +431,6 @@ export default function DetailedAuditTrail() {
       Alert.alert("Export Error", "Failed to generate print layout.");
     }
   };
-  // -------------------------
 
   if (loading) {
     return (
@@ -560,7 +680,7 @@ export default function DetailedAuditTrail() {
             >
               <Text
                 className="flex-1 font-bold text-center text-sm"
-                style={{ color: "#fff" }} // Always white for dark header
+                style={{ color: "#fff" }}
               >
                 TX ID
               </Text>
@@ -638,12 +758,12 @@ export default function DetailedAuditTrail() {
           <TouchableOpacity
             onPress={() => router.back()}
             className="flex-1 justify-center items-center rounded-md active:bg-gray-600"
-            style={{ backgroundColor: theme.textSecondary }} // Dark gray button
+            style={{ backgroundColor: theme.textSecondary }}
           >
             <Text className="font-semibold text-lg text-white">Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={handlePrint} // LINKED PRINT FUNCTION HERE
+            onPress={handlePrint}
             className="flex-1 justify-center items-center rounded-md active:bg-blue-700"
             style={{ backgroundColor: theme.primary }}
           >
