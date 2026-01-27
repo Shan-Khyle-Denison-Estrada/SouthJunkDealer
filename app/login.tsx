@@ -136,7 +136,7 @@ export default function Login() {
           <TouchableOpacity
             style={[
               styles.button,
-              { backgroundColor: theme.buttonBg },
+              { backgroundColor: "#F2C94C" },
               isSubmitting && styles.buttonDisabled,
             ]}
             onPress={handleLogin}
