@@ -23,12 +23,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useColorScheme,
   useWindowDimensions,
   View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
+import { db } from "../db/client";
 import {
   auditTrails,
   inventory,
@@ -37,7 +39,6 @@ import {
   transactionItems,
   transactions,
 } from "../db/schema";
-import { db } from "../db/client";
 
 // --- REUSABLE COMPONENT: Custom Modal Picker ---
 const CustomPicker = ({
@@ -46,6 +47,7 @@ const CustomPicker = ({
   placeholder,
   items,
   enabled = true,
+  theme,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -56,19 +58,33 @@ const CustomPicker = ({
     <>
       <Pressable
         onPress={() => enabled && setModalVisible(true)}
-        style={[styles.pickerTrigger, !enabled && styles.pickerDisabled]}
+        style={[
+          styles.pickerTrigger,
+          !enabled && styles.pickerDisabled,
+          {
+            backgroundColor: theme.inputBg,
+            borderColor: theme.border,
+            opacity: enabled ? 1 : 0.6,
+          },
+        ]}
       >
         <Text
           style={[
             styles.pickerText,
             !selectedValue && styles.placeholderText,
             !enabled && styles.textDisabled,
+            {
+              color: selectedValue ? theme.textPrimary : theme.placeholder,
+            },
           ]}
           numberOfLines={1}
         >
           {displayLabel}
         </Text>
-        <ChevronDown size={20} color={enabled ? "gray" : "#9ca3af"} />
+        <ChevronDown
+          size={20}
+          color={enabled ? theme.textSecondary : theme.placeholder}
+        />
       </Pressable>
 
       <Modal
@@ -81,11 +97,20 @@ const CustomPicker = ({
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-          <View style={styles.pickerOptionsContainer}>
-            <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>{placeholder}</Text>
+          <View
+            style={[
+              styles.pickerOptionsContainer,
+              { backgroundColor: theme.card },
+            ]}
+          >
+            <View
+              style={[styles.pickerHeader, { borderBottomColor: theme.border }]}
+            >
+              <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
+                {placeholder}
+              </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="gray" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -95,7 +120,10 @@ const CustomPicker = ({
                 <TouchableOpacity
                   style={[
                     styles.pickerOption,
-                    selectedValue === item.value && styles.pickerOptionSelected,
+                    { borderBottomColor: theme.subtleBorder },
+                    selectedValue === item.value && {
+                      backgroundColor: theme.highlightBg,
+                    },
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
@@ -105,14 +133,17 @@ const CustomPicker = ({
                   <Text
                     style={[
                       styles.pickerOptionText,
-                      selectedValue === item.value &&
-                        styles.pickerOptionTextSelected,
+                      { color: theme.textSecondary },
+                      selectedValue === item.value && {
+                        color: theme.primary,
+                        fontWeight: "bold",
+                      },
                     ]}
                   >
                     {item.label}
                   </Text>
                   {selectedValue === item.value && (
-                    <Check size={20} color="#2563eb" />
+                    <Check size={20} color={theme.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -125,6 +156,28 @@ const CustomPicker = ({
 };
 
 export default function ScannedInventory() {
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6",
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    border: isDark ? "#333333" : "#e5e7eb",
+    subtleBorder: isDark ? "#2C2C2C" : "#f9fafb",
+    inputBg: isDark ? "#2C2C2C" : "#f3f4f6", // Default input bg
+    inputBgReadOnly: isDark ? "#252525" : "#e5e7eb", // Slightly different for disabled
+    inputText: isDark ? "#FFFFFF" : "#000000",
+    placeholder: isDark ? "#888888" : "#9ca3af",
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb",
+    highlightBg: isDark ? "#1e3a8a" : "#eff6ff",
+    headerBg: isDark ? "#0f0f0f" : "#f3f4f6",
+    primary: "#2563eb",
+  };
+
   // Get params
   const params = useLocalSearchParams();
   const passedBatchId = params.batchId;
@@ -445,7 +498,10 @@ export default function ScannedInventory() {
   };
 
   return (
-    <View className="flex-1 bg-gray-100 p-4 gap-4" style={{ zIndex: 1 }}>
+    <View
+      className="flex-1 p-4 gap-4"
+      style={{ zIndex: 1, backgroundColor: theme.background }}
+    >
       {/* CLICK OUTSIDE OVERLAY */}
       {isBatchDropdownOpen && (
         <Pressable
@@ -459,11 +515,20 @@ export default function ScannedInventory() {
 
       {/* HEADER ROW with SEARCHABLE DROPDOWN */}
       <View className="items-center justify-center z-50">
-        <Text className="text-gray-500 font-bold mb-2 uppercase tracking-widest">
+        <Text
+          className="font-bold mb-2 uppercase tracking-widest"
+          style={{ color: theme.textSecondary }}
+        >
           Item Details
         </Text>
         <View className="w-[80%] relative z-50">
-          <View className="flex-row items-center bg-white border-2 border-gray-300 rounded-md h-12 px-2">
+          <View
+            className="flex-row items-center border-2 rounded-md h-12 px-2"
+            style={{
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+            }}
+          >
             <TextInput
               value={batchSearchQuery}
               onChangeText={(text) => {
@@ -473,29 +538,34 @@ export default function ScannedInventory() {
               }}
               onFocus={() => setIsBatchDropdownOpen(true)}
               placeholder="Type to filter Batch ID..."
-              className="flex-1 text-base text-black h-full"
+              placeholderTextColor={theme.placeholder}
+              className="flex-1 text-base h-full"
+              style={{ color: theme.inputText }}
             />
             {batchSearchQuery.length > 0 && (
               <TouchableOpacity onPress={handleClearBatch} className="mr-2">
-                <XCircle size={18} color="gray" />
+                <XCircle size={18} color={theme.placeholder} />
               </TouchableOpacity>
             )}
             <TouchableOpacity
               onPress={() => setIsBatchDropdownOpen(!isBatchDropdownOpen)}
             >
               {isBatchDropdownOpen ? (
-                <ChevronUp size={20} color="gray" />
+                <ChevronUp size={20} color={theme.placeholder} />
               ) : (
-                <ChevronDown size={20} color="gray" />
+                <ChevronDown size={20} color={theme.placeholder} />
               )}
             </TouchableOpacity>
           </View>
-
           {/* ABSOLUTE DROPDOWN LIST */}
           {isBatchDropdownOpen && (
             <View
-              className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded-b-md shadow-lg z-50 elevation-5"
-              style={{ maxHeight: 400 }}
+              className="absolute top-12 left-0 right-0 border rounded-b-md shadow-lg z-50 elevation-5"
+              style={{
+                maxHeight: 400,
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+              }}
             >
               <FlatList
                 data={filteredBatches}
@@ -503,19 +573,29 @@ export default function ScannedInventory() {
                 nestedScrollEnabled={true}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    className="p-3 border-b border-gray-100 active:bg-blue-50"
+                    className="p-3 border-b"
+                    style={{ borderBottomColor: theme.subtleBorder }}
                     onPress={() => handleBatchChange(item)}
                   >
-                    <Text className="font-bold text-gray-800">
+                    <Text
+                      className="font-bold"
+                      style={{ color: theme.textPrimary }}
+                    >
                       {item.displayLabel}
                     </Text>
-                    <Text className="text-xs text-gray-500">
+                    <Text
+                      className="text-xs"
+                      style={{ color: theme.textSecondary }}
+                    >
                       {item.materialName}
                     </Text>
                   </TouchableOpacity>
                 )}
                 ListEmptyComponent={
-                  <Text className="p-3 text-gray-500 italic">
+                  <Text
+                    className="p-3 italic"
+                    style={{ color: theme.placeholder }}
+                  >
                     No batches found
                   </Text>
                 }
@@ -528,15 +608,26 @@ export default function ScannedInventory() {
       {/* ROW 2: Info & Action */}
       <View className="flex-row gap-4 -z-10">
         <View className="flex-1">
-          <Text className="text-gray-600 font-bold mb-1">Material</Text>
+          <Text
+            className="font-bold mb-1"
+            style={{ color: theme.textSecondary }}
+          >
+            Material
+          </Text>
           <TextInput
-            className="bg-gray-200 h-12 rounded-md px-3 text-gray-500"
+            className="h-12 rounded-md px-3"
+            style={{
+              backgroundColor: theme.inputBgReadOnly,
+              color: theme.textSecondary,
+            }}
             value={scannedData.material}
             editable={false}
           />
         </View>
         <View className="flex-1">
-          <Text className="text-black font-bold mb-1">Status Check</Text>
+          <Text className="font-bold mb-1" style={{ color: theme.textPrimary }}>
+            Status Check
+          </Text>
           <View className="h-12">
             <CustomPicker
               selectedValue={status}
@@ -546,6 +637,7 @@ export default function ScannedInventory() {
                 { label: "Damaged", value: "Damaged" },
                 { label: "Adjust", value: "Adjusted" },
               ]}
+              theme={theme}
             />
           </View>
         </View>
@@ -554,9 +646,18 @@ export default function ScannedInventory() {
       {/* ROW 3: Weights (Conditional) */}
       <View className="flex-row gap-4 -z-10">
         <View className="flex-1">
-          <Text className="text-gray-600 font-bold mb-1">Current Weight</Text>
+          <Text
+            className="font-bold mb-1"
+            style={{ color: theme.textSecondary }}
+          >
+            Current Weight
+          </Text>
           <TextInput
-            className="bg-gray-200 h-12 rounded-md px-3 text-gray-500 font-bold"
+            className="h-12 rounded-md px-3 font-bold"
+            style={{
+              backgroundColor: theme.inputBgReadOnly,
+              color: theme.textSecondary,
+            }}
             value={
               scannedData.netWeight
                 ? `${scannedData.netWeight} ${scannedData.uom}`
@@ -565,19 +666,24 @@ export default function ScannedInventory() {
             editable={false}
           />
         </View>
-
         {status === "Adjusted" && (
           <View className="flex-1">
             <Text className="text-blue-600 font-bold mb-1">
               New Weight (kg)
             </Text>
             <TextInput
-              className="bg-white h-12 rounded-md px-3 text-blue-800 border-2 border-blue-500 font-bold"
+              className="h-12 rounded-md px-3 border-2 font-bold"
+              style={{
+                backgroundColor: theme.inputBg,
+                color: theme.primary,
+                borderColor: theme.primary,
+              }}
               value={adjustedWeight}
               onChangeText={(text) =>
                 handleNumericInput(text, setAdjustedWeight)
               }
               placeholder="0.00"
+              placeholderTextColor={theme.placeholder}
               keyboardType="numeric"
             />
           </View>
@@ -587,24 +693,41 @@ export default function ScannedInventory() {
       {/* ROW 4: Photo Evidence & Notes */}
       <View className="flex-row gap-4 -z-10">
         <View className="flex-1">
-          <Text className="text-gray-700 font-bold mb-1">
+          <Text
+            className="font-bold mb-1"
+            style={{ color: theme.textSecondary }}
+          >
             Evidence ({evidenceImages.length})
           </Text>
-
-          <View className="h-48 border-2 border-dashed border-gray-300 bg-gray-50 rounded-md p-2">
+          <View
+            className="h-48 border-2 border-dashed rounded-md p-2"
+            style={{
+              backgroundColor: theme.rowOdd,
+              borderColor: theme.border,
+            }}
+          >
             <TouchableOpacity
               onPress={handleTakePhoto}
-              className="flex-row items-center justify-center p-3 bg-white border border-gray-300 rounded shadow-sm"
+              className="flex-row items-center justify-center p-3 border rounded shadow-sm"
+              style={{
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+              }}
             >
-              <Camera size={20} color="#4b5563" />
-              <Text className="text-gray-700 font-bold ml-2 text-xs">
+              <Camera size={20} color={theme.textSecondary} />
+              <Text
+                className="font-bold ml-2 text-xs"
+                style={{ color: theme.textPrimary }}
+              >
                 Add Photo
               </Text>
             </TouchableOpacity>
-
             {evidenceImages.length === 0 ? (
               <View className="flex-1 justify-center items-center">
-                <Text className="text-gray-400 text-xs italic">
+                <Text
+                  className="text-xs italic"
+                  style={{ color: theme.placeholder }}
+                >
                   No photos added
                 </Text>
               </View>
@@ -614,76 +737,139 @@ export default function ScannedInventory() {
                   setCurrentImageIndex(0);
                   setGalleryModalVisible(true);
                 }}
-                className="flex-1 mt-2 bg-blue-50 border border-blue-200 rounded-md items-center justify-center flex-row gap-2"
+                className="flex-1 mt-2 border rounded-md items-center justify-center flex-row gap-2"
+                style={{
+                  backgroundColor: theme.highlightBg,
+                  borderColor: theme.primary,
+                }}
               >
-                <Images size={24} color="#2563eb" />
-                <Text className="text-blue-700 font-bold text-sm">
+                <Images size={24} color={theme.primary} />
+                <Text
+                  className="font-bold text-sm"
+                  style={{ color: theme.primary }}
+                >
                   View Captured ({evidenceImages.length})
                 </Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
-
         <View className="flex-[1.5]">
-          <Text className="text-black font-bold mb-1">Notes</Text>
+          <Text className="font-bold mb-1" style={{ color: theme.textPrimary }}>
+            Notes
+          </Text>
           <TextInput
-            className="bg-white h-48 rounded-md p-3 border border-gray-200"
+            className="h-48 rounded-md p-3 border"
+            style={{
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+              color: theme.inputText,
+            }}
             multiline
             textAlignVertical="top"
             value={notes}
             onChangeText={setNotes}
             placeholder="Add remarks..."
+            placeholderTextColor={theme.placeholder}
           />
         </View>
       </View>
 
       {/* TABLE SECTION */}
-      <View className="mt-4 bg-white rounded-md border border-gray-200 overflow-hidden flex-1 -z-10">
-        <View className="bg-gray-100 p-3 border-b border-gray-200">
-          <Text className="text-gray-700 font-bold text-xs uppercase">
+      <View
+        className="mt-4 rounded-md border overflow-hidden flex-1 -z-10"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
+        <View
+          className="p-3 border-b"
+          style={{
+            backgroundColor: theme.headerBg,
+            borderColor: theme.border,
+          }}
+        >
+          <Text
+            className="font-bold text-xs uppercase"
+            style={{ color: theme.textSecondary }}
+          >
             Transaction History (Source)
           </Text>
         </View>
-
         <ScrollView className="flex-1">
           {lineItems.length === 0 ? (
             <View className="p-8 items-center">
-              <Text className="text-gray-400 italic">
+              <Text className="italic" style={{ color: theme.placeholder }}>
                 No source transactions found.
               </Text>
             </View>
           ) : (
             <View>
-              <View className="flex-row bg-gray-50 p-2 border-b border-gray-100">
-                <Text className="flex-1 text-xs font-bold text-gray-500">
+              <View
+                className="flex-row p-2 border-b"
+                style={{
+                  backgroundColor: theme.rowOdd,
+                  borderColor: theme.subtleBorder,
+                }}
+              >
+                <Text
+                  className="flex-1 text-xs font-bold"
+                  style={{ color: theme.textSecondary }}
+                >
                   TX ID
                 </Text>
-                <Text className="flex-1 text-xs font-bold text-gray-500">
+                <Text
+                  className="flex-1 text-xs font-bold"
+                  style={{ color: theme.textSecondary }}
+                >
                   Type
                 </Text>
-                <Text className="flex-1 text-xs font-bold text-gray-500">
+                <Text
+                  className="flex-1 text-xs font-bold"
+                  style={{ color: theme.textSecondary }}
+                >
                   Date
                 </Text>
-                <Text className="flex-1 text-xs font-bold text-gray-500 text-right">
+                <Text
+                  className="flex-1 text-xs font-bold text-right"
+                  style={{ color: theme.textSecondary }}
+                >
                   Allocated
                 </Text>
               </View>
               {lineItems.map((item, idx) => (
                 <View
-                  key={idx}
-                  className="flex-row p-2 border-b border-gray-50 items-center"
+                  key={item.id}
+                  className="flex-row p-3 border-b items-center"
+                  style={{
+                    backgroundColor:
+                      idx % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                    borderColor: theme.subtleBorder,
+                  }}
                 >
-                  <Text className="flex-1 text-xs text-gray-800">
+                  <Text
+                    className="flex-1 text-xs"
+                    style={{ color: theme.textPrimary }}
+                  >
                     #{item.txId}
                   </Text>
-                  <Text className="flex-1 text-xs text-blue-600 font-medium">
+                  <Text
+                    className="flex-1 text-xs"
+                    style={{ color: theme.textPrimary }}
+                  >
                     {item.type}
                   </Text>
-                  <Text className="flex-1 text-xs text-gray-600">
+                  <Text
+                    className="flex-1 text-xs"
+                    style={{ color: theme.textPrimary }}
+                  >
                     {item.date}
                   </Text>
-                  <Text className="flex-1 text-xs text-gray-800 text-right font-bold">
+                  <Text
+                    className="flex-1 text-xs font-bold text-right"
+                    style={{ color: theme.textPrimary }}
+                  >
                     {item.allocated} kg
                   </Text>
                 </View>
@@ -693,141 +879,131 @@ export default function ScannedInventory() {
         </ScrollView>
       </View>
 
-      {/* SUBMIT BUTTON */}
-      <TouchableOpacity
-        onPress={handleSubmit}
-        className="bg-blue-600 h-14 rounded-md justify-center items-center shadow-sm mt-2 mb-2 active:bg-blue-700 -z-10"
-      >
-        <Text className="text-white font-bold text-lg uppercase tracking-wider">
-          Confirm Audit
-        </Text>
-      </TouchableOpacity>
-
-      {/* GALLERY CAROUSEL MODAL */}
-      <Modal
-        visible={galleryModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setGalleryModalVisible(false)}
-      >
-        <View className="flex-1 bg-black">
-          {/* Top Bar */}
-          <View className="flex-row justify-between items-center p-4 mt-8 z-10">
-            <Text className="text-white font-bold text-xl">
-              Evidence Gallery
-            </Text>
-            <TouchableOpacity
-              onPress={() => setGalleryModalVisible(false)}
-              className="bg-gray-800 p-2 rounded-full"
-            >
-              <X size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Carousel */}
-          <View className="flex-1 justify-center items-center">
-            {evidenceImages.length > 0 ? (
-              <FlatList
-                data={evidenceImages}
-                keyExtractor={(_, index) => index.toString()}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onScroll={handleScroll}
-                scrollEventThrottle={16} // smooth updates
-                renderItem={({ item }) => (
-                  <View style={{ width, justifyContent: "center" }}>
-                    <Image
-                      source={{ uri: item }}
-                      style={{ width: width, height: "80%" }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                )}
-              />
-            ) : (
-              <Text className="text-gray-500">No images available</Text>
-            )}
-          </View>
-
-          {/* Bottom Bar: Counter & Delete */}
-          {evidenceImages.length > 0 && (
-            <View className="absolute bottom-10 left-0 right-0 items-center justify-center gap-4">
-              <View className="bg-gray-800 px-4 py-1 rounded-full">
-                <Text className="text-white font-bold">
-                  {currentImageIndex + 1} / {evidenceImages.length}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={removeImage}
-                className="bg-red-600 flex-row items-center gap-2 px-6 py-3 rounded-full shadow-lg"
-              >
-                <Trash2 size={20} color="white" />
-                <Text className="text-white font-bold">Delete Image</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </Modal>
+      {/* FOOTER BUTTONS */}
+      <View className="flex-row gap-3 pt-2 -z-10">
+        <TouchableOpacity
+          onPress={() => router.push("/auditTrails")}
+          className="flex-1 bg-gray-500 h-14 rounded-lg flex-row items-center justify-center gap-2"
+        >
+          <Text className="text-white font-bold text-lg">Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleSubmit}
+          className="flex-[2] bg-blue-600 h-14 rounded-lg flex-row items-center justify-center gap-2"
+        >
+          <Check size={24} color="white" />
+          <Text className="text-white font-bold text-lg">Submit Audit</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* CONFIRMATION MODAL */}
       <Modal
-        animationType="fade"
+        animationType="slide"
         transparent={true}
         visible={isModalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View className="flex-1 bg-black/50 justify-center items-center p-4">
-          <View className="bg-white w-full max-w-sm rounded-lg p-6 shadow-lg">
-            <Text className="text-xl font-bold text-gray-800 mb-2">
-              Confirm Audit?
-            </Text>
-            <Text className="text-gray-600 mb-4">
-              Log <Text className="font-bold">{status}</Text> for{" "}
-              <Text className="font-bold">
-                {
-                  inventoryBatches.find((b) => b.value === selectedBatchId)
-                    ?.label
-                }
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View
+              className="flex-row justify-between items-center mb-4 border-b pb-2"
+              style={{ borderBottomColor: theme.border }}
+            >
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
+                Confirm Audit
               </Text>
-              ?
-            </Text>
-
-            {status === "Adjusted" && (
-              <View className="bg-yellow-50 p-3 rounded-md mb-4 border border-yellow-200">
-                <Text className="text-yellow-800 text-xs font-bold uppercase">
-                  Weight Change
-                </Text>
-                <View className="flex-row justify-between mt-1">
-                  <Text className="text-gray-500 line-through">
-                    {scannedData.netWeight} kg
-                  </Text>
-                  <Text className="text-blue-600 font-bold text-lg">
-                    {adjustedWeight} kg
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            <View className="flex-row gap-4">
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                className="flex-1 bg-gray-200 p-3 rounded-md"
-              >
-                <Text className="text-gray-700 text-center font-bold">
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleConfirmModal}
-                className="flex-1 bg-blue-600 p-3 rounded-md"
-              >
-                <Text className="text-white text-center font-bold">
-                  Confirm
-                </Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
+
+            <View className="gap-2 mb-6">
+              <Text style={{ color: theme.textPrimary }}>
+                Batch:{" "}
+                <Text className="font-bold">
+                  {scannedData.material} ({selectedBatchId})
+                </Text>
+              </Text>
+              <Text style={{ color: theme.textPrimary }}>
+                Status: <Text className="font-bold">{status}</Text>
+              </Text>
+              {status === "Adjusted" && (
+                <Text className="text-blue-600 font-bold">
+                  New Weight: {adjustedWeight} kg
+                </Text>
+              )}
+              <Text
+                className="italic text-xs mt-2"
+                style={{ color: theme.textSecondary }}
+              >
+                This will create a permanent audit trail record.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleConfirmModal}
+              className="bg-blue-600 p-4 rounded-lg items-center shadow-sm"
+            >
+              <Text className="text-white font-bold text-lg">
+                Confirm & Save
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* GALLERY MODAL */}
+      <Modal
+        visible={galleryModalVisible}
+        transparent={true}
+        onRequestClose={() => setGalleryModalVisible(false)}
+      >
+        <View className="flex-1 bg-black justify-center items-center">
+          <TouchableOpacity
+            onPress={() => setGalleryModalVisible(false)}
+            className="absolute top-10 right-5 z-50 p-2 bg-gray-800 rounded-full"
+          >
+            <X size={24} color="white" />
+          </TouchableOpacity>
+
+          <View className="h-[70%] w-full">
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={handleScroll}
+            >
+              {evidenceImages.map((uri, index) => (
+                <View key={index} style={{ width, alignItems: "center" }}>
+                  <Image
+                    source={{ uri }}
+                    className="w-full h-full"
+                    resizeMode="contain"
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View className="absolute bottom-20 flex-row items-center gap-4">
+            <Text className="text-white font-bold text-lg">
+              {currentImageIndex + 1} / {evidenceImages.length}
+            </Text>
+            <TouchableOpacity
+              onPress={removeImage}
+              className="bg-red-600 p-3 rounded-full"
+            >
+              <Trash2 size={24} color="white" />
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -836,39 +1012,36 @@ export default function ScannedInventory() {
 }
 
 const styles = StyleSheet.create({
-  // New Styles for the Custom Picker
   pickerTrigger: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f3f4f6",
     borderWidth: 1,
-    borderColor: "#d1d5db",
     borderRadius: 6,
     paddingHorizontal: 12,
     height: "100%",
-    width: "100%",
   },
   pickerDisabled: {
-    backgroundColor: "#e5e7eb",
-    borderColor: "#d1d5db",
-    borderWidth: 1,
+    opacity: 0.5,
   },
   pickerText: {
     fontSize: 16,
-    color: "black",
     flex: 1,
   },
-  textDisabled: {
-    color: "#9ca3af",
-  },
   placeholderText: {
-    color: "#9ca3af",
+    fontStyle: "italic",
   },
-  // Modal Styles for Picker
+  textDisabled: {
+    fontStyle: "italic",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   pickerOptionsContainer: {
-    backgroundColor: "white",
-    width: "40%",
+    width: "80%",
     maxHeight: "50%",
     borderRadius: 12,
     padding: 16,
@@ -884,13 +1057,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
     paddingBottom: 8,
   },
   pickerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#374151",
   },
   pickerOption: {
     flexDirection: "row",
@@ -899,26 +1070,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f9fafb",
-  },
-  pickerOptionSelected: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 6,
   },
   pickerOptionText: {
     fontSize: 16,
-    color: "#4b5563",
   },
-  pickerOptionTextSelected: {
-    color: "#2563eb",
-    fontWeight: "bold",
-  },
-  // Main Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+  modalContent: {
+    width: "80%",
+    borderRadius: 12,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });

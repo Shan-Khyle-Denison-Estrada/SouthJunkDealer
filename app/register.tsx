@@ -13,6 +13,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
@@ -20,11 +21,11 @@ const { height } = Dimensions.get("window");
 
 export default function Register() {
   const { signUp } = useAuth();
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-
-  // Separate confirm password from form data so it's not sent to DB
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [form, setForm] = useState({
     firstName: "",
     middleName: "",
@@ -32,6 +33,30 @@ export default function Register() {
     email: "",
     password: "",
   });
+
+  // --- DYNAMIC THEME COLORS ---
+  const theme = {
+    // Layout Backgrounds
+    containerBg: isDark ? "#000000" : "#ffffff",
+    leftPanelBg: isDark ? "#121212" : "#F2C94C", // Dark : Brand Yellow
+    rightPanelBg: isDark ? "#1E1E1E" : "#ffffff", // Dark Gray : White
+
+    // Text
+    textPrimary: isDark ? "#FFFFFF" : "#333333",
+    textSecondary: isDark ? "#A1A1AA" : "#666666",
+    textBranding: isDark ? "#F2C94C" : "#FFFFFF", // Yellow text in dark mode for contrast
+
+    // Inputs
+    inputBackground: isDark ? "#2C2C2C" : "#f9f9f9",
+    inputBorder: isDark ? "#444444" : "#e0e0e0",
+    inputText: isDark ? "#FFFFFF" : "#333333",
+    placeholder: isDark ? "#888888" : "#999999",
+
+    // Interactive
+    buttonBg: isDark ? "#2563eb" : "#F2C94C", // Blue : Brand Yellow
+    buttonText: "#ffffff",
+    iconColor: isDark ? "#2563eb" : "#F2C94C",
+  };
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -47,7 +72,6 @@ export default function Register() {
   };
 
   const handleRegister = async () => {
-    // 1. Basic Field Validation
     if (
       !form.firstName ||
       !form.lastName ||
@@ -59,7 +83,6 @@ export default function Register() {
       return;
     }
 
-    // 2. Password Match Validation
     if (form.password !== confirmPassword) {
       Alert.alert("Error", "Passwords do not match.");
       return;
@@ -81,7 +104,7 @@ export default function Register() {
     text: string;
     required?: boolean;
   }) => (
-    <Text style={styles.label}>
+    <Text style={[styles.label, { color: theme.textPrimary }]}>
       {text} {required && <Text style={styles.required}>*</Text>}
     </Text>
   );
@@ -89,43 +112,79 @@ export default function Register() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.containerBg }]}
     >
       <View style={styles.splitLayout}>
-        {/* LEFT HALF (Smaller width now) */}
-        <View style={styles.leftPanel}>
+        {/* LEFT HALF - Branding */}
+        <View
+          style={[styles.leftPanel, { backgroundColor: theme.leftPanelBg }]}
+        >
           <View style={styles.logoContainer}>
             <Image
               source={require("../assets/images/icon.png")}
               style={styles.mainLogo}
             />
-            <Text style={styles.brandingText}>
+            <Text style={[styles.brandingText, { color: theme.textBranding }]}>
               South Junk Dealer Management System
             </Text>
-            <Text style={styles.tagline}>Secure • Reliable • Fast</Text>
+            <Text
+              style={[
+                styles.tagline,
+                { color: theme.textBranding, opacity: 0.8 },
+              ]}
+            >
+              Secure • Reliable • Fast
+            </Text>
           </View>
         </View>
 
-        {/* RIGHT HALF (Wider width, No ScrollView) */}
-        <View style={styles.rightPanel}>
+        {/* RIGHT HALF - Content */}
+        <View
+          style={[styles.rightPanel, { backgroundColor: theme.rightPanelBg }]}
+        >
           <View style={styles.contentWrapper}>
-            <Text style={styles.headerTitle}>Initial System Setup</Text>
-            <Text style={styles.headerSubtitle}>
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
+              Initial System Setup
+            </Text>
+            <Text
+              style={[styles.headerSubtitle, { color: theme.textSecondary }]}
+            >
               Create the owner account to begin.
             </Text>
 
             {/* CIRCULAR PHOTO UPLOAD */}
             <View style={styles.photoContainer}>
-              <TouchableOpacity onPress={pickImage} style={styles.photoWrapper}>
+              <TouchableOpacity
+                onPress={pickImage}
+                style={[
+                  styles.photoWrapper,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                  },
+                ]}
+              >
                 {photoUri ? (
                   <Image source={{ uri: photoUri }} style={styles.photo} />
                 ) : (
                   <View style={styles.photoPlaceholder}>
-                    <Camera size={32} color="#888" />
-                    <Text style={styles.photoText}>Add Photo</Text>
+                    <Camera size={32} color={theme.placeholder} />
+                    <Text
+                      style={[styles.photoText, { color: theme.placeholder }]}
+                    >
+                      Add Photo
+                    </Text>
                   </View>
                 )}
-                <View style={styles.editBadge}>
+                <View
+                  style={[
+                    styles.editBadge,
+                    {
+                      backgroundColor: theme.buttonBg,
+                      borderColor: theme.rightPanelBg,
+                    },
+                  ]}
+                >
                   <Pencil size={14} color="#fff" />
                 </View>
               </TouchableOpacity>
@@ -133,13 +192,21 @@ export default function Register() {
 
             {/* FORM FIELDS */}
             <View style={styles.formGroup}>
-              {/* ROW 1: NAMES (3 Columns) */}
+              {/* ROW 1: NAMES */}
               <View style={styles.row}>
                 <View style={styles.col}>
                   <Label text="First Name" required />
                   <TextInput
                     placeholder="First Name"
-                    style={styles.input}
+                    placeholderTextColor={theme.placeholder}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.inputBackground,
+                        borderColor: theme.inputBorder,
+                        color: theme.inputText,
+                      },
+                    ]}
                     onChangeText={(t) => setForm({ ...form, firstName: t })}
                   />
                 </View>
@@ -148,7 +215,15 @@ export default function Register() {
                   <Label text="Middle Name" />
                   <TextInput
                     placeholder="Middle Name"
-                    style={styles.input}
+                    placeholderTextColor={theme.placeholder}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.inputBackground,
+                        borderColor: theme.inputBorder,
+                        color: theme.inputText,
+                      },
+                    ]}
                     onChangeText={(t) => setForm({ ...form, middleName: t })}
                   />
                 </View>
@@ -157,7 +232,15 @@ export default function Register() {
                   <Label text="Last Name" required />
                   <TextInput
                     placeholder="Last Name"
-                    style={styles.input}
+                    placeholderTextColor={theme.placeholder}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.inputBackground,
+                        borderColor: theme.inputBorder,
+                        color: theme.inputText,
+                      },
+                    ]}
                     onChangeText={(t) => setForm({ ...form, lastName: t })}
                   />
                 </View>
@@ -167,7 +250,15 @@ export default function Register() {
               <Label text="Email Address" required />
               <TextInput
                 placeholder="Enter Email"
-                style={styles.input}
+                placeholderTextColor={theme.placeholder}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBackground,
+                    borderColor: theme.inputBorder,
+                    color: theme.inputText,
+                  },
+                ]}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 onChangeText={(t) => setForm({ ...form, email: t })}
@@ -179,8 +270,16 @@ export default function Register() {
                   <Label text="Password" required />
                   <TextInput
                     placeholder="Enter Password"
+                    placeholderTextColor={theme.placeholder}
                     secureTextEntry
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.inputBackground,
+                        borderColor: theme.inputBorder,
+                        color: theme.inputText,
+                      },
+                    ]}
                     onChangeText={(t) => setForm({ ...form, password: t })}
                   />
                 </View>
@@ -189,15 +288,28 @@ export default function Register() {
                   <Label text="Confirm Password" required />
                   <TextInput
                     placeholder="Confirm Password"
+                    placeholderTextColor={theme.placeholder}
                     secureTextEntry
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.inputBackground,
+                        borderColor: theme.inputBorder,
+                        color: theme.inputText,
+                      },
+                    ]}
                     onChangeText={setConfirmPassword}
                   />
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.button} onPress={handleRegister}>
-                <Text style={styles.buttonText}>Complete Setup</Text>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: theme.buttonBg }]}
+                onPress={handleRegister}
+              >
+                <Text style={[styles.buttonText, { color: theme.buttonText }]}>
+                  Complete Setup
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -211,100 +323,88 @@ const styles = StyleSheet.create({
   container: {
     height: height,
     flex: 1,
-    backgroundColor: "#fff",
   },
   splitLayout: { flex: 1, flexDirection: "row" },
 
-  // --- LEFT PANEL (Modified Flex) ---
+  // --- LEFT PANEL ---
   leftPanel: {
-    flex: 1, // Takes 40% (approx)
-    backgroundColor: "#F2C94C",
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     borderRightWidth: 1,
-    borderRightColor: "#e0e0e0",
+    borderRightColor: "rgba(0,0,0,0.1)", // Subtle border
   },
   logoContainer: { alignItems: "center", paddingHorizontal: 20 },
   mainLogo: {
-    width: 250, // Slightly reduced to fit better
+    width: 250,
     height: 250,
     resizeMode: "contain",
     marginBottom: 0,
   },
   brandingText: {
-    fontSize: 42, // Adjusted for balance
+    fontSize: 42,
     fontWeight: "bold",
-    color: "#fff",
     textAlign: "center",
     lineHeight: 50,
   },
-  tagline: { fontSize: 16, color: "#fff", opacity: 0.9, marginTop: 5 },
+  tagline: { fontSize: 16, marginTop: 5 },
 
-  // --- RIGHT PANEL (Modified Flex) ---
+  // --- RIGHT PANEL ---
   rightPanel: {
-    flex: 1.5, // Takes 60% (approx) - Occupies more space
-    backgroundColor: "#fff",
-    justifyContent: "center", // Vertically Center content
+    flex: 1.5,
+    justifyContent: "center",
   },
   contentWrapper: {
-    padding: 50, // More padding since we have more space
+    padding: 50,
     width: "100%",
-    maxWidth: 800, // Limit max width on very large screens
+    maxWidth: 800,
     alignSelf: "center",
   },
 
   headerTitle: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 8,
     textAlign: "center",
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#666",
     marginBottom: 30,
     textAlign: "center",
   },
 
   photoContainer: { alignItems: "center", marginBottom: 30 },
   photoWrapper: {
-    width: 100, // Slightly smaller to save vertical space
+    width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#f5f5f5",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#e0e0e0",
   },
   photo: { width: "100%", height: "100%", borderRadius: 50 },
   photoPlaceholder: { alignItems: "center", justifyContent: "center" },
-  photoText: { fontSize: 10, color: "#888", marginTop: 4 },
+  photoText: { fontSize: 10, marginTop: 4 },
   editBadge: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: "#333",
     width: 26,
     height: 26,
     borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#fff",
   },
 
   formGroup: { width: "100%" },
 
-  // New Row Styles
-  row: { flexDirection: "row", gap: 15 }, // Adds space between columns
-  col: { flex: 1 }, // Equal width columns
+  row: { flexDirection: "row", gap: 15 },
+  col: { flex: 1 },
 
   label: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 6,
     marginLeft: 2,
   },
@@ -313,16 +413,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   input: {
-    backgroundColor: "#f9f9f9",
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    padding: 12, // Slightly tighter padding
+    padding: 12,
     borderRadius: 8,
     marginBottom: 15,
     fontSize: 14,
   },
   button: {
-    backgroundColor: "#333",
     padding: 16,
     borderRadius: 8,
     alignItems: "center",
@@ -333,5 +430,5 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  buttonText: { color: "white", fontWeight: "bold", fontSize: 16 },
+  buttonText: { fontWeight: "bold", fontSize: 16 },
 });

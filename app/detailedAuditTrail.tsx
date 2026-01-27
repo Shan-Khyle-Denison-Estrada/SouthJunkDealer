@@ -10,12 +10,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
 // Added 'materials' back to the imports
+import { db } from "../db/client";
 import {
   auditTrails,
   inventory,
@@ -24,12 +26,37 @@ import {
   transactionItems,
   transactions,
 } from "../db/schema";
-import { db } from "../db/client";
 
 const { width } = Dimensions.get("window");
 
 export default function DetailedAuditTrail() {
   const { id } = useLocalSearchParams();
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6",
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    border: isDark ? "#333333" : "#d1d5db", // Gray-300
+    subtleBorder: isDark ? "#2C2C2C" : "#f3f4f6", // Gray-100
+    inputBg: isDark ? "#2C2C2C" : "#e5e7eb", // Gray-200
+    inputText: isDark ? "#FFFFFF" : "#374151", // Gray-700
+    placeholder: isDark ? "#888888" : "#9ca3af",
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb", // Gray-50
+    headerBg: isDark ? "#0f0f0f" : "#1f2937", // Gray-800
+    primary: "#2563eb",
+    // Specific colors for status/highlights
+    success: isDark ? "#4ade80" : "#16a34a",
+    danger: isDark ? "#f87171" : "#dc2626",
+    info: isDark ? "#60a5fa" : "#2563eb",
+    warningBg: isDark ? "#422006" : "#fffbeb", // Yellow-50 equivalent
+    warningBorder: isDark ? "#a16207" : "#facc15", // Yellow-400 equivalent
+  };
+
   const [loading, setLoading] = useState(true);
   const [imageModalVisible, setImageModalVisible] = useState(false);
 
@@ -118,13 +145,13 @@ export default function DetailedAuditTrail() {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "verified":
-        return "text-green-600";
+        return theme.success;
       case "damaged":
-        return "text-red-600";
+        return theme.danger;
       case "adjusted":
-        return "text-blue-600";
+        return theme.info;
       default:
-        return "text-gray-600";
+        return theme.textSecondary;
     }
   };
 
@@ -143,19 +170,28 @@ export default function DetailedAuditTrail() {
 
   if (loading) {
     return (
-      <View className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color="#2563eb" />
+      <View
+        className="flex-1 justify-center items-center"
+        style={{ backgroundColor: theme.background }}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
 
   if (!auditDetails) {
     return (
-      <View className="flex-1 justify-center items-center">
-        <Text className="text-gray-500 text-lg">Audit Record Not Found</Text>
+      <View
+        className="flex-1 justify-center items-center"
+        style={{ backgroundColor: theme.background }}
+      >
+        <Text style={{ color: theme.textSecondary, fontSize: 18 }}>
+          Audit Record Not Found
+        </Text>
         <TouchableOpacity
           onPress={() => router.back()}
-          className="mt-4 p-3 bg-blue-600 rounded-md"
+          className="mt-4 p-3 rounded-md"
+          style={{ backgroundColor: theme.primary }}
         >
           <Text className="text-white font-bold">Go Back</Text>
         </TouchableOpacity>
@@ -167,38 +203,63 @@ export default function DetailedAuditTrail() {
     auditDetails.evidenceImages && auditDetails.evidenceImages.length > 0;
 
   return (
-    <View className="flex-1 px-4 bg-gray-100">
+    <View className="flex-1 px-4" style={{ backgroundColor: theme.background }}>
       <View className="flex-1 gap-4 py-4">
         {/* --- HEADER: ID, BATCH(Material), STATUS --- */}
         <View className="flex-row gap-4 h-20">
           <View className="flex-1 justify-center">
-            <Text className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-xs">
+            <Text
+              className="font-bold mb-1 uppercase tracking-widest text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Audit ID
             </Text>
             <TextInput
-              className="bg-gray-200 rounded-md px-3 h-12 text-lg font-bold text-gray-700 border border-gray-300"
+              className="rounded-md px-3 h-12 text-lg font-bold border"
+              style={{
+                backgroundColor: theme.inputBg,
+                color: theme.inputText,
+                borderColor: theme.border,
+              }}
               value={`AUD-${auditDetails.auditId}`}
               editable={false}
             />
           </View>
           <View className="flex-1 justify-center">
-            <Text className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-xs">
+            <Text
+              className="font-bold mb-1 uppercase tracking-widest text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Batch ID
             </Text>
-            {/* Modified to show Batch ID (Material Name) */}
             <TextInput
-              className="bg-gray-200 rounded-md px-3 h-12 text-lg font-bold text-gray-700 border border-gray-300"
+              className="rounded-md px-3 h-12 text-lg font-bold border"
+              style={{
+                backgroundColor: theme.inputBg,
+                color: theme.inputText,
+                borderColor: theme.border,
+              }}
               value={`${auditDetails.batchId} (${auditDetails.materialName || "N/A"})`}
               editable={false}
             />
           </View>
           <View className="flex-1 justify-center">
-            <Text className="text-gray-600 font-bold mb-1 uppercase tracking-widest text-xs">
+            <Text
+              className="font-bold mb-1 uppercase tracking-widest text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Status
             </Text>
-            <View className="bg-white h-12 rounded-md justify-center items-center border border-gray-300">
+            <View
+              className="h-12 rounded-md justify-center items-center border"
+              style={{
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+              }}
+            >
               <Text
-                className={`font-bold text-lg uppercase ${getStatusColor(auditDetails.status)}`}
+                className="font-bold text-lg uppercase"
+                style={{ color: getStatusColor(auditDetails.status) }}
               >
                 {auditDetails.status}
               </Text>
@@ -209,11 +270,19 @@ export default function DetailedAuditTrail() {
         {/* --- ROW 2: WEIGHTS --- */}
         <View className="flex-row gap-4">
           <View className="flex-1">
-            <Text className="text-gray-600 font-bold mb-1 text-xs">
+            <Text
+              className="font-bold mb-1 text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Original Wt.
             </Text>
             <TextInput
-              className="bg-gray-200 h-12 rounded-md px-3 text-gray-600 font-medium text-lg border border-gray-300"
+              className="h-12 rounded-md px-3 font-medium text-lg border"
+              style={{
+                backgroundColor: theme.inputBg,
+                color: theme.textSecondary,
+                borderColor: theme.border,
+              }}
               value={
                 auditDetails.prevWeight ? `${auditDetails.prevWeight} kg` : "-"
               }
@@ -221,11 +290,27 @@ export default function DetailedAuditTrail() {
             />
           </View>
           <View className="flex-1">
-            <Text className="text-gray-600 font-bold mb-1 text-xs">
+            <Text
+              className="font-bold mb-1 text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Adjusted Wt.
             </Text>
             <TextInput
-              className={`h-12 rounded-md px-3 font-bold text-lg border ${auditDetails.status === "Adjusted" ? "bg-yellow-50 border-yellow-400 text-blue-700" : "bg-gray-200 border-gray-300 text-gray-400"}`}
+              className="h-12 rounded-md px-3 font-bold text-lg border"
+              style={
+                auditDetails.status === "Adjusted"
+                  ? {
+                      backgroundColor: theme.warningBg,
+                      borderColor: theme.warningBorder,
+                      color: theme.info,
+                    }
+                  : {
+                      backgroundColor: theme.inputBg,
+                      borderColor: theme.border,
+                      color: theme.textSecondary,
+                    }
+              }
               value={
                 auditDetails.newWeight ? `${auditDetails.newWeight} kg` : "-"
               }
@@ -238,11 +323,19 @@ export default function DetailedAuditTrail() {
         <View className="flex-row gap-4 h-32">
           {/* Notes Area */}
           <View className="flex-[1.5]">
-            <Text className="text-gray-600 font-bold mb-1 text-xs">
+            <Text
+              className="font-bold mb-1 text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Audit Notes
             </Text>
             <TextInput
-              className="bg-white flex-1 rounded-md p-3 text-base border border-gray-300 text-gray-700 leading-5"
+              className="flex-1 rounded-md p-3 text-base border leading-5"
+              style={{
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+                color: theme.inputText,
+              }}
               multiline={true}
               editable={false}
               value={auditDetails.notes || "No notes provided."}
@@ -252,28 +345,48 @@ export default function DetailedAuditTrail() {
 
           {/* Evidence Button */}
           <View className="flex-1">
-            <Text className="text-gray-600 font-bold mb-1 text-xs">
+            <Text
+              className="font-bold mb-1 text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Evidence
             </Text>
             <TouchableOpacity
               onPress={() => hasImages && setImageModalVisible(true)}
               disabled={!hasImages}
-              className={`flex-1 rounded-md items-center justify-center border-2 border-dashed ${hasImages ? "bg-blue-50 border-blue-300" : "bg-gray-100 border-gray-300"}`}
+              className="flex-1 rounded-md items-center justify-center border-2 border-dashed"
+              style={
+                hasImages
+                  ? {
+                      backgroundColor: theme.highlightBg,
+                      borderColor: theme.primary,
+                    }
+                  : {
+                      backgroundColor: theme.inputBg,
+                      borderColor: theme.border,
+                    }
+              }
             >
               {hasImages ? (
                 <>
-                  <Camera size={28} color="#2563eb" />
-                  <Text className="text-blue-600 font-bold mt-1">
+                  <Camera size={28} color={theme.primary} />
+                  <Text
+                    className="font-bold mt-1"
+                    style={{ color: theme.primary }}
+                  >
                     View Photos
                   </Text>
-                  <Text className="text-blue-400 text-xs">
+                  <Text className="text-xs" style={{ color: theme.primary }}>
                     ({auditDetails.evidenceImages.length} items)
                   </Text>
                 </>
               ) : (
                 <>
-                  <Camera size={28} color="#9ca3af" />
-                  <Text className="text-gray-400 font-bold mt-1">
+                  <Camera size={28} color={theme.placeholder} />
+                  <Text
+                    className="font-bold mt-1"
+                    style={{ color: theme.placeholder }}
+                  >
                     No Photos
                   </Text>
                 </>
@@ -284,21 +397,45 @@ export default function DetailedAuditTrail() {
 
         {/* --- TABLE SECTION: Source Transactions --- */}
         <View className="flex-1 mt-1">
-          <Text className="text-gray-600 font-bold mb-1 text-xs">
+          <Text
+            className="font-bold mb-1 text-xs"
+            style={{ color: theme.textSecondary }}
+          >
             Batch Source History
           </Text>
-          <View className="bg-white flex-1 rounded-md border border-gray-200 overflow-hidden">
-            <View className="flex-row bg-gray-800 p-3">
-              <Text className="flex-1 font-bold text-white text-center text-sm">
+          <View
+            className="flex-1 rounded-md border overflow-hidden"
+            style={{
+              backgroundColor: theme.card,
+              borderColor: theme.border,
+            }}
+          >
+            <View
+              className="flex-row p-3"
+              style={{ backgroundColor: theme.headerBg }}
+            >
+              <Text
+                className="flex-1 font-bold text-center text-sm"
+                style={{ color: "#fff" }} // Always white for dark header
+              >
                 TX ID
               </Text>
-              <Text className="flex-1 font-bold text-white text-center text-sm">
+              <Text
+                className="flex-1 font-bold text-center text-sm"
+                style={{ color: "#fff" }}
+              >
                 Type
               </Text>
-              <Text className="flex-1 font-bold text-white text-center text-sm">
+              <Text
+                className="flex-1 font-bold text-center text-sm"
+                style={{ color: "#fff" }}
+              >
                 Date
               </Text>
-              <Text className="flex-1 font-bold text-white text-center text-sm">
+              <Text
+                className="flex-1 font-bold text-center text-sm"
+                style={{ color: "#fff" }}
+              >
                 Allocated
               </Text>
             </View>
@@ -306,7 +443,7 @@ export default function DetailedAuditTrail() {
             <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
               {lineItems.length === 0 ? (
                 <View className="p-4 items-center">
-                  <Text className="text-gray-400 italic">
+                  <Text className="italic" style={{ color: theme.placeholder }}>
                     No source transactions found.
                   </Text>
                 </View>
@@ -314,18 +451,35 @@ export default function DetailedAuditTrail() {
                 lineItems.map((item, index) => (
                   <View
                     key={index}
-                    className={`flex-row items-center p-3 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                    className="flex-row items-center p-3 border-b"
+                    style={{
+                      backgroundColor:
+                        index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                      borderBottomColor: theme.subtleBorder,
+                    }}
                   >
-                    <Text className="flex-1 text-gray-800 text-center text-xs font-medium">
+                    <Text
+                      className="flex-1 text-center text-xs font-medium"
+                      style={{ color: theme.textPrimary }}
+                    >
                       #{item.txId}
                     </Text>
-                    <Text className="flex-1 text-blue-700 text-center text-xs font-bold">
+                    <Text
+                      className="flex-1 text-center text-xs font-bold"
+                      style={{ color: theme.primary }}
+                    >
                       {item.type}
                     </Text>
-                    <Text className="flex-1 text-gray-600 text-center text-xs">
+                    <Text
+                      className="flex-1 text-center text-xs"
+                      style={{ color: theme.textSecondary }}
+                    >
                       {item.date}
                     </Text>
-                    <Text className="flex-1 text-gray-600 text-center text-xs">
+                    <Text
+                      className="flex-1 text-center text-xs"
+                      style={{ color: theme.textSecondary }}
+                    >
                       {item.allocated} kg
                     </Text>
                   </View>
@@ -339,11 +493,15 @@ export default function DetailedAuditTrail() {
         <View className="h-16 flex-row gap-4 mb-2">
           <TouchableOpacity
             onPress={() => router.back()}
-            className="bg-gray-500 flex-1 justify-center items-center rounded-md active:bg-gray-600"
+            className="flex-1 justify-center items-center rounded-md active:bg-gray-600"
+            style={{ backgroundColor: theme.textSecondary }} // Dark gray button
           >
             <Text className="font-semibold text-lg text-white">Back</Text>
           </TouchableOpacity>
-          <TouchableOpacity className="bg-blue-600 flex-1 justify-center items-center rounded-md active:bg-blue-700">
+          <TouchableOpacity
+            className="flex-1 justify-center items-center rounded-md active:bg-blue-700"
+            style={{ backgroundColor: theme.primary }}
+          >
             <Text className="font-semibold text-lg text-white">
               Export Report
             </Text>

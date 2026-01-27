@@ -1,11 +1,10 @@
 import * as Print from "expo-print";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   Camera,
   CheckCircle,
-  ChevronLeft,
   Printer,
-  X,
+  X
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
@@ -16,17 +15,52 @@ import {
   Pressable,
   SafeAreaView,
   Text,
+  useColorScheme,
   View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
-import { materials, transactionItems, transactions } from "../db/schema";
 import { db } from "../db/client";
+import { materials, transactionItems, transactions } from "../db/schema";
 
 export default function TransactionDetailed() {
   const params = useLocalSearchParams();
   const transactionId = Number(params.transactionId);
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6", // Gray-100
+    card: isDark ? "#1E1E1E" : "#ffffff", // White
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#6b7280", // Gray-500
+    border: isDark ? "#333333" : "#e5e7eb", // Gray-200
+    subtleBorder: isDark ? "#2C2C2C" : "#f3f4f6", // Gray-100
+    headerBg: isDark ? "#0f0f0f" : "#1f2937", // Gray-800
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb", // Gray-50
+    sectionBg: isDark ? "#2C2C2C" : "#f9fafb", // Gray-50
+
+    // Specific Status Colors (Dark : Light)
+    successBg: isDark ? "#064e3b" : "#dcfce7", // Green-900 : Green-100
+    successBorder: isDark ? "#065f46" : "#bbf7d0", // Green-800 : Green-200
+    successText: isDark ? "#4ade80" : "#15803d", // Green-400 : Green-700
+
+    warningBg: isDark ? "#451a03" : "#fef9c3", // Yellow-950 : Yellow-100
+    warningBorder: isDark ? "#78350f" : "#fde047", // Yellow-900 : Yellow-200
+    warningText: isDark ? "#facc15" : "#a16207", // Yellow-400 : Yellow-700
+
+    dangerBg: isDark ? "#450a0a" : "#fee2e2", // Red-950 : Red-100
+    dangerBorder: isDark ? "#7f1d1d" : "#fecaca", // Red-900 : Red-200
+    dangerText: isDark ? "#f87171" : "#b91c1c", // Red-400 : Red-700
+
+    // Selling/Logistics Specifics
+    orangeBg: isDark ? "#431407" : "#fff7ed", // Orange-950 : Orange-50
+    orangeBorder: isDark ? "#7c2d12" : "#fed7aa", // Orange-900 : Orange-200
+    orangeText: isDark ? "#fb923c" : "#c2410c", // Orange-400 : Orange-700
+  };
 
   const [lineItems, setLineItems] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
@@ -69,28 +103,30 @@ export default function TransactionDetailed() {
   );
 
   // Helper to check if transaction is commercial (Buying/Selling)
-  const isCommercial =
-    header.type === "Buying" || header.type === "Selling";
+  const isCommercial = header.type === "Buying" || header.type === "Selling";
 
   const getStatusInfo = () => {
-    // If not commercial, status isn't really applicable in the financial sense,
-    // but we can default to something or just hide the badge.
-    // For now, we'll keep the logic but handle visibility in render.
     const paid = header.paidAmount || 0;
     const total = header.totalAmount || 0;
     if (paid >= total && total > 0)
       return {
         label: "PAID",
-        color: "text-green-700 bg-green-100 border-green-200",
+        bg: theme.successBg,
+        border: theme.successBorder,
+        text: theme.successText,
       };
     if (paid > 0)
       return {
         label: "PARTIAL",
-        color: "text-yellow-700 bg-yellow-100 border-yellow-200",
+        bg: theme.warningBg,
+        border: theme.warningBorder,
+        text: theme.warningText,
       };
     return {
       label: "UNPAID",
-      color: "text-red-700 bg-red-100 border-red-200",
+      bg: theme.dangerBg,
+      border: theme.dangerBorder,
+      text: theme.dangerText,
     };
   };
 
@@ -128,43 +164,43 @@ export default function TransactionDetailed() {
     const printDateStr = now.toLocaleDateString();
     const printTimeStr = now.toLocaleTimeString();
 
-    // Conditional HTML blocks
+    // Conditional HTML blocks (Hardcoded Black/White for Physical Paper)
     const financialRows = isCommercial
       ? `
-        <tr><td style="padding: 4px;"><strong>Payment Method:</strong></td><td style="text-align: right;">${header.paymentMethod || "-"}</td></tr>
-        <tr><td style="padding: 4px;"><strong>Status:</strong></td><td style="text-align: right;">${statusInfo.label}</td></tr>
-        <tr><td style="padding: 4px;"><strong>Amount Paid:</strong></td><td style="text-align: right;">₱${(header.paidAmount || 0).toFixed(2)}</td></tr>
+        <tr><td style="padding: 4px; color: #000;"><strong>Payment Method:</strong></td><td style="text-align: right; color: #000;">${header.paymentMethod || "-"}</td></tr>
+        <tr><td style="padding: 4px; color: #000;"><strong>Status:</strong></td><td style="text-align: right; color: #000;">${statusInfo.label}</td></tr>
+        <tr><td style="padding: 4px; color: #000;"><strong>Amount Paid:</strong></td><td style="text-align: right; color: #000;">₱${(header.paidAmount || 0).toFixed(2)}</td></tr>
         `
       : "";
 
     const clientRows = isCommercial
       ? `
-        <tr><td style="border-top: 1px dashed #ddd; padding: 8px 4px 4px 4px;"><strong>Client Name:</strong></td><td style="border-top: 1px dashed #ddd; padding: 8px 4px 4px 4px; text-align: right;">${header.clientName || "-"}</td></tr>
-        <tr><td style="padding: 4px;"><strong>Company:</strong></td><td style="text-align: right;">${header.clientAffiliation || "N/A"}</td></tr>
+        <tr><td style="border-top: 1px dashed #ddd; padding: 8px 4px 4px 4px; color: #000;"><strong>Client Name:</strong></td><td style="border-top: 1px dashed #ddd; padding: 8px 4px 4px 4px; text-align: right; color: #000;">${header.clientName || "-"}</td></tr>
+        <tr><td style="padding: 4px; color: #000;"><strong>Company:</strong></td><td style="text-align: right; color: #000;">${header.clientAffiliation || "N/A"}</td></tr>
         `
       : "";
 
     const logisticsDiv =
       header.type === "Selling"
         ? `
-            <div style="margin-bottom: 20px; border: 1px dashed #333; padding: 10px;">
-                <h3 style="margin-top:0;">Logistics Details</h3>
-                <p style="margin: 5px 0;"><strong>Driver Name:</strong> ${header.driverName || "N/A"}</p>
-                <p style="margin: 5px 0;"><strong>Truck Plate:</strong> ${header.truckPlate || "N/A"}</p>
-                <p style="margin: 5px 0;"><strong>Truck Weight:</strong> ${header.truckWeight} kg</p>
+            <div style="margin-bottom: 20px; border: 1px dashed #333; padding: 10px; color: #000;">
+                <h3 style="margin-top:0; color: #000;">Logistics Details</h3>
+                <p style="margin: 5px 0; color: #000;"><strong>Driver Name:</strong> ${header.driverName || "N/A"}</p>
+                <p style="margin: 5px 0; color: #000;"><strong>Truck Plate:</strong> ${header.truckPlate || "N/A"}</p>
+                <p style="margin: 5px 0; color: #000;"><strong>Truck Weight:</strong> ${header.truckWeight} kg</p>
             </div>`
         : "";
 
     const html = `
         <html>
-          <body style="font-family: Helvetica Neue; padding: 20px;">
-            <h1 style="text-align: center;">Transaction Record</h1>
+          <body style="font-family: Helvetica Neue; padding: 20px; background-color: #fff; color: #000;">
+            <h1 style="text-align: center; color: #000;">Transaction Record</h1>
             <p style="text-align: center; color: #555;">ID: #${transactionId}</p>
 
-            <div style="margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: #fafafa;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <tr><td style="padding: 4px;"><strong>Date:</strong></td><td style="text-align: right;">${header.date}</td></tr>
-                    <tr><td style="padding: 4px;"><strong>Type:</strong></td><td style="text-align: right;">${header.type}</td></tr>
+            <div style="margin-bottom: 20px; border: 1px solid #000; padding: 15px; border-radius: 5px; background-color: #fff;">
+                <table style="width: 100%; border-collapse: collapse; color: #000;">
+                    <tr><td style="padding: 4px; color: #000;"><strong>Date:</strong></td><td style="text-align: right; color: #000;">${header.date}</td></tr>
+                    <tr><td style="padding: 4px; color: #000;"><strong>Type:</strong></td><td style="text-align: right; color: #000;">${header.type}</td></tr>
                     ${financialRows}
                     ${clientRows}
                 </table>
@@ -172,13 +208,13 @@ export default function TransactionDetailed() {
 
             ${logisticsDiv}
 
-            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px; color: #000;">
               <thead>
-                <tr style="background-color: #333; color: white;">
-                  <th style="padding: 10px; text-align: left;">Material</th>
-                  <th style="padding: 10px; text-align: center;">Weight</th>
-                  <th style="padding: 10px; text-align: right;">Price</th>
-                  <th style="padding: 10px; text-align: right;">Subtotal</th>
+                <tr style="background-color: #eee; color: #000;">
+                  <th style="padding: 10px; text-align: left; border-bottom: 1px solid #000;">Material</th>
+                  <th style="padding: 10px; text-align: center; border-bottom: 1px solid #000;">Weight</th>
+                  <th style="padding: 10px; text-align: right; border-bottom: 1px solid #000;">Price</th>
+                  <th style="padding: 10px; text-align: right; border-bottom: 1px solid #000;">Subtotal</th>
                 </tr>
               </thead>
               <tbody>
@@ -186,10 +222,10 @@ export default function TransactionDetailed() {
                   .map(
                     (item) => `
                   <tr style="border-bottom: 1px solid #eee;">
-                    <td style="padding: 10px;">${item.material}</td>
-                    <td style="padding: 10px; text-align: center;">${item.weight} ${item.uom}</td>
-                    <td style="padding: 10px; text-align: right;">₱${item.price}</td>
-                    <td style="padding: 10px; text-align: right;">₱${item.subtotal.toFixed(2)}</td>
+                    <td style="padding: 10px; color: #000;">${item.material}</td>
+                    <td style="padding: 10px; text-align: center; color: #000;">${item.weight} ${item.uom}</td>
+                    <td style="padding: 10px; text-align: right; color: #000;">₱${item.price}</td>
+                    <td style="padding: 10px; text-align: right; color: #000;">₱${item.subtotal.toFixed(2)}</td>
                   </tr>`,
                   )
                   .join("")}
@@ -199,10 +235,10 @@ export default function TransactionDetailed() {
             <div style="margin-top: 30px; text-align: right;">
                 ${
                   isCommercial
-                    ? `<h3 style="margin: 5px 0; color: #555;">Amount Paid: ₱${(header.paidAmount || 0).toFixed(2)}</h3>`
+                    ? `<h3 style="margin: 5px 0; color: #000;">Amount Paid: ₱${(header.paidAmount || 0).toFixed(2)}</h3>`
                     : ""
                 }
-                <h2 style="margin: 0; color: #2563eb;">Total: ₱${grandTotal.toFixed(2)}</h2>
+                <h2 style="margin: 0; color: #000;">Total: ₱${grandTotal.toFixed(2)}</h2>
             </div>
             <div style="margin-top: 30px; border-top: 1px solid #eee; text-align: center; font-size: 10px; color: #aaa; padding-top:5px">
                 Printed: ${printDateStr} ${printTimeStr}
@@ -219,49 +255,85 @@ export default function TransactionDetailed() {
   };
 
   return (
-    <View className="flex-1 bg-gray-100 p-4 gap-4">
+    <View
+      className="flex-1 p-4 gap-4"
+      style={{ backgroundColor: theme.background }}
+    >
       {/* --- HEADER CONTAINER --- */}
-      <View className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm gap-4">
-        
+      <View
+        className="rounded-lg border p-4 shadow-sm gap-4"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
         {/* LAYER 1: ID, Type, Date, Status */}
         <View
-          className={`flex-row justify-between items-center ${isCommercial ? "border-b border-gray-100 pb-3" : ""}`}
+          className="flex-row justify-between items-center pb-3 border-b"
+          style={{
+            borderBottomColor: isCommercial
+              ? theme.subtleBorder
+              : "transparent",
+          }}
         >
           <View>
-            <Text className="text-[10px] text-gray-400 font-bold uppercase">
+            <Text
+              className="text-[10px] font-bold uppercase"
+              style={{ color: theme.textSecondary }}
+            >
               Transaction ID
             </Text>
-            <Text className="font-bold text-gray-800 text-lg">
+            <Text
+              className="font-bold text-lg"
+              style={{ color: theme.textPrimary }}
+            >
               #{transactionId}
             </Text>
           </View>
 
           <View>
-            <Text className="text-[10px] text-gray-400 font-bold uppercase">
+            <Text
+              className="text-[10px] font-bold uppercase"
+              style={{ color: theme.textSecondary }}
+            >
               Type
             </Text>
             <Text
-              className={`font-bold ${header.type === "Selling" ? "text-orange-600" : "text-blue-600"}`}
+              className={`font-bold ${
+                header.type === "Selling"
+                  ? "text-orange-600 dark:text-orange-400"
+                  : "text-blue-600 dark:text-blue-400"
+              }`}
             >
               {header.type}
             </Text>
           </View>
 
           <View>
-            <Text className="text-[10px] text-gray-400 font-bold uppercase">
+            <Text
+              className="text-[10px] font-bold uppercase"
+              style={{ color: theme.textSecondary }}
+            >
               Date
             </Text>
-            <Text className="font-medium text-gray-800">{header.date}</Text>
+            <Text className="font-medium" style={{ color: theme.textPrimary }}>
+              {header.date}
+            </Text>
           </View>
 
           {/* Status Badge - Only for Commercial */}
           {isCommercial ? (
             <View className="items-end">
               <View
-                className={`px-2 py-1 rounded border ${statusInfo.color.split(" ").filter((c) => c.startsWith("bg") || c.startsWith("border")).join(" ")}`}
+                className="px-2 py-1 rounded border"
+                style={{
+                  backgroundColor: statusInfo.bg,
+                  borderColor: statusInfo.border,
+                }}
               >
                 <Text
-                  className={`text-xs font-bold ${statusInfo.color.split(" ")[0]}`}
+                  className="text-xs font-bold"
+                  style={{ color: statusInfo.text }}
                 >
                   {statusInfo.label}
                 </Text>
@@ -269,8 +341,19 @@ export default function TransactionDetailed() {
             </View>
           ) : (
             <View className="items-end">
-              <View className="px-2 py-1 rounded border bg-gray-100 border-gray-200">
-                <Text className="text-xs font-bold text-gray-500">N/A</Text>
+              <View
+                className="px-2 py-1 rounded border"
+                style={{
+                  backgroundColor: theme.sectionBg,
+                  borderColor: theme.border,
+                }}
+              >
+                <Text
+                  className="text-xs font-bold"
+                  style={{ color: theme.textSecondary }}
+                >
+                  N/A
+                </Text>
               </View>
             </View>
           )}
@@ -278,22 +361,37 @@ export default function TransactionDetailed() {
 
         {/* FINANCIAL SUMMARY ROW (Only if Commercial) */}
         {isCommercial && (
-          <View className="flex-row justify-between bg-gray-50 p-2 rounded border border-gray-100 items-center">
+          <View
+            className="flex-row justify-between p-2 rounded border items-center"
+            style={{
+              backgroundColor: theme.sectionBg,
+              borderColor: theme.subtleBorder,
+            }}
+          >
             <View>
-              <Text className="text-[10px] text-gray-400 font-bold uppercase">
+              <Text
+                className="text-[10px] font-bold uppercase"
+                style={{ color: theme.textSecondary }}
+              >
                 Payment Method
               </Text>
-              <Text className="font-bold text-gray-700">
+              <Text className="font-bold" style={{ color: theme.textPrimary }}>
                 {header.paymentMethod}
               </Text>
             </View>
 
             <View className="flex-row items-center gap-3">
               <View className="items-end">
-                <Text className="text-[10px] text-gray-400 font-bold uppercase">
+                <Text
+                  className="text-[10px] font-bold uppercase"
+                  style={{ color: theme.textSecondary }}
+                >
                   Amount Paid
                 </Text>
-                <Text className="font-bold text-green-700">
+                <Text
+                  className="font-bold"
+                  style={{ color: theme.successText }}
+                >
                   ₱{(header.paidAmount || 0).toFixed(2)}
                 </Text>
               </View>
@@ -302,7 +400,7 @@ export default function TransactionDetailed() {
               {!isFullyPaid && (
                 <Pressable
                   onPress={handleMarkAsPaid}
-                  className="bg-green-600 px-3 py-2 rounded-md flex-row items-center gap-1 active:bg-green-700"
+                  className="bg-green-600 px-3 py-2 rounded-md flex-row items-center gap-1 active:bg-green-700 shadow-sm"
                 >
                   <CheckCircle size={14} color="white" />
                   <Text className="text-white text-xs font-bold">
@@ -319,31 +417,67 @@ export default function TransactionDetailed() {
           // --- SELLING: TWO COLUMNS (Client | Logistics) ---
           <View className="flex-row gap-4 h-32">
             {/* Left Column: Client Info */}
-            <View className="flex-1 bg-gray-50 p-3 rounded border border-gray-200 justify-center">
-              <Text className="text-[10px] text-gray-500 font-bold uppercase mb-2 border-b border-gray-200 pb-1">
+            <View
+              className="flex-1 p-3 rounded border justify-center"
+              style={{
+                backgroundColor: theme.sectionBg,
+                borderColor: theme.border,
+              }}
+            >
+              <Text
+                className="text-[10px] font-bold uppercase mb-2 border-b pb-1"
+                style={{
+                  color: theme.textSecondary,
+                  borderBottomColor: theme.subtleBorder,
+                }}
+              >
                 Client Details
               </Text>
               <View className="mb-2">
-                <Text className="text-[10px] text-gray-400 font-bold uppercase">
+                <Text
+                  className="text-[10px] font-bold uppercase"
+                  style={{ color: theme.textSecondary }}
+                >
                   Name
                 </Text>
-                <Text className="font-bold text-gray-800 text-sm leading-4">
+                <Text
+                  className="font-bold text-sm leading-4"
+                  style={{ color: theme.textPrimary }}
+                >
                   {header.clientName || "-"}
                 </Text>
               </View>
               <View>
-                <Text className="text-[10px] text-gray-400 font-bold uppercase">
+                <Text
+                  className="text-[10px] font-bold uppercase"
+                  style={{ color: theme.textSecondary }}
+                >
                   Company
                 </Text>
-                <Text className="text-sm text-gray-700 leading-4">
+                <Text
+                  className="text-sm leading-4"
+                  style={{ color: theme.textPrimary }}
+                >
                   {header.clientAffiliation || "N/A"}
                 </Text>
               </View>
             </View>
 
             {/* Right Column: Logistics Info (2x2 Grid) */}
-            <View className="flex-1 p-3 rounded border bg-orange-50 border-orange-200">
-              <Text className="text-[10px] font-bold uppercase mb-2 border-b pb-1 text-orange-800 border-orange-200">
+            <View
+              className="flex-1 p-3 rounded border"
+              style={{
+                backgroundColor: theme.orangeBg,
+                borderColor: theme.orangeBorder,
+              }}
+            >
+              <Text
+                className="text-[10px] font-bold uppercase mb-2 border-b pb-1"
+                style={{
+                  color: theme.orangeText,
+                  borderBottomColor: theme.orangeBorder,
+                }}
+              >
                 Logistics Info
               </Text>
 
@@ -351,21 +485,31 @@ export default function TransactionDetailed() {
                 {/* Row 1: Driver | Weight */}
                 <View className="flex-row justify-between items-start">
                   <View className="flex-1 mr-2">
-                    <Text className="text-[10px] text-orange-800/70 font-bold uppercase">
+                    <Text
+                      className="text-[10px] font-bold uppercase"
+                      style={{ color: theme.orangeText, opacity: 0.8 }}
+                    >
                       Driver
                     </Text>
                     <Text
-                      className="text-xs text-gray-800 font-bold"
+                      className="text-xs font-bold"
+                      style={{ color: theme.textPrimary }}
                       numberOfLines={1}
                     >
                       {header.driverName}
                     </Text>
                   </View>
                   <View className="items-end">
-                    <Text className="text-[10px] text-orange-800/70 font-bold uppercase">
+                    <Text
+                      className="text-[10px] font-bold uppercase"
+                      style={{ color: theme.orangeText, opacity: 0.8 }}
+                    >
                       Weight
                     </Text>
-                    <Text className="text-xs text-gray-800 font-bold">
+                    <Text
+                      className="text-xs font-bold"
+                      style={{ color: theme.textPrimary }}
+                    >
                       {header.truckWeight} kg
                     </Text>
                   </View>
@@ -374,10 +518,16 @@ export default function TransactionDetailed() {
                 {/* Row 2: Plate | Button */}
                 <View className="flex-row justify-between items-end">
                   <View className="flex-1 mr-2">
-                    <Text className="text-[10px] text-orange-800/70 font-bold uppercase">
+                    <Text
+                      className="text-[10px] font-bold uppercase"
+                      style={{ color: theme.orangeText, opacity: 0.8 }}
+                    >
                       Plate
                     </Text>
-                    <Text className="text-xs text-gray-800 font-bold">
+                    <Text
+                      className="text-xs font-bold"
+                      style={{ color: theme.textPrimary }}
+                    >
                       {header.truckPlate}
                     </Text>
                   </View>
@@ -385,10 +535,17 @@ export default function TransactionDetailed() {
                   {header.licenseImageUri && (
                     <Pressable
                       onPress={() => setModalVisible(true)}
-                      className="bg-white border border-orange-300 rounded-md px-3 py-2 flex-row items-center shadow-sm active:bg-orange-100"
+                      className="border rounded-md px-3 py-2 flex-row items-center shadow-sm"
+                      style={{
+                        backgroundColor: theme.card,
+                        borderColor: theme.orangeText,
+                      }}
                     >
-                      <Camera size={16} color="#c2410c" />
-                      <Text className="text-[10px] text-orange-700 font-bold ml-1 uppercase">
+                      <Camera size={16} color={theme.orangeText} />
+                      <Text
+                        className="text-[10px] font-bold ml-1 uppercase"
+                        style={{ color: theme.orangeText }}
+                      >
                         License
                       </Text>
                     </Pressable>
@@ -399,38 +556,71 @@ export default function TransactionDetailed() {
           </View>
         ) : header.type === "Buying" ? (
           // --- BUYING: WHOLE ROW FORMAT ---
-          <View className="bg-gray-50 p-4 rounded border border-gray-200">
-            <Text className="text-[10px] text-gray-500 font-bold uppercase mb-2 border-b border-gray-200 pb-1">
+          <View
+            className="p-4 rounded border"
+            style={{
+              backgroundColor: theme.sectionBg,
+              borderColor: theme.border,
+            }}
+          >
+            <Text
+              className="text-[10px] font-bold uppercase mb-2 border-b pb-1"
+              style={{
+                color: theme.textSecondary,
+                borderBottomColor: theme.subtleBorder,
+              }}
+            >
               Client Details
             </Text>
             <View className="flex-row justify-between items-center">
               {/* Left: Name */}
               <View className="flex-1">
-                <Text className="text-[10px] text-gray-400 font-bold uppercase">
+                <Text
+                  className="text-[10px] font-bold uppercase"
+                  style={{ color: theme.textSecondary }}
+                >
                   Name
                 </Text>
-                <Text className="font-bold text-gray-800 text-lg">
+                <Text
+                  className="font-bold text-lg"
+                  style={{ color: theme.textPrimary }}
+                >
                   {header.clientName || "-"}
                 </Text>
               </View>
 
               {/* Right: Company */}
               <View className="flex-1 items-end">
-                <Text className="text-[10px] text-gray-400 font-bold uppercase">
+                <Text
+                  className="text-[10px] font-bold uppercase"
+                  style={{ color: theme.textSecondary }}
+                >
                   Company
                 </Text>
-                <Text className="font-medium text-gray-700 text-lg">
+                <Text
+                  className="font-medium text-lg"
+                  style={{ color: theme.textPrimary }}
+                >
                   {header.clientAffiliation || "N/A"}
                 </Text>
               </View>
             </View>
           </View>
-        ) : null /* Other Types = Hide Client & Logistics */}
+        ) : null}
       </View>
 
       {/* --- TABLE --- */}
-      <View className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <View className="flex-row bg-gray-800 p-3 items-center">
+      <View
+        className="flex-1 rounded-lg border overflow-hidden"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
+        <View
+          className="flex-row p-3 items-center"
+          style={{ backgroundColor: theme.headerBg }}
+        >
           <Text className="flex-[2] font-bold text-white text-sm">
             Material
           </Text>
@@ -450,18 +640,31 @@ export default function TransactionDetailed() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item, index }) => (
             <View
-              className={`flex-row items-center p-3 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+              className="flex-row items-center p-3 border-b"
+              style={{
+                backgroundColor: index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                borderBottomColor: theme.subtleBorder,
+              }}
             >
-              <Text className="flex-[2] text-gray-800 font-medium text-sm">
+              <Text
+                className="flex-[2] font-medium text-sm"
+                style={{ color: theme.textPrimary }}
+              >
                 {item.material}
               </Text>
-              <Text className="flex-1 text-gray-600 text-center text-sm">
+              <Text
+                className="flex-1 text-center text-sm"
+                style={{ color: theme.textSecondary }}
+              >
                 {item.weight} {item.uom}
               </Text>
-              <Text className="flex-1 text-gray-600 text-center text-sm">
+              <Text
+                className="flex-1 text-center text-sm"
+                style={{ color: theme.textSecondary }}
+              >
                 ₱{item.price}
               </Text>
-              <Text className="flex-1 text-blue-700 text-center font-bold text-sm">
+              <Text className="flex-1 text-blue-700 dark:text-blue-400 text-center font-bold text-sm">
                 ₱{item.subtotal.toFixed(2)}
               </Text>
             </View>
@@ -471,26 +674,35 @@ export default function TransactionDetailed() {
 
       {/* --- FOOTER --- */}
       <View className="h-14 flex-row items-center justify-between gap-3">
-        <View className="px-4 py-2 bg-white border border-gray-300 rounded-md flex-1 justify-center">
-          <Text className="font-bold text-gray-600 text-xs uppercase">
+        <View
+          className="px-4 py-2 border rounded-md flex-1 justify-center"
+          style={{
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }}
+        >
+          <Text
+            className="font-bold text-xs uppercase"
+            style={{ color: theme.textSecondary }}
+          >
             Total Amount
           </Text>
-          <Text className="font-bold text-blue-700 text-lg">
+          <Text className="font-bold text-blue-700 dark:text-blue-400 text-lg">
             ₱{grandTotal.toFixed(2)}
           </Text>
         </View>
         <Pressable
           onPress={handlePrint}
-          className="bg-amber-500 w-14 h-full rounded-lg items-center justify-center"
+          className="bg-amber-500 w-14 h-full rounded-lg items-center justify-center active:bg-amber-600"
         >
           <Printer size={24} color="white" />
         </Pressable>
-        <Pressable
+        {/* <Pressable
           onPress={() => router.back()}
-          className="bg-blue-600 w-14 h-full rounded-lg items-center justify-center"
+          className="bg-blue-600 w-14 h-full rounded-lg items-center justify-center active:bg-blue-700"
         >
           <ChevronLeft size={24} color="white" />
-        </Pressable>
+        </Pressable> */}
       </View>
 
       {/* --- IMAGE MODAL --- */}

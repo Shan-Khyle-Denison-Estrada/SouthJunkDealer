@@ -24,23 +24,30 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { desc, eq, sql } from "drizzle-orm";
 // Added unitOfMeasurements to imports
+import { db } from "../../db/client";
 import {
   inventory,
   materials,
   transactionItems,
   unitOfMeasurements,
 } from "../../db/schema";
-import { db } from "../../db/client";
 
 const ITEMS_PER_PAGE = 9;
 
 // --- CUSTOM PICKER COMPONENT ---
-const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
+const CustomPicker = ({
+  selectedValue,
+  onValueChange,
+  placeholder,
+  items,
+  theme,
+}) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   const selectedItem = items.find((i) => i.value === selectedValue);
@@ -50,15 +57,21 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
     <>
       <Pressable
         onPress={() => setModalVisible(true)}
-        style={styles.pickerTrigger}
+        style={[
+          styles.pickerTrigger,
+          { backgroundColor: theme.inputBg, borderColor: theme.border },
+        ]}
       >
         <Text
-          style={[styles.pickerText, !selectedValue && styles.placeholderText]}
+          style={[
+            styles.pickerText,
+            { color: selectedValue ? theme.textPrimary : theme.placeholder },
+          ]}
           numberOfLines={1}
         >
           {displayLabel}
         </Text>
-        <ChevronDown size={20} color="gray" />
+        <ChevronDown size={20} color={theme.textSecondary} />
       </Pressable>
 
       <Modal
@@ -71,11 +84,20 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-          <View style={styles.pickerOptionsContainer}>
-            <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>{placeholder}</Text>
+          <View
+            style={[
+              styles.pickerOptionsContainer,
+              { backgroundColor: theme.card },
+            ]}
+          >
+            <View
+              style={[styles.pickerHeader, { borderBottomColor: theme.border }]}
+            >
+              <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
+                {placeholder}
+              </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="gray" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -85,7 +107,10 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
                 <TouchableOpacity
                   style={[
                     styles.pickerOption,
-                    selectedValue === item.value && styles.pickerOptionSelected,
+                    { borderBottomColor: theme.subtleBorder },
+                    selectedValue === item.value && {
+                      backgroundColor: theme.highlightBg,
+                    },
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
@@ -95,14 +120,17 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
                   <Text
                     style={[
                       styles.pickerOptionText,
-                      selectedValue === item.value &&
-                        styles.pickerOptionTextSelected,
+                      { color: theme.textSecondary },
+                      selectedValue === item.value && {
+                        color: theme.primary,
+                        fontWeight: "bold",
+                      },
                     ]}
                   >
                     {item.label}
                   </Text>
                   {selectedValue === item.value && (
-                    <Check size={20} color="#2563eb" />
+                    <Check size={20} color={theme.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -115,6 +143,27 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
 };
 
 export default function MaterialIndex() {
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6",
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    border: isDark ? "#333333" : "#e5e7eb",
+    subtleBorder: isDark ? "#2C2C2C" : "#f9fafb",
+    inputBg: isDark ? "#2C2C2C" : "#f3f4f6",
+    inputText: isDark ? "#FFFFFF" : "#000000",
+    placeholder: isDark ? "#888888" : "#9ca3af",
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb",
+    highlightBg: isDark ? "#1e3a8a" : "#eff6ff", // Blue-900 : Blue-50
+    headerBg: isDark ? "#0f0f0f" : "#1f2937",
+    primary: "#2563eb",
+  };
+
   // --- STATE ---
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -151,8 +200,6 @@ export default function MaterialIndex() {
     { label: "Class B (Mid Value)", value: "B" },
     { label: "Class C (Low Value)", value: "C" },
   ];
-
-  // REMOVED: Hardcoded uomOptions
 
   // --- DATA FETCHING ---
   const loadData = async () => {
@@ -201,8 +248,6 @@ export default function MaterialIndex() {
     [materialsData],
   );
 
-  // NOTE: uniqueUoms is still derived from actual material usage for the *Filter* logic,
-  // ensuring the filter only shows UoMs that are actually in use.
   const uniqueUoms = useMemo(
     () => [...new Set(materialsData.map((item) => item.uom).filter(Boolean))],
     [materialsData],
@@ -376,7 +421,10 @@ export default function MaterialIndex() {
   };
 
   return (
-    <View className="flex-1 bg-gray-100 p-4 gap-4">
+    <View
+      className="flex-1 p-4 gap-4"
+      style={{ backgroundColor: theme.background }}
+    >
       {/* --- ADD MODAL --- */}
       <Modal
         animationType="fade"
@@ -388,31 +436,52 @@ export default function MaterialIndex() {
           style={styles.modalOverlay}
           onPress={() => setAddModalVisible(false)}
         >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
-            <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
-              <Text className="text-xl font-bold text-gray-800">
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View
+              className="flex-row justify-between items-center mb-4 border-b pb-2"
+              style={{ borderBottomColor: theme.border }}
+            >
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 New Material
               </Text>
               <TouchableOpacity onPress={() => setAddModalVisible(false)}>
-                <X size={24} color="#9ca3af" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <View className="gap-4">
               <View>
-                <Text className="text-gray-700 font-bold mb-1">
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textSecondary }}
+                >
                   Material Name <Text className="text-red-500">*</Text>
                 </Text>
                 <TextInput
-                  className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
+                  className="rounded-md px-3 h-12 border"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  }}
                   placeholder="Ex: Copper Wire"
+                  placeholderTextColor={theme.placeholder}
                   value={materialName}
                   onChangeText={setMaterialName}
                 />
               </View>
               <View className="flex-row gap-4">
                 <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1">
+                  <Text
+                    className="font-bold mb-1"
+                    style={{ color: theme.textSecondary }}
+                  >
                     Class (Optional)
                   </Text>
                   <View className="h-12">
@@ -421,20 +490,24 @@ export default function MaterialIndex() {
                       onValueChange={setMaterialClass}
                       placeholder="Select..."
                       items={classOptions}
+                      theme={theme}
                     />
                   </View>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1">
+                  <Text
+                    className="font-bold mb-1"
+                    style={{ color: theme.textSecondary }}
+                  >
                     Unit of Measurement <Text className="text-red-500">*</Text>
                   </Text>
                   <View className="h-12">
-                    {/* CHANGED: Passing dynamic uomOptions instead of hardcoded list */}
                     <CustomPicker
                       selectedValue={uom}
                       onValueChange={setUom}
                       placeholder="Select..."
                       items={uomOptions}
+                      theme={theme}
                     />
                   </View>
                 </View>
@@ -470,30 +543,50 @@ export default function MaterialIndex() {
           style={styles.modalOverlay}
           onPress={() => setEditModalVisible(false)}
         >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
-            <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
-              <Text className="text-xl font-bold text-gray-800">
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View
+              className="flex-row justify-between items-center mb-4 border-b pb-2"
+              style={{ borderBottomColor: theme.border }}
+            >
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 Edit Material: {selectedMaterial?.id}
               </Text>
               <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <X size={24} color="#9ca3af" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <View className="gap-4">
               <View>
-                <Text className="text-gray-700 font-bold mb-1">
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textSecondary }}
+                >
                   Material Name
                 </Text>
                 <TextInput
-                  className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
+                  className="rounded-md px-3 h-12 border"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  }}
                   value={materialName}
                   onChangeText={setMaterialName}
                 />
               </View>
               <View className="flex-row gap-4">
                 <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1">
+                  <Text
+                    className="font-bold mb-1"
+                    style={{ color: theme.textSecondary }}
+                  >
                     Class (Optional)
                   </Text>
                   <View className="h-12">
@@ -502,20 +595,24 @@ export default function MaterialIndex() {
                       onValueChange={setMaterialClass}
                       placeholder="Select..."
                       items={classOptions}
+                      theme={theme}
                     />
                   </View>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-gray-700 font-bold mb-1">
+                  <Text
+                    className="font-bold mb-1"
+                    style={{ color: theme.textSecondary }}
+                  >
                     Unit of Measurement
                   </Text>
                   <View className="h-12">
-                    {/* CHANGED: Passing dynamic uomOptions instead of hardcoded list */}
                     <CustomPicker
                       selectedValue={uom}
                       onValueChange={setUom}
                       placeholder="Select..."
                       items={uomOptions}
+                      theme={theme}
                     />
                   </View>
                 </View>
@@ -543,12 +640,19 @@ export default function MaterialIndex() {
 
       {/* --- TOP BAR --- */}
       <View className="h-14 flex-row items-center justify-between gap-2">
-        <View className="flex-1 h-full flex-row items-center bg-white rounded-md px-3 border border-gray-200">
-          <Search size={24} color="gray" />
+        <View
+          className="flex-1 h-full flex-row items-center rounded-md px-3 border"
+          style={{
+            backgroundColor: theme.inputBg,
+            borderColor: theme.border,
+          }}
+        >
+          <Search size={24} color={theme.placeholder} />
           <TextInput
             placeholder="Search Material..."
-            className="flex-1 ml-2 text-lg text-gray-700 h-full"
-            style={{ textAlignVertical: "center" }}
+            placeholderTextColor={theme.placeholder}
+            className="flex-1 ml-2 text-lg h-full"
+            style={{ textAlignVertical: "center", color: theme.inputText }}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -559,27 +663,38 @@ export default function MaterialIndex() {
                 setCurrentPage(1);
               }}
             >
-              <XCircle size={20} color="gray" />
+              <XCircle size={20} color={theme.placeholder} />
             </TouchableOpacity>
           )}
         </View>
 
         <Pressable
           onPress={() => setFilterModalVisible(true)}
-          className={`h-full aspect-square items-center justify-center rounded-md border ${selectedClasses.length > 0 || selectedUoms.length > 0 ? "bg-blue-100 border-blue-500" : "bg-white border-gray-200"}`}
+          className="h-full aspect-square items-center justify-center rounded-md border"
+          style={{
+            backgroundColor:
+              selectedClasses.length > 0 || selectedUoms.length > 0
+                ? theme.highlightBg
+                : theme.card,
+            borderColor:
+              selectedClasses.length > 0 || selectedUoms.length > 0
+                ? theme.primary
+                : theme.border,
+          }}
         >
           <Filter
             size={24}
             color={
               selectedClasses.length > 0 || selectedUoms.length > 0
-                ? "#2563eb"
-                : "gray"
+                ? theme.primary
+                : theme.textSecondary
             }
           />
         </Pressable>
 
         <Pressable
-          className="h-full flex-row items-center justify-center bg-primary rounded-md px-4 active:bg-blue-700"
+          className="h-full flex-row items-center justify-center rounded-md px-4 active:opacity-80"
+          style={{ backgroundColor: "#F2C94C" }}
           onPress={() => {
             resetForm();
             setAddModalVisible(true);
@@ -593,8 +708,17 @@ export default function MaterialIndex() {
       </View>
 
       {/* --- TABLE --- */}
-      <View className="flex-1 bg-white rounded-lg overflow-hidden border border-gray-200">
-        <View className="flex-row bg-gray-800 p-4">
+      <View
+        className="flex-1 rounded-lg overflow-hidden border"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
+        <View
+          className="flex-row p-4"
+          style={{ backgroundColor: theme.headerBg }}
+        >
           {[
             { label: "ID", key: "id", flex: 1 },
             { label: "Material Name", key: "name", flex: 2 },
@@ -618,13 +742,27 @@ export default function MaterialIndex() {
           <View
             style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
-            <Text style={{ color: "#888" }}>No materials found.</Text>
+            <Text style={{ color: theme.textSecondary }}>
+              No materials found.
+            </Text>
             {materialsData.length === 0 ? (
-              <Text style={{ color: "#aaa", fontSize: 12, marginTop: 5 }}>
+              <Text
+                style={{
+                  color: theme.placeholder,
+                  fontSize: 12,
+                  marginTop: 5,
+                }}
+              >
                 Try adding a new material.
               </Text>
             ) : (
-              <Text style={{ color: "#aaa", fontSize: 12, marginTop: 5 }}>
+              <Text
+                style={{
+                  color: theme.placeholder,
+                  fontSize: 12,
+                  marginTop: 5,
+                }}
+              >
                 Try adjusting your search.
               </Text>
             )}
@@ -637,21 +775,41 @@ export default function MaterialIndex() {
             renderItem={({ item, index }) => (
               <Pressable
                 onPress={() => handleRowClick(item)}
-                className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} active:bg-blue-50`}
+                className="flex-row items-center p-5 border-b active:opacity-70"
+                style={{
+                  backgroundColor:
+                    index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                  borderColor: theme.border,
+                }}
               >
-                <Text className="flex-1 text-gray-800 text-center text-lg font-medium">
+                <Text
+                  className="flex-1 text-center text-lg font-medium"
+                  style={{ color: theme.textPrimary }}
+                >
                   {item.id}
                 </Text>
-                <Text className="flex-[2] text-gray-600 text-center text-lg">
+                <Text
+                  className="flex-[2] text-center text-lg"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.name}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+                <Text
+                  className="flex-1 text-center text-lg"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.class}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+                <Text
+                  className="flex-1 text-center text-lg"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.uom}
                 </Text>
-                <Text className="flex-1 text-blue-700 text-center text-lg font-bold">
+                <Text
+                  className="flex-1 text-blue-700 text-center text-lg font-bold"
+                  style={{ color: theme.primary }}
+                >
                   {Number(item.totalStock).toFixed(2)}
                 </Text>
               </Pressable>
@@ -665,12 +823,22 @@ export default function MaterialIndex() {
         <Pressable
           onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage === 1}
-          className={`h-full aspect-square items-center justify-center border rounded-md ${currentPage === 1 ? "bg-gray-100 border-gray-200" : "bg-white border-gray-300"}`}
+          className="h-full aspect-square items-center justify-center border rounded-md"
+          style={{
+            backgroundColor: currentPage === 1 ? theme.background : theme.card,
+            borderColor: theme.border,
+          }}
         >
-          <ChevronLeft size={24} color={currentPage === 1 ? "gray" : "black"} />
+          <ChevronLeft
+            size={24}
+            color={currentPage === 1 ? theme.textSecondary : theme.textPrimary}
+          />
         </Pressable>
 
-        <View className="h-full px-6 items-center justify-center bg-blue-600 rounded-md">
+        <View
+          className="h-full px-6 items-center justify-center rounded-md"
+          style={{ backgroundColor: "#F2C94C" }}
+        >
           <Text className="text-white text-xl font-bold">
             {currentPage} / {totalPages || 1}
           </Text>
@@ -679,11 +847,20 @@ export default function MaterialIndex() {
         <Pressable
           onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
           disabled={currentPage >= totalPages}
-          className={`h-full aspect-square items-center justify-center border rounded-md ${currentPage >= totalPages ? "bg-gray-100 border-gray-200" : "bg-white border-gray-300"}`}
+          className="h-full aspect-square items-center justify-center border rounded-md"
+          style={{
+            backgroundColor:
+              currentPage >= totalPages ? theme.background : theme.card,
+            borderColor: theme.border,
+          }}
         >
           <ChevronRight
             size={24}
-            color={currentPage >= totalPages ? "gray" : "black"}
+            color={
+              currentPage >= totalPages
+                ? theme.textSecondary
+                : theme.textPrimary
+            }
           />
         </Pressable>
       </View>
@@ -699,19 +876,30 @@ export default function MaterialIndex() {
           style={styles.modalOverlay}
           onPress={() => setFilterModalVisible(false)}
         >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
             <View className="flex-row justify-between items-center">
-              <Text className="text-xl font-bold text-gray-800">
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 Filter Materials
               </Text>
               <Pressable onPress={() => setFilterModalVisible(false)}>
-                <X size={24} color="gray" />
+                <X size={24} color={theme.textSecondary} />
               </Pressable>
             </View>
 
             {/* Filter Section: Class */}
-            <View>
-              <Text className="text-gray-600 font-bold mb-2">Class</Text>
+            <View className="mt-4">
+              <Text
+                className="font-bold mb-2"
+                style={{ color: theme.textSecondary }}
+              >
+                Class
+              </Text>
               <View className="flex-row flex-wrap gap-2">
                 {uniqueClasses.map((cls) => (
                   <TouchableOpacity
@@ -719,10 +907,25 @@ export default function MaterialIndex() {
                     onPress={() =>
                       toggleSelection(selectedClasses, setSelectedClasses, cls)
                     }
-                    className={`px-4 py-2 rounded-full border ${selectedClasses.includes(cls) ? "bg-blue-100 border-blue-500" : "bg-gray-50 border-gray-200"}`}
+                    className="px-4 py-2 rounded-full border"
+                    style={{
+                      backgroundColor: selectedClasses.includes(cls)
+                        ? theme.highlightBg
+                        : theme.background,
+                      borderColor: selectedClasses.includes(cls)
+                        ? theme.primary
+                        : theme.border,
+                    }}
                   >
                     <Text
-                      className={`${selectedClasses.includes(cls) ? "text-blue-700 font-bold" : "text-gray-600"}`}
+                      style={{
+                        color: selectedClasses.includes(cls)
+                          ? theme.primary
+                          : theme.textSecondary,
+                        fontWeight: selectedClasses.includes(cls)
+                          ? "bold"
+                          : "normal",
+                      }}
                     >
                       {cls}
                     </Text>
@@ -732,8 +935,11 @@ export default function MaterialIndex() {
             </View>
 
             {/* Filter Section: UoM */}
-            <View>
-              <Text className="text-gray-600 font-bold mb-2">
+            <View className="mt-4">
+              <Text
+                className="font-bold mb-2"
+                style={{ color: theme.textSecondary }}
+              >
                 Unit of Measure (UoM)
               </Text>
               <View className="flex-row flex-wrap gap-2">
@@ -743,10 +949,25 @@ export default function MaterialIndex() {
                     onPress={() =>
                       toggleSelection(selectedUoms, setSelectedUoms, unit)
                     }
-                    className={`px-4 py-2 rounded-full border ${selectedUoms.includes(unit) ? "bg-blue-100 border-blue-500" : "bg-gray-50 border-gray-200"}`}
+                    className="px-4 py-2 rounded-full border"
+                    style={{
+                      backgroundColor: selectedUoms.includes(unit)
+                        ? theme.highlightBg
+                        : theme.background,
+                      borderColor: selectedUoms.includes(unit)
+                        ? theme.primary
+                        : theme.border,
+                    }}
                   >
                     <Text
-                      className={`${selectedUoms.includes(unit) ? "text-blue-700 font-bold" : "text-gray-600"}`}
+                      style={{
+                        color: selectedUoms.includes(unit)
+                          ? theme.primary
+                          : theme.textSecondary,
+                        fontWeight: selectedUoms.includes(unit)
+                          ? "bold"
+                          : "normal",
+                      }}
                     >
                       {unit}
                     </Text>
@@ -764,11 +985,17 @@ export default function MaterialIndex() {
                 }}
                 className="px-4 py-2"
               >
-                <Text className="text-gray-500 font-medium">Clear All</Text>
+                <Text
+                  className="font-medium"
+                  style={{ color: theme.textSecondary }}
+                >
+                  Clear All
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => setFilterModalVisible(false)}
-                className="px-6 py-2 bg-primary rounded-md"
+                className="px-6 py-2 rounded-md"
+                style={{ backgroundColor: theme.primary }}
               >
                 <Text className="text-white font-bold">Apply Filters</Text>
               </Pressable>
@@ -781,31 +1008,22 @@ export default function MaterialIndex() {
 }
 
 const styles = StyleSheet.create({
-  // New Styles for the Custom Picker
   pickerTrigger: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f3f4f6", // Matched input bg
     borderWidth: 1,
-    borderColor: "#d1d5db", // Matched input border
     borderRadius: 6,
     paddingHorizontal: 12,
-    height: "100%", // Inherit height from parent View
+    height: "100%",
     width: "100%",
   },
   pickerText: {
     fontSize: 16,
-    color: "black",
     flex: 1,
   },
-  placeholderText: {
-    color: "#9ca3af",
-  },
-  // Modal Styles for Picker
   pickerOptionsContainer: {
-    backgroundColor: "white",
-    width: "40%", // Narrower than main modal
+    width: "40%",
     maxHeight: "50%",
     borderRadius: 12,
     padding: 16,
@@ -821,13 +1039,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
     paddingBottom: 8,
   },
   pickerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#374151",
   },
   pickerOption: {
     flexDirection: "row",
@@ -836,21 +1052,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f9fafb",
-  },
-  pickerOptionSelected: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 6,
   },
   pickerOptionText: {
     fontSize: 16,
-    color: "#4b5563",
   },
-  pickerOptionTextSelected: {
-    color: "#2563eb",
-    fontWeight: "bold",
-  },
-  // Main Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -859,7 +1064,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: "white",
     width: "50%",
     borderRadius: 12,
     padding: 24,

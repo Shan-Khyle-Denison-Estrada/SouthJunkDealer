@@ -1,6 +1,12 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator, Image, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Text,
+  View,
+  useColorScheme,
+} from "react-native";
 import "./global.css";
 
 // --- DATABASE IMPORTS ---
@@ -15,6 +21,18 @@ function RootLayoutNav() {
   const { user, hasUsers, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#ffffff",
+    headerBg: isDark ? "#121212" : "#ffffff",
+    headerTint: isDark ? "#FFFFFF" : "#000000",
+    text: isDark ? "#FFFFFF" : "#000000",
+    primary: "#F2C94C",
+  };
 
   useEffect(() => {
     if (isLoading) return;
@@ -52,8 +70,15 @@ function RootLayoutNav() {
   // Loading State
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#F2C94C" />
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: theme.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -62,6 +87,12 @@ function RootLayoutNav() {
   return (
     <Stack
       screenOptions={{
+        // 1. Dynamic Header Background
+        headerStyle: { backgroundColor: theme.headerBg },
+        // 2. Dynamic Header Text/Icon Color
+        headerTintColor: theme.headerTint,
+        // 3. Dynamic Screen Body Background
+        contentStyle: { backgroundColor: theme.background },
         headerRight: () =>
           // Only show icon if logged in (user exists)
           user ? (
@@ -120,6 +151,15 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const { success, error } = useMigrations(db, migrations);
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // Simple Theme for Wrapper Screens (Migration/Loading)
+  const wrapperTheme = {
+    background: isDark ? "#121212" : "#ffffff",
+    text: isDark ? "#FFFFFF" : "#000000",
+    subText: isDark ? "#AAAAAA" : "#666666",
+  };
 
   if (error) {
     return (
@@ -129,18 +169,30 @@ export default function RootLayout() {
           justifyContent: "center",
           alignItems: "center",
           padding: 20,
+          backgroundColor: wrapperTheme.background,
         }}
       >
-        <Text>Migration Error: {error.message}</Text>
+        <Text style={{ color: wrapperTheme.text }}>
+          Migration Error: {error.message}
+        </Text>
       </View>
     );
   }
 
   if (!success) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: wrapperTheme.background,
+        }}
+      >
         <ActivityIndicator size="large" color="#F2C94C" />
-        <Text style={{ marginTop: 10 }}>Updating Database...</Text>
+        <Text style={{ marginTop: 10, color: wrapperTheme.text }}>
+          Updating Database...
+        </Text>
       </View>
     );
   }

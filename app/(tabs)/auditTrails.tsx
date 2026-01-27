@@ -20,18 +20,39 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { desc, eq } from "drizzle-orm";
 // Added 'materials' to imports
-import { auditTrails, inventory, materials } from "../../db/schema";
 import { db } from "../../db/client";
+import { auditTrails, inventory, materials } from "../../db/schema";
 
 // Limit items per page to fill the screen nicely
 const ITEMS_PER_PAGE = 9;
 
 export default function AuditIndex() {
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6",
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    border: isDark ? "#333333" : "#e5e7eb",
+    inputBg: isDark ? "#2C2C2C" : "#ffffff",
+    inputText: isDark ? "#FFFFFF" : "#000000",
+    placeholder: isDark ? "#888888" : "#9ca3af",
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb",
+    headerBg: isDark ? "#0f0f0f" : "#1f2937",
+    primary: "#2563eb",
+    highlightBg: isDark ? "#1e3a8a" : "#dbeafe", // Blue-900 : Blue-100
+  };
+
   const [auditData, setAuditData] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -47,25 +68,22 @@ export default function AuditIndex() {
   // --- FILTER STATE ---
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedActions, setSelectedActions] = useState([]);
-  // Added state for Material Filter
   const [selectedMaterials, setSelectedMaterials] = useState([]);
 
   const loadAuditData = async () => {
     try {
-      // Updated query to join materials table
-      // Because we use Soft Delete for inventory, this JOIN still works even if the batch is marked "Deleted"
       const result = await db
         .select({
           id: auditTrails.id,
           batchId: inventory.batchId,
-          material: materials.name, // Select Material Name
+          material: materials.name,
           action: auditTrails.action,
           note: auditTrails.notes,
           date: auditTrails.date,
         })
         .from(auditTrails)
         .leftJoin(inventory, eq(auditTrails.inventoryId, inventory.id))
-        .leftJoin(materials, eq(inventory.materialId, materials.id)) // Join Materials
+        .leftJoin(materials, eq(inventory.materialId, materials.id))
         .orderBy(desc(auditTrails.id));
 
       setAuditData(result);
@@ -90,17 +108,17 @@ export default function AuditIndex() {
   const getActionColor = (action) => {
     switch (action?.toLowerCase()) {
       case "verified":
-        return "text-green-600";
+        return isDark ? "text-green-400" : "text-green-600";
       case "damaged":
-        return "text-red-600";
+        return isDark ? "text-red-400" : "text-red-600";
       case "adjusted":
-        return "text-blue-600";
+        return isDark ? "text-blue-400" : "text-blue-600";
       case "added":
         return "text-[#F2C94C]";
-      case "deleted": // --- NEW: Handle deleted action
+      case "deleted":
         return "text-gray-400 italic";
       default:
-        return "text-gray-800";
+        return isDark ? "text-gray-300" : "text-gray-800";
     }
   };
 
@@ -110,7 +128,6 @@ export default function AuditIndex() {
     [auditData],
   );
 
-  // Derive unique materials for the filter list
   const uniqueMaterials = useMemo(
     () => [...new Set(auditData.map((item) => item.material).filter(Boolean))],
     [auditData],
@@ -134,44 +151,38 @@ export default function AuditIndex() {
     );
   };
 
-  // --- PROCESSING DATA (Filter -> Sort -> Paginate) ---
+  // --- PROCESSING DATA ---
   const processedData = useMemo(() => {
     let data = [...auditData];
 
-    // 1. Search Filter (Updated to include material)
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       data = data.filter(
         (item) =>
           item.batchId?.toLowerCase().includes(lowerQuery) ||
-          item.material?.toLowerCase().includes(lowerQuery) || // Search by material
+          item.material?.toLowerCase().includes(lowerQuery) ||
           item.action?.toLowerCase().includes(lowerQuery) ||
           (item.note && item.note.toLowerCase().includes(lowerQuery)) ||
           item.id.toString().includes(lowerQuery),
       );
     }
 
-    // 2. Action Filter
     if (selectedActions.length > 0) {
       data = data.filter((item) => selectedActions.includes(item.action));
     }
 
-    // 3. Material Filter
     if (selectedMaterials.length > 0) {
       data = data.filter((item) => selectedMaterials.includes(item.material));
     }
 
-    // 4. Sorting
     data.sort((a, b) => {
       let valA = a[sortConfig.key];
       let valB = b[sortConfig.key];
 
-      // Numeric sorting for ID
       if (sortConfig.key === "id") {
         valA = Number(valA || 0);
         valB = Number(valB || 0);
       } else {
-        // String sorting for everything else
         valA = valA ? valA.toString().toLowerCase() : "";
         valB = valB ? valB.toString().toLowerCase() : "";
       }
@@ -184,14 +195,12 @@ export default function AuditIndex() {
     return data;
   }, [auditData, searchQuery, sortConfig, selectedActions, selectedMaterials]);
 
-  // 5. Pagination
   const totalPages = Math.ceil(processedData.length / ITEMS_PER_PAGE);
   const paginatedList = processedData.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE,
   );
 
-  // Reset page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedActions, selectedMaterials]);
@@ -205,20 +214,29 @@ export default function AuditIndex() {
   };
 
   return (
-    <View className="flex-1 bg-gray-100 p-4 gap-4">
-      {/* --- TOP BAR (Fixed Height) --- */}
+    <View
+      className="flex-1 p-4 gap-4"
+      style={{ backgroundColor: theme.background }}
+    >
+      {/* --- TOP BAR --- */}
       <View className="h-14 flex-row items-center justify-between gap-2">
         {/* Search */}
-        <View className="flex-1 h-full flex-row items-center bg-white rounded-md px-3 border border-gray-200">
-          <Search size={20} color="gray" />
+        <View
+          className="flex-1 h-full flex-row items-center rounded-md px-3 border"
+          style={{
+            backgroundColor: theme.inputBg,
+            borderColor: theme.border,
+          }}
+        >
+          <Search size={20} color={theme.placeholder} />
           <TextInput
             placeholder="Search Audit..."
-            className="flex-1 ml-2 text-lg text-gray-700 h-full"
-            style={{ textAlignVertical: "center" }}
+            placeholderTextColor={theme.placeholder}
+            className="flex-1 ml-2 text-lg h-full"
+            style={{ textAlignVertical: "center", color: theme.inputText }} // FIX: Explicit color
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {/* Added Clear Button */}
           {searchQuery.length > 0 && (
             <TouchableOpacity
               onPress={() => {
@@ -226,7 +244,7 @@ export default function AuditIndex() {
                 setCurrentPage(1);
               }}
             >
-              <XCircle size={20} color="gray" />
+              <XCircle size={20} color={theme.placeholder} />
             </TouchableOpacity>
           )}
         </View>
@@ -234,18 +252,24 @@ export default function AuditIndex() {
         {/* Filter Button */}
         <Pressable
           onPress={() => setFilterModalVisible(true)}
-          className={`h-full aspect-square items-center justify-center rounded-md border ${
-            selectedActions.length > 0 || selectedMaterials.length > 0
-              ? "bg-blue-100 border-blue-500"
-              : "bg-white border-gray-200"
-          }`}
+          className="h-full aspect-square items-center justify-center rounded-md border"
+          style={{
+            backgroundColor:
+              selectedActions.length > 0 || selectedMaterials.length > 0
+                ? theme.highlightBg
+                : theme.card,
+            borderColor:
+              selectedActions.length > 0 || selectedMaterials.length > 0
+                ? theme.primary
+                : theme.border,
+          }}
         >
           <Filter
             size={24}
             color={
               selectedActions.length > 0 || selectedMaterials.length > 0
-                ? "#2563eb"
-                : "gray"
+                ? theme.primary
+                : theme.textSecondary
             }
           />
         </Pressable>
@@ -253,21 +277,31 @@ export default function AuditIndex() {
         {/* New Audit Button */}
         <Pressable
           onPress={() => router.push("/scannedInventory")}
-          className="h-full px-4 flex-row items-center justify-center bg-primary rounded-md active:bg-yellow-500"
+          className="h-full px-4 flex-row items-center justify-center rounded-md active:opacity-80"
+          style={{ backgroundColor: "#F2C94C" }}
         >
           <Plus size={24} color="white" />
           <Text className="text-white font-bold text-lg ml-2">New Audit</Text>
         </Pressable>
       </View>
 
-      {/* --- TABLE (Flex 1 - Fills Remaining Space) --- */}
-      <View className="flex-1 bg-white rounded-lg overflow-hidden border border-gray-200">
+      {/* --- TABLE --- */}
+      <View
+        className="flex-1 rounded-lg overflow-hidden border"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
         {/* Header */}
-        <View className="flex-row bg-gray-800 p-4">
+        <View
+          className="flex-row p-4"
+          style={{ backgroundColor: theme.headerBg }}
+        >
           {[
             { label: "Audit ID", key: "id" },
             { label: "Batch ID", key: "batchId" },
-            { label: "Material", key: "material" }, // Added Material Column
+            { label: "Material", key: "material" },
             { label: "Action", key: "action" },
             { label: "Note", key: "note" },
             { label: "Date", key: "date" },
@@ -288,7 +322,9 @@ export default function AuditIndex() {
           <View
             style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
-            <Text style={{ color: "#888" }}>No audit records found.</Text>
+            <Text style={{ color: theme.textSecondary }}>
+              No audit records found.
+            </Text>
           </View>
         ) : (
           <FlatList
@@ -303,18 +339,37 @@ export default function AuditIndex() {
                     params: { id: item.id },
                   })
                 }
-                className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} active:bg-blue-50`}
+                className="flex-row items-center p-5 border-b active:opacity-70"
+                style={{
+                  backgroundColor:
+                    index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                  borderColor: theme.border,
+                }}
               >
-                <Text className="flex-1 text-gray-800 text-center text-lg font-medium">
+                <Text
+                  className="flex-1 text-center text-lg font-medium"
+                  style={{ color: theme.textPrimary }}
+                >
                   AUD-{item.id}
                 </Text>
                 <Text
-                  className={`flex-1 text-center text-lg ${item.action === "Deleted" ? "text-gray-400 italic line-through" : "text-gray-600"}`}
+                  className={`flex-1 text-center text-lg ${
+                    item.action === "Deleted"
+                      ? "text-gray-400 italic line-through"
+                      : ""
+                  }`}
+                  style={
+                    item.action !== "Deleted"
+                      ? { color: theme.textSecondary }
+                      : {}
+                  }
                 >
                   {item.batchId}
                 </Text>
-                {/* Added Material Data Cell */}
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+                <Text
+                  className="flex-1 text-center text-lg"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.material || "-"}
                 </Text>
                 <Text
@@ -323,12 +378,16 @@ export default function AuditIndex() {
                   {item.action}
                 </Text>
                 <Text
-                  className="flex-1 text-gray-600 text-center text-lg"
+                  className="flex-1 text-center text-lg"
+                  style={{ color: theme.textSecondary }}
                   numberOfLines={1}
                 >
                   {truncate(item.note, 20)}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+                <Text
+                  className="flex-1 text-center text-lg"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.date}
                 </Text>
               </Pressable>
@@ -337,17 +396,27 @@ export default function AuditIndex() {
         )}
       </View>
 
-      {/* --- PAGINATION CONTROLS (Fixed Height) --- */}
+      {/* --- PAGINATION CONTROLS --- */}
       <View className="h-14 flex-row items-center justify-center gap-3">
         <Pressable
           onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage === 1}
-          className={`h-full aspect-square items-center justify-center border rounded-md ${currentPage === 1 ? "bg-gray-100 border-gray-200" : "bg-white border-gray-300"}`}
+          className="h-full aspect-square items-center justify-center border rounded-md"
+          style={{
+            backgroundColor: currentPage === 1 ? theme.background : theme.card,
+            borderColor: theme.border,
+          }}
         >
-          <ChevronLeft size={24} color={currentPage === 1 ? "gray" : "black"} />
+          <ChevronLeft
+            size={24}
+            color={currentPage === 1 ? theme.textSecondary : theme.textPrimary}
+          />
         </Pressable>
 
-        <View className="h-full px-6 items-center justify-center bg-blue-600 rounded-md">
+        <View
+          className="h-full px-6 items-center justify-center rounded-md "
+          style={{ backgroundColor: "#F2C94C" }}
+        >
           <Text className="text-white text-xl font-bold">
             {currentPage} / {totalPages || 1}
           </Text>
@@ -356,11 +425,20 @@ export default function AuditIndex() {
         <Pressable
           onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
           disabled={currentPage >= totalPages}
-          className={`h-full aspect-square items-center justify-center border rounded-md ${currentPage >= totalPages ? "bg-gray-100 border-gray-200" : "bg-white border-gray-300"}`}
+          className="h-full aspect-square items-center justify-center border rounded-md"
+          style={{
+            backgroundColor:
+              currentPage >= totalPages ? theme.background : theme.card,
+            borderColor: theme.border,
+          }}
         >
           <ChevronRight
             size={24}
-            color={currentPage >= totalPages ? "gray" : "black"}
+            color={
+              currentPage >= totalPages
+                ? theme.textSecondary
+                : theme.textPrimary
+            }
           />
         </Pressable>
       </View>
@@ -372,27 +450,36 @@ export default function AuditIndex() {
         animationType="fade"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        {/* CHANGED: Wrappers are now Pressable to handle background close */}
         <Pressable
-          className="flex-1 bg-black/50 justify-center items-center p-4"
+          className="flex-1 justify-center items-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
           onPress={() => setFilterModalVisible(false)}
         >
           <Pressable
-            className="bg-white w-full max-w-md rounded-lg p-6 gap-4 shadow-xl"
-            onPress={() => {}} // Swallows press to prevent closing
+            className="w-full max-w-md rounded-lg p-6 gap-4 shadow-xl"
+            style={{ backgroundColor: theme.card }}
+            onPress={() => {}}
           >
             <View className="flex-row justify-between items-center">
-              <Text className="text-xl font-bold text-gray-800">
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 Filter Audits
               </Text>
               <Pressable onPress={() => setFilterModalVisible(false)}>
-                <X size={24} color="gray" />
+                <X size={24} color={theme.textSecondary} />
               </Pressable>
             </View>
 
             {/* Filter Section: Action */}
             <View>
-              <Text className="text-gray-600 font-bold mb-2">Action Type</Text>
+              <Text
+                className="font-bold mb-2"
+                style={{ color: theme.textSecondary }}
+              >
+                Action Type
+              </Text>
               <View className="flex-row flex-wrap gap-2">
                 {uniqueActions.map((action) => (
                   <TouchableOpacity
@@ -404,10 +491,25 @@ export default function AuditIndex() {
                         action,
                       )
                     }
-                    className={`px-4 py-2 rounded-full border ${selectedActions.includes(action) ? "bg-blue-100 border-blue-500" : "bg-gray-50 border-gray-200"}`}
+                    className="px-4 py-2 rounded-full border"
+                    style={{
+                      backgroundColor: selectedActions.includes(action)
+                        ? theme.highlightBg
+                        : theme.background,
+                      borderColor: selectedActions.includes(action)
+                        ? theme.primary
+                        : theme.border,
+                    }}
                   >
                     <Text
-                      className={`${selectedActions.includes(action) ? "text-blue-700 font-bold" : "text-gray-600"}`}
+                      style={{
+                        color: selectedActions.includes(action)
+                          ? theme.primary
+                          : theme.textSecondary,
+                        fontWeight: selectedActions.includes(action)
+                          ? "bold"
+                          : "normal",
+                      }}
                     >
                       {action}
                     </Text>
@@ -416,9 +518,14 @@ export default function AuditIndex() {
               </View>
             </View>
 
-            {/* New Filter Section: Material */}
+            {/* Filter Section: Material */}
             <View>
-              <Text className="text-gray-600 font-bold mb-2">Material</Text>
+              <Text
+                className="font-bold mb-2"
+                style={{ color: theme.textSecondary }}
+              >
+                Material
+              </Text>
               <View className="flex-row flex-wrap gap-2">
                 {uniqueMaterials.map((mat) => (
                   <TouchableOpacity
@@ -430,10 +537,25 @@ export default function AuditIndex() {
                         mat,
                       )
                     }
-                    className={`px-4 py-2 rounded-full border ${selectedMaterials.includes(mat) ? "bg-purple-100 border-purple-500" : "bg-gray-50 border-gray-200"}`}
+                    className="px-4 py-2 rounded-full border"
+                    style={{
+                      backgroundColor: selectedMaterials.includes(mat)
+                        ? theme.highlightBg
+                        : theme.background,
+                      borderColor: selectedMaterials.includes(mat)
+                        ? theme.primary
+                        : theme.border,
+                    }}
                   >
                     <Text
-                      className={`${selectedMaterials.includes(mat) ? "text-purple-700 font-bold" : "text-gray-600"}`}
+                      style={{
+                        color: selectedMaterials.includes(mat)
+                          ? theme.primary
+                          : theme.textSecondary,
+                        fontWeight: selectedMaterials.includes(mat)
+                          ? "bold"
+                          : "normal",
+                      }}
                     >
                       {mat}
                     </Text>
@@ -447,15 +569,21 @@ export default function AuditIndex() {
               <Pressable
                 onPress={() => {
                   setSelectedActions([]);
-                  setSelectedMaterials([]); // Clear materials too
+                  setSelectedMaterials([]);
                 }}
                 className="px-4 py-2"
               >
-                <Text className="text-gray-500 font-medium">Clear All</Text>
+                <Text
+                  className="font-medium"
+                  style={{ color: theme.textSecondary }}
+                >
+                  Clear All
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => setFilterModalVisible(false)}
-                className="px-6 py-2 bg-primary rounded-md"
+                className="px-6 py-2 rounded-md"
+                style={{ backgroundColor: theme.primary }}
               >
                 <Text className="text-white font-bold">Apply Filters</Text>
               </Pressable>

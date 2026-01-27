@@ -17,30 +17,35 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  useColorScheme,
+  View
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { and, asc, eq, gt, sum } from "drizzle-orm";
+import { db } from "../db/client";
 import {
   auditTrails,
   inventory,
   inventoryTransactionItems,
   materials,
-  paymentMethods, // Imported paymentMethods table
+  paymentMethods,
   transactionItems,
   transactions,
 } from "../db/schema";
-import { db } from "../db/client";
 
 // --- CUSTOM PICKER COMPONENT ---
-// Replaces the native picker with a robust Modal-based implementation
-const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
+const CustomPicker = ({
+  selectedValue,
+  onValueChange,
+  placeholder,
+  items,
+  theme,
+}) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   const selectedItem = items.find((i) => i.value === selectedValue);
@@ -48,18 +53,24 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
 
   return (
     <>
-      {/* 1. The Trigger Field - Fully Clickable */}
+      {/* 1. The Trigger Field */}
       <Pressable
         onPress={() => setModalVisible(true)}
-        style={styles.pickerTrigger}
+        style={[
+          styles.pickerTrigger,
+          { backgroundColor: theme.inputBg, borderColor: theme.border },
+        ]}
       >
         <Text
-          style={[styles.pickerText, !selectedValue && styles.placeholderText]}
+          style={[
+            styles.pickerText,
+            { color: selectedValue ? theme.textPrimary : theme.placeholder },
+          ]}
           numberOfLines={1}
         >
           {displayLabel}
         </Text>
-        <ChevronDown size={20} color="gray" />
+        <ChevronDown size={20} color={theme.textSecondary} />
       </Pressable>
 
       {/* 2. The Options Modal */}
@@ -73,11 +84,20 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-          <View style={styles.pickerOptionsContainer}>
-            <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>{placeholder}</Text>
+          <View
+            style={[
+              styles.pickerOptionsContainer,
+              { backgroundColor: theme.card },
+            ]}
+          >
+            <View
+              style={[styles.pickerHeader, { borderBottomColor: theme.border }]}
+            >
+              <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
+                {placeholder}
+              </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="gray" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -87,7 +107,10 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
                 <TouchableOpacity
                   style={[
                     styles.pickerOption,
-                    selectedValue === item.value && styles.pickerOptionSelected,
+                    { borderBottomColor: theme.subtleBorder },
+                    selectedValue === item.value && {
+                      backgroundColor: theme.highlightBg,
+                    },
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
@@ -97,14 +120,17 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
                   <Text
                     style={[
                       styles.pickerOptionText,
-                      selectedValue === item.value &&
-                        styles.pickerOptionTextSelected,
+                      { color: theme.textSecondary },
+                      selectedValue === item.value && {
+                        color: theme.primary,
+                        fontWeight: "bold",
+                      },
                     ]}
                   >
                     {item.label}
                   </Text>
                   {selectedValue === item.value && (
-                    <Check size={20} color="#2563eb" />
+                    <Check size={20} color={theme.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -118,6 +144,27 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
 
 export default function TransactionSummary() {
   const params = useLocalSearchParams();
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION (Matches materials.tsx) ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6",
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    border: isDark ? "#333333" : "#e5e7eb",
+    subtleBorder: isDark ? "#2C2C2C" : "#f9fafb",
+    inputBg: isDark ? "#2C2C2C" : "#f3f4f6",
+    inputText: isDark ? "#FFFFFF" : "#000000",
+    placeholder: isDark ? "#888888" : "#9ca3af",
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb",
+    highlightBg: isDark ? "#1e3a8a" : "#eff6ff", // Blue-900 : Blue-50
+    headerBg: isDark ? "#0f0f0f" : "#1f2937",
+    primary: "#2563eb",
+  };
+
   const transactionId = params.transactionId
     ? Number(params.transactionId)
     : null;
@@ -146,7 +193,7 @@ export default function TransactionSummary() {
 
   // Add Item Modal Inputs
   const [materialsList, setMaterialsList] = useState([]);
-  const [paymentMethodList, setPaymentMethodList] = useState([]); // State for dynamic payment methods
+  const [paymentMethodList, setPaymentMethodList] = useState([]);
   const [newItemMaterialId, setNewItemMaterialId] = useState(null);
   const [newItemWeight, setNewItemWeight] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
@@ -160,11 +207,9 @@ export default function TransactionSummary() {
     );
   };
 
-  // Load Payment Methods from DB
   const loadPaymentMethods = async () => {
     try {
       const data = await db.select().from(paymentMethods);
-      // Mapping name to value because transactions table stores the string name
       setPaymentMethodList(
         data.map((pm) => ({ label: pm.name, value: pm.name })),
       );
@@ -174,7 +219,6 @@ export default function TransactionSummary() {
   };
 
   const loadTransactionData = async () => {
-    // If Editing an existing transaction
     if (transactionId) {
       const txHeader = await db
         .select()
@@ -208,7 +252,6 @@ export default function TransactionSummary() {
       setLineItems(items);
       setGrandTotal(items.reduce((sum, item) => sum + item.subtotal, 0));
     } else {
-      // New Transaction - Reset
       setLineItems([]);
       setGrandTotal(0);
       setTransactionType(null);
@@ -225,12 +268,10 @@ export default function TransactionSummary() {
   useFocusEffect(
     useCallback(() => {
       loadMaterials();
-      loadPaymentMethods(); // Fetch payment methods on focus
+      loadPaymentMethods();
       loadTransactionData();
     }, [transactionId]),
   );
-
-  // --- ACTIONS ---
 
   const updateHeader = async (field, value) => {
     if (field === "type") setTransactionType(value);
@@ -249,12 +290,6 @@ export default function TransactionSummary() {
   };
 
   const takeLicensePhoto = async () => {
-    // Note: Expo ImagePicker setup required in actual device
-    // import * as ImagePicker from "expo-image-picker";
-    // For brevity, assuming imports are handled or this is a stub
-    // The user provided code imported ImagePicker, so we keep using it if available.
-    // However, it wasn't in the provided imports block above, so I'll skip implementation details to avoid errors if package missing.
-    // Re-adding logic assuming package exists based on previous file context:
     const {
       requestCameraPermissionsAsync,
       launchCameraAsync,
@@ -273,9 +308,6 @@ export default function TransactionSummary() {
     if (!result.canceled) setLicenseImage(result.assets[0].uri);
   };
 
-  // --- ITEM MANAGEMENT ---
-
-  // 1. Fetch Stock when Material changes in Modal
   useEffect(() => {
     const checkStock = async () => {
       if (
@@ -306,7 +338,6 @@ export default function TransactionSummary() {
     checkStock();
   }, [addItemModalVisible, newItemMaterialId, transactionType]);
 
-  // 2. Auto-Calculate Subtotal
   useEffect(() => {
     const w = parseFloat(newItemWeight) || 0;
     const p = parseFloat(newItemPrice) || 0;
@@ -318,8 +349,6 @@ export default function TransactionSummary() {
       Alert.alert("Required", "Select Type and Payment Method first.");
       return;
     }
-
-    // Open Local Modal
     setNewItemMaterialId(null);
     setNewItemWeight("");
     setNewItemPrice("");
@@ -336,7 +365,6 @@ export default function TransactionSummary() {
     const p = parseFloat(newItemPrice);
     const sub = w * p;
 
-    // VALIDATION: Check Stock if Selling
     if (transactionType === "Selling" && w > availableStock) {
       Alert.alert(
         "Insufficient Stock",
@@ -348,7 +376,6 @@ export default function TransactionSummary() {
     const mat = materialsList.find((m) => m.value === newItemMaterialId);
 
     if (transactionId) {
-      // EDIT MODE: Insert directly to DB
       await db.insert(transactionItems).values({
         transactionId,
         materialId: newItemMaterialId,
@@ -358,9 +385,8 @@ export default function TransactionSummary() {
       });
       loadTransactionData();
     } else {
-      // NEW MODE: Add to local state
       const newItem = {
-        id: Date.now(), // Temp ID
+        id: Date.now(),
         material: mat.label,
         materialId: newItemMaterialId,
         weight: w,
@@ -385,8 +411,6 @@ export default function TransactionSummary() {
       setGrandTotal(newList.reduce((s, i) => s + i.subtotal, 0));
     }
   };
-
-  // --- FINISH LOGIC ---
 
   const handleDone = () => {
     if (!transactionType || !paymentMethod) {
@@ -416,19 +440,15 @@ export default function TransactionSummary() {
   const confirmFinish = async () => {
     try {
       const finalPaidAmount = parseFloat(paidAmountInput) || 0;
-
-      // --- FIX: Use Local Date instead of ISO (UTC) ---
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const day = String(now.getDate()).padStart(2, "0");
       const localDate = `${year}-${month}-${day}`;
-      // ------------------------------------------------
 
       let finalTxId = transactionId;
 
       if (transactionId) {
-        // EDIT MODE: Update existing
         await db
           .update(transactions)
           .set({
@@ -444,7 +464,6 @@ export default function TransactionSummary() {
           })
           .where(eq(transactions.id, transactionId));
       } else {
-        // NEW MODE: Create Transaction
         const result = await db
           .insert(transactions)
           .values({
@@ -453,7 +472,7 @@ export default function TransactionSummary() {
             totalAmount: grandTotal,
             paidAmount: finalPaidAmount,
             status: "Completed",
-            date: localDate, // Uses local date
+            date: localDate,
             clientName,
             clientAffiliation: clientAffiliation || null,
             driverName: transactionType === "Selling" ? driverName : null,
@@ -467,9 +486,7 @@ export default function TransactionSummary() {
 
         finalTxId = result[0].id;
 
-        // PROCESS ITEMS
         for (const item of lineItems) {
-          // 1. Insert Transaction Item
           const itemRes = await db
             .insert(transactionItems)
             .values({
@@ -482,7 +499,6 @@ export default function TransactionSummary() {
             .returning();
           const newItemId = itemRes[0].id;
 
-          // 2. Handle Selling Inventory Logic (FIFO)
           if (transactionType === "Selling") {
             let remainingQty = item.weight;
 
@@ -549,12 +565,24 @@ export default function TransactionSummary() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={100}
     >
-      <View className="flex-1 bg-gray-50 p-3 gap-3">
+      <View
+        className="flex-1 p-3 gap-3"
+        style={{ backgroundColor: theme.background }}
+      >
         {/* HEADER INPUTS */}
-        <View className="bg-white p-3 rounded-lg border border-gray-200 gap-3 shadow-sm">
+        <View
+          className="p-3 rounded-lg border gap-3 shadow-sm"
+          style={{
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }}
+        >
           <View className="flex-row gap-3">
             <View className="flex-1">
-              <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
+              <Text
+                className="text-xs font-bold mb-1 uppercase"
+                style={{ color: theme.textSecondary }}
+              >
                 Type <Text className="text-red-500">*</Text>
               </Text>
               <View className="h-12">
@@ -566,11 +594,15 @@ export default function TransactionSummary() {
                     { label: "Buying", value: "Buying" },
                     { label: "Selling", value: "Selling" },
                   ]}
+                  theme={theme}
                 />
               </View>
             </View>
             <View className="flex-1">
-              <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
+              <Text
+                className="text-xs font-bold mb-1 uppercase"
+                style={{ color: theme.textSecondary }}
+              >
                 Payment Method <Text className="text-red-500">*</Text>
               </Text>
               <View className="h-12">
@@ -578,47 +610,72 @@ export default function TransactionSummary() {
                   selectedValue={paymentMethod}
                   onValueChange={(v) => updateHeader("payment", v)}
                   placeholder="Method"
-                  items={paymentMethodList} // Replaced hardcoded items with DB data
+                  items={paymentMethodList}
+                  theme={theme}
                 />
               </View>
             </View>
           </View>
+
           <View className="flex-row gap-3">
             <View className="flex-1">
-              <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
+              <Text
+                className="text-xs font-bold mb-1 uppercase"
+                style={{ color: theme.textSecondary }}
+              >
                 Client Name <Text className="text-red-500">*</Text>
               </Text>
               <TextInput
                 placeholder="Full Name"
+                placeholderTextColor={theme.placeholder}
                 value={clientName}
                 onChangeText={setClientName}
-                className="border border-gray-300 rounded px-2 h-12 bg-white text-base"
+                className="border rounded px-2 h-12 text-base"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: theme.border,
+                  color: theme.inputText,
+                }}
               />
             </View>
             <View className="flex-1">
-              <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
+              <Text
+                className="text-xs font-bold mb-1 uppercase"
+                style={{ color: theme.textSecondary }}
+              >
                 Affiliation
               </Text>
               <TextInput
                 placeholder="Company (Opt)"
+                placeholderTextColor={theme.placeholder}
                 value={clientAffiliation}
                 onChangeText={setClientAffiliation}
-                className="border border-gray-300 rounded px-2 h-12 bg-white text-base"
+                className="border rounded px-2 h-12 text-base"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: theme.border,
+                  color: theme.inputText,
+                }}
               />
             </View>
           </View>
+
           {transactionType === "Selling" && (
             <>
-              <View className="flex-row gap-3 pt-2 border-t border-gray-100 mt-1">
+              <View
+                className="flex-row gap-3 pt-2 border-t mt-1"
+                style={{ borderTopColor: theme.subtleBorder }}
+              >
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-orange-600 mb-1 uppercase">
                     Driver <Text className="text-red-500">*</Text>
                   </Text>
                   <TextInput
                     placeholder="Driver Name"
+                    placeholderTextColor={isDark ? "#fb923c" : "#9ca3af"}
                     value={driverName}
                     onChangeText={setDriverName}
-                    className="border border-orange-200 rounded px-2 h-12 bg-orange-50 text-base"
+                    className="border border-orange-200 dark:border-orange-900 rounded px-2 h-12 bg-orange-50 dark:bg-orange-950 text-base text-gray-900 dark:text-orange-100"
                   />
                 </View>
                 <View className="flex-1">
@@ -627,12 +684,14 @@ export default function TransactionSummary() {
                   </Text>
                   <TextInput
                     placeholder="ABC-123"
+                    placeholderTextColor={isDark ? "#fb923c" : "#9ca3af"}
                     value={truckPlate}
                     onChangeText={setTruckPlate}
-                    className="border border-orange-200 rounded px-2 h-12 bg-orange-50 text-base"
+                    className="border border-orange-200 dark:border-orange-900 rounded px-2 h-12 bg-orange-50 dark:bg-orange-950 text-base text-gray-900 dark:text-orange-100"
                   />
                 </View>
               </View>
+
               <View className="flex-row gap-3 items-end">
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-orange-600 mb-1 uppercase">
@@ -641,18 +700,23 @@ export default function TransactionSummary() {
                   <TextInput
                     placeholder="0.00"
                     keyboardType="numeric"
+                    placeholderTextColor={isDark ? "#fb923c" : "#9ca3af"}
                     value={truckWeight}
                     onChangeText={setTruckWeight}
-                    className="border border-orange-200 rounded px-2 h-12 bg-orange-50 text-base"
+                    className="border border-orange-200 dark:border-orange-900 rounded px-2 h-12 bg-orange-50 dark:bg-orange-950 text-base text-gray-900 dark:text-orange-100"
                   />
                 </View>
                 <View className="flex-1 flex-row gap-2">
                   <Pressable
                     onPress={takeLicensePhoto}
-                    className={`flex-1 h-12 rounded items-center justify-center flex-row gap-1 border ${licenseImage ? "bg-green-100 border-green-300" : "bg-gray-100 border-gray-300"}`}
+                    className={`flex-1 h-12 rounded items-center justify-center flex-row gap-1 border ${
+                      licenseImage
+                        ? "bg-green-100 dark:bg-green-900 border-green-300 dark:border-green-700"
+                        : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700"
+                    }`}
                   >
-                    <Camera size={18} color="black" />
-                    <Text className="text-xs font-bold">
+                    <Camera size={18} color={isDark ? "white" : "black"} />
+                    <Text className="text-xs font-bold text-black dark:text-white">
                       {licenseImage ? (
                         "Retake"
                       ) : (
@@ -665,9 +729,9 @@ export default function TransactionSummary() {
                   {licenseImage && (
                     <Pressable
                       onPress={() => setImageModalVisible(true)}
-                      className="w-12 h-12 bg-blue-100 border border-blue-300 rounded items-center justify-center"
+                      className="w-12 h-12 bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700 rounded items-center justify-center"
                     >
-                      <Eye size={20} color="#2563eb" />
+                      <Eye size={20} color={isDark ? "#93c5fd" : "#2563eb"} />
                     </Pressable>
                   )}
                 </View>
@@ -677,273 +741,405 @@ export default function TransactionSummary() {
         </View>
 
         {/* ITEMS LIST */}
-        <View className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <View className="flex-row bg-gray-100 p-2 border-b border-gray-200 justify-between items-center">
-            <Text className="font-bold text-gray-700">Items List</Text>
+        <View
+          className="flex-1 rounded-lg border overflow-hidden"
+          style={{
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }}
+        >
+          <View
+            className="flex-row p-2 border-b justify-between items-center"
+            style={{
+              backgroundColor: theme.headerBg,
+              borderColor: theme.border,
+            }}
+          >
+            <Text className="font-bold" style={{ color: theme.textSecondary }}>
+              Items List
+            </Text>
             <View className="items-end">
-              <Text className="text-xs text-gray-500">Total Amount</Text>
-              <Text className="font-bold text-blue-700 text-lg">
+              <Text className="text-xs" style={{ color: theme.textSecondary }}>
+                Total Amount
+              </Text>
+              <Text className="font-bold text-blue-700 dark:text-blue-400 text-lg">
                 ₱{grandTotal.toFixed(2)}
               </Text>
             </View>
           </View>
-          <View className="flex-row bg-gray-800 p-2 items-center">
-            <Text className="flex-[2] font-bold text-white text-xs">
+
+          <View
+            className="flex-row p-2 items-center"
+            style={{ backgroundColor: theme.rowOdd }}
+          >
+            <Text
+              className="flex-[2] font-bold text-xs uppercase"
+              style={{ color: theme.textSecondary }}
+            >
               Material
             </Text>
-            <Text className="flex-1 font-bold text-white text-center text-xs">
-              Wt
+            <Text
+              className="flex-1 font-bold text-xs text-center uppercase"
+              style={{ color: theme.textSecondary }}
+            >
+              Kg
             </Text>
-            <Text className="flex-1 font-bold text-white text-center text-xs">
-              Price
+            <Text
+              className="flex-1 font-bold text-xs text-right uppercase"
+              style={{ color: theme.textSecondary }}
+            >
+              Total
             </Text>
-            <Text className="flex-1 font-bold text-white text-center text-xs">
-              Sub
-            </Text>
-            <Text className="w-16 font-bold text-white text-center text-xs">
-              Act
-            </Text>
+            <View className="w-8" />
           </View>
+
           <FlatList
             data={lineItems}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ paddingBottom: 60 }}
+            keyExtractor={(item) => String(item.id)}
             renderItem={({ item, index }) => (
               <View
-                className={`flex-row items-center p-3 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                className="flex-row p-3 items-center border-b"
+                style={{
+                  backgroundColor:
+                    index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                  borderColor: theme.subtleBorder,
+                }}
               >
-                <Text
-                  className="flex-[2] text-gray-800 text-sm font-medium"
-                  numberOfLines={1}
-                >
-                  {item.material}
-                </Text>
-                <Text className="flex-1 text-gray-600 text-center text-sm">
-                  {item.weight} {item.uom}
-                </Text>
-                <Text className="flex-1 text-gray-600 text-center text-sm">
-                  ₱{item.price}
-                </Text>
-                <Text className="flex-1 text-blue-700 text-center text-sm font-bold">
-                  ₱{item.subtotal.toFixed(0)}
-                </Text>
-                <View className="w-16 flex-row justify-center gap-2">
-                  <Pressable onPress={() => handleDeleteItem(item.id)}>
-                    <Trash2 size={18} color="#dc2626" />
-                  </Pressable>
+                <View className="flex-[2]">
+                  <Text
+                    className="font-bold text-base"
+                    style={{ color: theme.textPrimary }}
+                  >
+                    {item.material}
+                  </Text>
+                  <Text
+                    className="text-xs"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    @{item.price.toFixed(2)}/kg
+                  </Text>
                 </View>
+                <Text
+                  className="flex-1 text-center font-medium"
+                  style={{ color: theme.textPrimary }}
+                >
+                  {item.weight}
+                </Text>
+                <Text
+                  className="flex-1 text-right font-bold"
+                  style={{ color: theme.textPrimary }}
+                >
+                  {item.subtotal.toFixed(2)}
+                </Text>
+                <Pressable
+                  onPress={() => handleDeleteItem(item.id)}
+                  className="w-8 items-end"
+                >
+                  <Trash2 size={20} color="#ef4444" />
+                </Pressable>
               </View>
             )}
+            ListEmptyComponent={
+              <View className="p-10 items-center justify-center">
+                <Text style={{ color: theme.placeholder }}>
+                  No items added yet.
+                </Text>
+              </View>
+            }
           />
         </View>
 
         {/* FOOTER BUTTONS */}
-        <View className="flex-row gap-2 h-14">
+        <View className="flex-row gap-3 pt-2">
           <Pressable
             onPress={handleAddItem}
-            className="flex-1 bg-blue-600 rounded-lg flex-row items-center justify-center gap-2"
+            className="flex-1 bg-green-600 h-14 rounded-lg flex-row items-center justify-center gap-2 shadow-sm active:bg-green-700"
           >
-            <Plus size={22} color="white" />
+            <Plus size={24} color="white" />
             <Text className="text-white font-bold text-lg">Add Item</Text>
           </Pressable>
+
           <Pressable
             onPress={handleDone}
-            className="flex-1 bg-green-600 rounded-lg items-center justify-center"
+            className="flex-[2] bg-blue-600 h-14 rounded-lg flex-row items-center justify-center gap-2 shadow-sm active:bg-blue-700"
           >
-            <Text className="text-white font-bold text-lg">Finish</Text>
+            <Check size={24} color="white" />
+            <Text className="text-white font-bold text-lg">
+              Finish Transaction
+            </Text>
           </Pressable>
         </View>
+      </View>
 
-        {/* IMAGE MODAL */}
-        <Modal
-          visible={isImageModalVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setImageModalVisible(false)}
+      {/* --- ADD ITEM MODAL --- */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={addItemModalVisible}
+        onRequestClose={() => setAddItemModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setAddItemModalVisible(false)}
         >
-          <SafeAreaView className="flex-1 bg-black/95">
-            <View className="flex-row justify-end p-4">
-              <Pressable
-                onPress={() => setImageModalVisible(false)}
-                className="bg-gray-800 rounded-full p-2 border border-gray-600"
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View
+              className="flex-row justify-between items-center mb-4 border-b pb-2"
+              style={{ borderBottomColor: theme.border }}
+            >
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
               >
-                <X size={28} color="white" />
-              </Pressable>
+                Add Item
+              </Text>
+              <TouchableOpacity onPress={() => setAddItemModalVisible(false)}>
+                <X size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
             </View>
-            <View className="flex-1 justify-center items-center p-4">
-              <View className="w-3/4 aspect-square bg-white rounded-lg overflow-hidden">
-                <Image
-                  source={{ uri: licenseImage }}
-                  className="w-full h-full"
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
-          </SafeAreaView>
-        </Modal>
 
-        {/* ADD ITEM MODAL */}
-        <Modal
-          visible={addItemModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setAddItemModalVisible(false)}
-        >
-          <View className="flex-1 bg-black/50 justify-center items-center p-4">
-            <View className="bg-white w-full max-w-sm rounded-lg p-5 gap-4">
-              <Text className="text-lg font-bold">Add Item</Text>
-
-              {/* Material Picker */}
+            <View className="gap-4">
               <View>
-                <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
+                <Text
+                  className="text-xs font-bold mb-1 uppercase"
+                  style={{ color: theme.textSecondary }}
+                >
                   Material <Text className="text-red-500">*</Text>
                 </Text>
-                <View className="h-14">
+                <View className="h-12">
                   <CustomPicker
                     selectedValue={newItemMaterialId}
                     onValueChange={setNewItemMaterialId}
                     placeholder="Select Material"
                     items={materialsList}
+                    theme={theme}
                   />
                 </View>
-                {transactionType === "Selling" && newItemMaterialId && (
-                  <Text className="text-xs text-orange-600 mt-1 font-bold">
+                {transactionType === "Selling" && availableStock !== null && (
+                  <Text className="text-xs text-blue-500 mt-1">
                     Available Stock: {availableStock} kg
                   </Text>
                 )}
               </View>
 
-              {/* Inputs */}
               <View className="flex-row gap-3">
                 <View className="flex-1">
-                  <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
-                    Weight <Text className="text-red-500">*</Text>
+                  <Text
+                    className="text-xs font-bold mb-1 uppercase"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    Weight (kg) <Text className="text-red-500">*</Text>
                   </Text>
                   <TextInput
-                    placeholder="0.0"
+                    placeholder="0.00"
+                    placeholderTextColor={theme.placeholder}
                     keyboardType="numeric"
-                    className="border border-gray-300 rounded h-12 px-3 text-lg"
                     value={newItemWeight}
                     onChangeText={setNewItemWeight}
+                    className="border rounded px-3 h-12 text-lg font-bold"
+                    style={{
+                      backgroundColor: theme.inputBg,
+                      borderColor: theme.border,
+                      color: theme.inputText,
+                    }}
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-gray-600 text-xs uppercase font-bold mb-1">
-                    Price <Text className="text-red-500">*</Text>
+                  <Text
+                    className="text-xs font-bold mb-1 uppercase"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    Price / kg <Text className="text-red-500">*</Text>
                   </Text>
                   <TextInput
-                    placeholder="0.0"
+                    placeholder="0.00"
+                    placeholderTextColor={theme.placeholder}
                     keyboardType="numeric"
-                    className="border border-gray-300 rounded h-12 px-3 text-lg"
                     value={newItemPrice}
                     onChangeText={setNewItemPrice}
+                    className="border rounded px-3 h-12 text-lg font-bold"
+                    style={{
+                      backgroundColor: theme.inputBg,
+                      borderColor: theme.border,
+                      color: theme.inputText,
+                    }}
                   />
                 </View>
               </View>
 
-              {/* Live Subtotal */}
-              <View className="items-end">
-                <Text className="text-xs text-gray-500 uppercase font-bold">
-                  Subtotal
+              <View className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded items-center border border-blue-100 dark:border-blue-900">
+                <Text className="text-xs text-blue-600 dark:text-blue-300 font-bold uppercase mb-1">
+                  Line Total
                 </Text>
-                <Text className="text-xl font-bold text-blue-700">
+                <Text className="text-2xl font-bold text-blue-700 dark:text-blue-400">
                   ₱{newItemSubtotal}
                 </Text>
               </View>
-
-              <View className="flex-row gap-3 mt-2">
-                <Pressable
-                  onPress={() => setAddItemModalVisible(false)}
-                  className="flex-1 bg-gray-200 p-3 rounded items-center"
-                >
-                  <Text className="font-bold text-gray-700">Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={saveNewItem}
-                  className="flex-1 bg-blue-600 p-3 rounded items-center"
-                >
-                  <Text className="font-bold text-white">Add</Text>
-                </Pressable>
-              </View>
             </View>
-          </View>
-        </Modal>
 
-        {/* FINISH MODAL */}
-        <Modal
-          visible={finishModalVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setFinishModalVisible(false)}
+            <TouchableOpacity
+              onPress={saveNewItem}
+              className="mt-6 bg-blue-600 p-3 rounded-lg items-center"
+            >
+              <Text className="text-white font-bold text-lg">Save Item</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* --- FINISH CONFIRM MODAL --- */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={finishModalVisible}
+        onRequestClose={() => setFinishModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setFinishModalVisible(false)}
         >
-          <View className="flex-1 bg-black/60 justify-center items-center p-4">
-            <View className="bg-white w-full max-w-sm rounded-xl p-6 shadow-xl">
-              <Text className="text-xl font-bold text-gray-800 mb-2">
-                Finish Transaction
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View
+              className="flex-row justify-between items-center mb-4 border-b pb-2"
+              style={{ borderBottomColor: theme.border }}
+            >
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
+                Confirm Transaction
               </Text>
-              <Text className="text-gray-600 mb-6">
-                Enter the amount paid by the client.
-              </Text>
-              <View className="mb-6">
-                <Text className="text-xs font-bold text-gray-500 mb-1 uppercase">
-                  Amount Paid (₱)
+              <TouchableOpacity onPress={() => setFinishModalVisible(false)}>
+                <X size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View className="gap-2 mb-4">
+              <View className="flex-row justify-between">
+                <Text style={{ color: theme.textSecondary }}>Client:</Text>
+                <Text
+                  className="font-bold"
+                  style={{ color: theme.textPrimary }}
+                >
+                  {clientName}
                 </Text>
-                <TextInput
-                  placeholder="0.00"
-                  keyboardType="numeric"
-                  autoFocus={true}
-                  value={paidAmountInput}
-                  onChangeText={setPaidAmountInput}
-                  className="border border-green-500 bg-green-50 rounded px-3 h-14 text-2xl font-bold text-green-800 text-center"
-                />
               </View>
-              <View className="flex-row gap-3">
-                <Pressable
-                  onPress={() => setFinishModalVisible(false)}
-                  className="flex-1 bg-gray-200 py-3 rounded-lg items-center"
+              <View className="flex-row justify-between">
+                <Text style={{ color: theme.textSecondary }}>Type:</Text>
+                <Text
+                  className="font-bold"
+                  style={{ color: theme.textPrimary }}
                 >
-                  <Text className="font-bold text-gray-700">Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={confirmFinish}
-                  className="flex-1 bg-green-600 py-3 rounded-lg items-center"
+                  {transactionType}
+                </Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text style={{ color: theme.textSecondary }}>Items Count:</Text>
+                <Text
+                  className="font-bold"
+                  style={{ color: theme.textPrimary }}
                 >
-                  <Text className="font-bold text-white">Confirm</Text>
-                </Pressable>
+                  {lineItems.length}
+                </Text>
+              </View>
+              <View
+                className="flex-row justify-between border-t pt-2 mt-2"
+                style={{ borderTopColor: theme.subtleBorder }}
+              >
+                <Text
+                  className="text-lg font-bold"
+                  style={{ color: theme.textPrimary }}
+                >
+                  Grand Total:
+                </Text>
+                <Text className="text-lg font-bold text-blue-600">
+                  ₱{grandTotal.toFixed(2)}
+                </Text>
               </View>
             </View>
-          </View>
-        </Modal>
-      </View>
+
+            <View className="mb-4">
+              <Text
+                className="text-xs font-bold mb-1 uppercase"
+                style={{ color: theme.textSecondary }}
+              >
+                Initial Payment / Paid Amount
+              </Text>
+              <TextInput
+                placeholder="0.00"
+                placeholderTextColor={theme.placeholder}
+                keyboardType="numeric"
+                value={paidAmountInput}
+                onChangeText={setPaidAmountInput}
+                className="border rounded px-3 h-12 text-xl font-bold text-green-700"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: theme.border,
+                }}
+              />
+            </View>
+
+            <TouchableOpacity
+              onPress={confirmFinish}
+              className="bg-green-600 p-4 rounded-lg items-center shadow-sm"
+            >
+              <Text className="text-white font-bold text-lg">
+                Confirm & Save
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* --- IMAGE PREVIEW MODAL --- */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isImageModalVisible}
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.imageModalClose}
+            onPress={() => setImageModalVisible(false)}
+          >
+            <X size={30} color="white" />
+          </Pressable>
+          {licenseImage && (
+            <Image
+              source={{ uri: licenseImage }}
+              style={{ width: "90%", height: "70%", borderRadius: 12 }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  // New Styles for the Custom Picker
   pickerTrigger: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f3f4f6", // Matched input bg
     borderWidth: 1,
-    borderColor: "#d1d5db", // Matched input border
     borderRadius: 6,
     paddingHorizontal: 12,
-    height: "100%", // Inherit height from parent View
+    height: "100%",
     width: "100%",
   },
   pickerText: {
     fontSize: 16,
-    color: "black",
     flex: 1,
   },
-  placeholderText: {
-    color: "#9ca3af",
-  },
-  // Modal Styles for Picker
   pickerOptionsContainer: {
-    backgroundColor: "white",
     width: "40%", // Narrower than main modal
     maxHeight: "50%",
     borderRadius: 12,
@@ -960,13 +1156,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
     paddingBottom: 8,
   },
   pickerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#374151",
   },
   pickerOption: {
     flexDirection: "row",
@@ -975,31 +1169,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f9fafb",
-  },
-  pickerOptionSelected: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 6,
   },
   pickerOptionText: {
     fontSize: 16,
-    color: "#4b5563",
   },
-  pickerOptionTextSelected: {
-    color: "#2563eb",
-    fontWeight: "bold",
-  },
-  // Main Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
   },
   modalContent: {
-    backgroundColor: "white",
-    width: "50%",
+    width: "40%",
     borderRadius: 12,
     padding: 24,
     shadowColor: "#000",
@@ -1007,5 +1188,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  imageModalClose: {
+    position: "absolute",
+    top: 40,
+    right: 30,
+    padding: 10,
   },
 });

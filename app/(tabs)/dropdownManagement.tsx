@@ -11,14 +11,34 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
-import { paymentMethods, unitOfMeasurements } from "../../db/schema";
 import { db } from "../../db/client";
+import { paymentMethods, unitOfMeasurements } from "../../db/schema";
 
 export default function DropdownManagement() {
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6",
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    border: isDark ? "#333333" : "#e5e7eb",
+    inputBg: isDark ? "#2C2C2C" : "#f3f4f6",
+    inputText: isDark ? "#FFFFFF" : "#000000",
+    placeholder: isDark ? "#888888" : "#9ca3af",
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb",
+    headerBg: isDark ? "#0f0f0f" : "#1f2937",
+    primary: "#2563eb",
+  };
+
   const [uomData, setUomData] = useState([]);
   const [paymentData, setPaymentData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -45,15 +65,18 @@ export default function DropdownManagement() {
   );
 
   return (
-    <View className="flex-1 bg-gray-100 p-4 gap-4 flex-row">
+    <View
+      className="flex-1 p-4 gap-4 flex-row"
+      style={{ backgroundColor: theme.background }}
+    >
       {/* LEFT COLUMN: UNIT OF MEASUREMENTS */}
       <View className="flex-1">
-        <UomSection data={uomData} onRefresh={loadData} />
+        <UomSection data={uomData} onRefresh={loadData} theme={theme} />
       </View>
 
       {/* RIGHT COLUMN: PAYMENT METHODS */}
       <View className="flex-1">
-        <PaymentSection data={paymentData} onRefresh={loadData} />
+        <PaymentSection data={paymentData} onRefresh={loadData} theme={theme} />
       </View>
     </View>
   );
@@ -62,7 +85,7 @@ export default function DropdownManagement() {
 // ============================================================================
 // COMPONENT 1: Unit of Measurement Section
 // ============================================================================
-const UomSection = ({ data, onRefresh }) => {
+const UomSection = ({ data, onRefresh, theme }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -131,24 +154,42 @@ const UomSection = ({ data, onRefresh }) => {
   return (
     <View className="flex-1 gap-4">
       {/* HEADER */}
-      <View className="bg-white p-3 rounded-lg border border-gray-200 gap-3 shadow-sm">
+      <View
+        className="p-3 rounded-lg border gap-3 shadow-sm"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
         <View className="flex-row justify-between items-center">
-          <Text className="text-xl font-bold text-gray-800">
+          <Text
+            className="text-xl font-bold"
+            style={{ color: theme.textPrimary }}
+          >
             Units of Measure
           </Text>
           <TouchableOpacity
             onPress={() => openModal()}
-            className="flex-row items-center bg-primary px-3 py-2 rounded-md active:bg-blue-700"
+            className="flex-row items-center px-3 py-2 rounded-md active:opacity-80"
+            style={{ backgroundColor: "#F2C94C" }}
           >
             <Plus size={18} color="white" />
             <Text className="text-white font-bold ml-1">Add</Text>
           </TouchableOpacity>
         </View>
-        <View className="flex-row items-center bg-gray-50 rounded-md px-3 border border-gray-200 h-12">
-          <Search size={20} color="gray" />
+        <View
+          className="flex-row items-center rounded-md px-3 border h-12"
+          style={{
+            backgroundColor: theme.inputBg,
+            borderColor: theme.border,
+          }}
+        >
+          <Search size={20} color={theme.placeholder} />
           <TextInput
             placeholder="Search Units..."
-            className="flex-1 ml-2 text-gray-700 h-full"
+            placeholderTextColor={theme.placeholder}
+            className="flex-1 ml-2 h-full"
+            style={{ color: theme.inputText }}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -156,8 +197,17 @@ const UomSection = ({ data, onRefresh }) => {
       </View>
 
       {/* LIST */}
-      <View className="flex-1 bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-        <View className="flex-row bg-gray-800 p-3">
+      <View
+        className="flex-1 rounded-lg overflow-hidden border shadow-sm"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
+        <View
+          className="flex-row p-3"
+          style={{ backgroundColor: theme.headerBg }}
+        >
           <Text className="flex-1 font-bold text-white">Symbol</Text>
           <Text className="flex-[2] font-bold text-white">Full Name</Text>
           <View className="w-10" />
@@ -168,16 +218,23 @@ const UomSection = ({ data, onRefresh }) => {
           renderItem={({ item, index }) => (
             <Pressable
               onPress={() => openModal(item)}
-              className={`flex-row items-center p-3 border-b border-gray-100 ${
-                index % 2 === 0 ? "bg-white" : "bg-gray-50"
-              }`}
+              className="flex-row items-center p-3 border-b"
+              style={{
+                backgroundColor: index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                borderColor: theme.border,
+              }}
             >
-              <Text className="flex-1 text-gray-800 font-bold">
+              <Text
+                className="flex-1 font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 {item.unit}
               </Text>
-              <Text className="flex-[2] text-gray-600">{item.name}</Text>
+              <Text className="flex-[2]" style={{ color: theme.textSecondary }}>
+                {item.name}
+              </Text>
               <View className="w-10 items-end">
-                <Edit2 size={16} color="#2563eb" />
+                <Edit2 size={16} color={theme.primary} />
               </View>
             </Pressable>
           )}
@@ -194,32 +251,58 @@ const UomSection = ({ data, onRefresh }) => {
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
-            <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
-              <Text className="text-xl font-bold text-gray-800">
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View
+              className="flex-row justify-between items-center mb-4 border-b pb-2"
+              style={{ borderBottomColor: theme.border }}
+            >
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 {selectedItem ? "Edit Unit" : "New Unit"}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="#9ca3af" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
             <View className="gap-4">
               <View>
-                <Text className="text-gray-700 font-bold mb-1">
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textSecondary }}
+                >
                   Unit Symbol (e.g., kg) <Text className="text-red-500">*</Text>
                 </Text>
                 <TextInput
-                  className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
+                  className="rounded-md px-3 h-12 border"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  }}
                   value={unit}
                   onChangeText={setUnit}
                 />
               </View>
               <View>
-                <Text className="text-gray-700 font-bold mb-1">
-                  Full Name (e.g., Kilograms) <Text className="text-red-500">*</Text>
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textSecondary }}
+                >
+                  Full Name (e.g., Kilograms){" "}
+                  <Text className="text-red-500">*</Text>
                 </Text>
                 <TextInput
-                  className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
+                  className="rounded-md px-3 h-12 border"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  }}
                   value={name}
                   onChangeText={setName}
                 />
@@ -251,7 +334,7 @@ const UomSection = ({ data, onRefresh }) => {
 // ============================================================================
 // COMPONENT 2: Payment Method Section
 // ============================================================================
-const PaymentSection = ({ data, onRefresh }) => {
+const PaymentSection = ({ data, onRefresh, theme }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -306,24 +389,42 @@ const PaymentSection = ({ data, onRefresh }) => {
   return (
     <View className="flex-1 gap-4">
       {/* HEADER */}
-      <View className="bg-white p-3 rounded-lg border border-gray-200 gap-3 shadow-sm">
+      <View
+        className="p-3 rounded-lg border gap-3 shadow-sm"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
         <View className="flex-row justify-between items-center">
-          <Text className="text-xl font-bold text-gray-800">
+          <Text
+            className="text-xl font-bold"
+            style={{ color: theme.textPrimary }}
+          >
             Payment Methods
           </Text>
           <TouchableOpacity
             onPress={() => openModal()}
-            className="flex-row items-center bg-primary px-3 py-2 rounded-md active:bg-blue-700"
+            className="flex-row items-center px-3 py-2 rounded-md active:opacity-80"
+            style={{ backgroundColor: "#F2C94C" }}
           >
             <Plus size={18} color="white" />
             <Text className="text-white font-bold ml-1">Add</Text>
           </TouchableOpacity>
         </View>
-        <View className="flex-row items-center bg-gray-50 rounded-md px-3 border border-gray-200 h-12">
-          <Search size={20} color="gray" />
+        <View
+          className="flex-row items-center rounded-md px-3 border h-12"
+          style={{
+            backgroundColor: theme.inputBg,
+            borderColor: theme.border,
+          }}
+        >
+          <Search size={20} color={theme.placeholder} />
           <TextInput
             placeholder="Search Methods..."
-            className="flex-1 ml-2 text-gray-700 h-full"
+            placeholderTextColor={theme.placeholder}
+            className="flex-1 ml-2 h-full"
+            style={{ color: theme.inputText }}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -331,8 +432,17 @@ const PaymentSection = ({ data, onRefresh }) => {
       </View>
 
       {/* LIST */}
-      <View className="flex-1 bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
-        <View className="flex-row bg-gray-800 p-3">
+      <View
+        className="flex-1 rounded-lg overflow-hidden border shadow-sm"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
+        <View
+          className="flex-row p-3"
+          style={{ backgroundColor: theme.headerBg }}
+        >
           <Text className="flex-1 font-bold text-white">Method Name</Text>
           <View className="w-10" />
         </View>
@@ -342,15 +452,20 @@ const PaymentSection = ({ data, onRefresh }) => {
           renderItem={({ item, index }) => (
             <Pressable
               onPress={() => openModal(item)}
-              className={`flex-row items-center p-3 border-b border-gray-100 ${
-                index % 2 === 0 ? "bg-white" : "bg-gray-50"
-              }`}
+              className="flex-row items-center p-3 border-b"
+              style={{
+                backgroundColor: index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                borderColor: theme.border,
+              }}
             >
-              <Text className="flex-1 text-gray-800 font-medium">
+              <Text
+                className="flex-1 font-medium"
+                style={{ color: theme.textPrimary }}
+              >
                 {item.name}
               </Text>
               <View className="w-10 items-end">
-                <Edit2 size={16} color="#2563eb" />
+                <Edit2 size={16} color={theme.primary} />
               </View>
             </Pressable>
           )}
@@ -367,22 +482,39 @@ const PaymentSection = ({ data, onRefresh }) => {
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
-            <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
-              <Text className="text-xl font-bold text-gray-800">
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View
+              className="flex-row justify-between items-center mb-4 border-b pb-2"
+              style={{ borderBottomColor: theme.border }}
+            >
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 {selectedItem ? "Edit Method" : "New Method"}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="#9ca3af" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
             <View className="gap-4">
               <View>
-                <Text className="text-gray-700 font-bold mb-1">
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textSecondary }}
+                >
                   Payment Method <Text className="text-red-500">*</Text>
                 </Text>
                 <TextInput
-                  className="bg-gray-100 rounded-md px-3 h-12 border border-gray-300"
+                  className="rounded-md px-3 h-12 border"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  }}
                   value={name}
                   onChangeText={setName}
                 />
@@ -420,7 +552,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: "white",
     width: 350,
     borderRadius: 12,
     padding: 24,

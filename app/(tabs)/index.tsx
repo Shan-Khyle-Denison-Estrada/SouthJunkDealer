@@ -11,6 +11,7 @@ import {
   ScrollView,
   Text,
   View,
+  useColorScheme,
 } from "react-native";
 import Svg, {
   Circle,
@@ -35,6 +36,24 @@ import {
 } from "../../db/schema";
 
 export default function Index() {
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f9fafb", // Gray-50 equivalent
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#6b7280", // Gray-500/600
+    border: isDark ? "#333333" : "#e5e7eb",
+    subtleBg: isDark ? "#2C2C2C" : "#f9fafb",
+    chartGrid: isDark ? "#444444" : "#e5e7eb",
+    chartText: isDark ? "#888888" : "#6b7280",
+    success: "#16a34a",
+    danger: "#dc2626",
+    primary: "#F2C94C",
+  };
+
   const [unallocatedItems, setUnallocatedItems] = useState([]);
   const [stockData, setStockData] = useState([]);
   const [profitData, setProfitData] = useState([]);
@@ -125,7 +144,6 @@ export default function Index() {
           break;
       }
 
-      // FIXED: Adjust for local timezone before ISO conversion
       const localStartDate = new Date(
         startDate.getTime() - startDate.getTimezoneOffset() * 60000,
       );
@@ -159,7 +177,6 @@ export default function Index() {
       setProfitData(profitArray);
 
       // 4. Today's Metrics
-      // FIXED: Use local timezone adjusted date instead of UTC
       const now = new Date();
       const localNow = new Date(
         now.getTime() - now.getTimezoneOffset() * 60000,
@@ -252,8 +269,13 @@ export default function Index() {
       chartAreaDimensions.height === 0
     ) {
       return (
-        <View className="flex-1 justify-center items-center bg-gray-50 rounded-lg border border-dashed border-gray-300">
-          <Text className="text-gray-400 text-sm">No stock data available</Text>
+        <View
+          className="flex-1 justify-center items-center rounded-lg border border-dashed"
+          style={{ borderColor: theme.border, backgroundColor: theme.subtleBg }}
+        >
+          <Text style={{ color: theme.textSecondary }}>
+            No stock data available
+          </Text>
         </View>
       );
     }
@@ -288,7 +310,7 @@ export default function Index() {
                   y1={y}
                   x2={scrollWidth}
                   y2={y}
-                  stroke="#e5e7eb"
+                  stroke={theme.chartGrid}
                   strokeWidth="1"
                   strokeDasharray="4, 4"
                 />
@@ -312,7 +334,7 @@ export default function Index() {
                     x={x + BAR_WIDTH / 2}
                     y={y - 6}
                     fontSize="10"
-                    fill="#6b7280"
+                    fill={theme.textSecondary}
                     textAnchor="middle"
                     fontWeight="bold"
                   >
@@ -322,7 +344,7 @@ export default function Index() {
                     x={x + BAR_WIDTH / 2}
                     y={containerHeight - 5}
                     fontSize="11"
-                    fill="#374151"
+                    fill={theme.textPrimary}
                     textAnchor="middle"
                   >
                     {item.name?.length > 8
@@ -346,8 +368,13 @@ export default function Index() {
       lineGraphDimensions.height === 0
     ) {
       return (
-        <View className="flex-1 justify-center items-center bg-gray-50 rounded-lg border border-dashed border-gray-300">
-          <Text className="text-gray-400 text-sm">No transaction data</Text>
+        <View
+          className="flex-1 justify-center items-center rounded-lg border border-dashed"
+          style={{ borderColor: theme.border, backgroundColor: theme.subtleBg }}
+        >
+          <Text style={{ color: theme.textSecondary }}>
+            No transaction data
+          </Text>
         </View>
       );
     }
@@ -370,19 +397,14 @@ export default function Index() {
       return { x, y, ...item };
     });
 
-    // Zero Line Calculations
     const zeroY = height - PADDING - ((0 - minVal) / range) * graphHeight;
-    // Calculate split percentage (0% is top, 100% is bottom)
-    // If maxVal is 100 and minVal is -100, zero is at 50%.
-    // SVG Y coordinates go from 0 (top) to Height (bottom).
-    // So if Zero is at Y=150 in a 300px high graph, the split is at 0.5.
     let splitOffset = 0;
     if (maxVal > 0 && minVal < 0) {
       splitOffset = maxVal / (maxVal - minVal);
     } else if (maxVal <= 0) {
-      splitOffset = 0; // All red (top to bottom)
+      splitOffset = 0;
     } else {
-      splitOffset = 1; // All green
+      splitOffset = 1;
     }
 
     const createSmoothPath = (pts) => {
@@ -405,14 +427,12 @@ export default function Index() {
     const areaPath = `${linePath} L ${width - PADDING} ${height - PADDING} L ${PADDING} ${height - PADDING} Z`;
     const labelStep = Math.ceil(points.length / 5);
 
-    // Colors
-    const POSITIVE_COLOR = "#16a34a"; // Green-600
-    const NEGATIVE_COLOR = "#dc2626"; // Red-600
+    const POSITIVE_COLOR = theme.success;
+    const NEGATIVE_COLOR = theme.danger;
 
     return (
       <Svg width={width} height={height}>
         <Defs>
-          {/* STROKE GRADIENT: Hard split at zero line */}
           <LinearGradient id="strokeGradient" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={POSITIVE_COLOR} />
             <Stop offset={splitOffset} stopColor={POSITIVE_COLOR} />
@@ -420,7 +440,6 @@ export default function Index() {
             <Stop offset="1" stopColor={NEGATIVE_COLOR} />
           </LinearGradient>
 
-          {/* FILL GRADIENT: Semi-transparent, fading out near zero line */}
           <LinearGradient id="fillGradient" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={POSITIVE_COLOR} stopOpacity="0.4" />
             <Stop
@@ -442,7 +461,7 @@ export default function Index() {
           y1={PADDING}
           x2={PADDING}
           y2={height - PADDING}
-          stroke="#e5e7eb"
+          stroke={theme.chartGrid}
           strokeWidth="1"
         />
         <Line
@@ -450,30 +469,27 @@ export default function Index() {
           y1={height - PADDING}
           x2={width - PADDING}
           y2={height - PADDING}
-          stroke="#e5e7eb"
+          stroke={theme.chartGrid}
           strokeWidth="1"
         />
 
-        {/* Zero Line */}
         {minVal < 0 && maxVal > 0 && (
           <Line
             x1={PADDING}
             y1={zeroY}
             x2={width - PADDING}
             y2={zeroY}
-            stroke="#9ca3af"
+            stroke={theme.chartText}
             strokeWidth="1"
             strokeDasharray="4, 4"
             opacity="0.6"
           />
         )}
 
-        {/* Fill */}
         {points.length > 1 && (
           <Path d={areaPath} fill="url(#fillGradient)" stroke="none" />
         )}
 
-        {/* Stroke (Line) */}
         {points.length > 1 && (
           <Path
             d={linePath}
@@ -483,10 +499,8 @@ export default function Index() {
           />
         )}
 
-        {/* Dots & Labels */}
         {points.map((p, i) => {
           if (i % labelStep !== 0 && i !== points.length - 1) return null;
-          // Determine color for this specific dot
           const dotColor = p.dailyProfit >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR;
 
           return (
@@ -496,7 +510,7 @@ export default function Index() {
                 cy={p.y}
                 r="4"
                 fill={dotColor}
-                stroke="white"
+                stroke={theme.card}
                 strokeWidth="1.5"
               />
 
@@ -515,7 +529,7 @@ export default function Index() {
                 x={p.x}
                 y={height - 10}
                 fontSize="9"
-                fill="#6b7280"
+                fill={theme.chartText}
                 textAnchor="middle"
               >
                 {new Date(p.date).toLocaleDateString("en-US", {
@@ -531,45 +545,71 @@ export default function Index() {
   };
 
   return (
-    <View className="flex-1 bg-gray-50 p-4 gap-4">
+    <View
+      className="flex-1 p-4 gap-4"
+      style={{ backgroundColor: theme.background }}
+    >
       {/* KPIS */}
       <View className="flex-row gap-3 h-24">
-        <View className="flex-1 bg-white rounded-2xl p-2 justify-center items-center shadow-sm">
-          <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">
-            Revenue Today
-          </Text>
-          <Text
-            className="text-2xl font-bold text-green-600 mt-1"
-            numberOfLines={1}
+        {[
+          {
+            label: "Revenue Today",
+            val: todaysMetrics.revenue,
+            color: theme.success,
+          },
+          {
+            label: "Buying Today",
+            val: todaysMetrics.expenditure,
+            color: theme.danger,
+          },
+        ].map((item, idx) => (
+          <View
+            key={idx}
+            className="flex-1 rounded-2xl p-2 justify-center items-center shadow-sm"
+            style={{ backgroundColor: theme.card }}
           >
-            ₱{todaysMetrics.revenue.toLocaleString()}
-          </Text>
-        </View>
-        <View className="flex-1 bg-white rounded-2xl p-2 justify-center items-center shadow-sm">
-          <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">
-            Buying Today
-          </Text>
+            <Text
+              className="text-[10px] font-bold uppercase tracking-wider"
+              style={{ color: theme.textSecondary }}
+            >
+              {item.label}
+            </Text>
+            <Text
+              className="text-2xl font-bold mt-1"
+              style={{ color: item.color }}
+              numberOfLines={1}
+            >
+              ₱{item.val.toLocaleString()}
+            </Text>
+          </View>
+        ))}
+
+        <View
+          className="flex-1 rounded-2xl p-2 justify-center items-center shadow-sm"
+          style={{ backgroundColor: theme.card }}
+        >
           <Text
-            className="text-2xl font-bold text-red-500 mt-1"
-            numberOfLines={1}
+            className="text-[10px] font-bold uppercase tracking-wider"
+            style={{ color: theme.textSecondary }}
           >
-            ₱{todaysMetrics.expenditure.toLocaleString()}
-          </Text>
-        </View>
-        <View className="flex-1 bg-white rounded-2xl p-2 justify-center items-center shadow-sm">
-          <Text className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">
             Profit Today
           </Text>
           <Text
-            className={`text-2xl font-bold mt-1 ${todaysMetrics.profit >= 0 ? "text-blue-600" : "text-orange-500"}`}
+            className="text-2xl font-bold mt-1"
+            style={{
+              color:
+                todaysMetrics.profit >= 0 ? "#3b82f6" : "rgb(249, 115, 22)",
+            }}
             numberOfLines={1}
           >
             ₱{todaysMetrics.profit.toLocaleString()}
           </Text>
         </View>
+
         <Pressable
           onPress={handleExport}
-          className="flex-1 bg-primary rounded-2xl justify-center items-center shadow-sm active:bg-amber-600"
+          className="flex-1 rounded-2xl justify-center items-center shadow-sm active:bg-amber-600"
+          style={{ backgroundColor: theme.primary }}
         >
           <Download color="white" size={28} />
           <Text className="text-white text-xl font-bold mt-1">Export</Text>
@@ -579,8 +619,14 @@ export default function Index() {
       {/* CHARTS */}
       <View className="flex-1 flex-row gap-4">
         {/* STOCK CHART */}
-        <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm overflow-hidden">
-          <Text className="text-lg font-bold text-gray-800 mb-2">
+        <View
+          className="flex-1 rounded-2xl p-4 shadow-sm overflow-hidden"
+          style={{ backgroundColor: theme.card }}
+        >
+          <Text
+            className="text-lg font-bold mb-2"
+            style={{ color: theme.textPrimary }}
+          >
             Current Stock Levels
           </Text>
           <View
@@ -592,18 +638,24 @@ export default function Index() {
         </View>
 
         {/* PROFIT CHART */}
-        <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm overflow-hidden">
+        <View
+          className="flex-1 rounded-2xl p-4 shadow-sm overflow-hidden"
+          style={{ backgroundColor: theme.card }}
+        >
           <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-lg font-bold text-gray-800">
+            <Text
+              className="text-lg font-bold"
+              style={{ color: theme.textPrimary }}
+            >
               Profit Trend
             </Text>
           </View>
 
-          {/* TIMELINE FILTER: Style used explicitly to prevent NativeWind crash */}
+          {/* TIMELINE FILTER */}
           <View
             style={{
               flexDirection: "row",
-              backgroundColor: "#f3f4f6",
+              backgroundColor: theme.subtleBg,
               borderRadius: 8,
               padding: 4,
               marginBottom: 8,
@@ -618,11 +670,11 @@ export default function Index() {
                   paddingVertical: 6,
                   borderRadius: 6,
                   alignItems: "center",
-                  backgroundColor: timeframe === item ? "white" : "transparent",
+                  backgroundColor:
+                    timeframe === item ? theme.card : "transparent",
                   shadowColor: timeframe === item ? "#000" : "transparent",
                   shadowOffset: { width: 0, height: 1 },
                   shadowOpacity: timeframe === item ? 0.1 : 0,
-                  shadowRadius: 2,
                   elevation: timeframe === item ? 1 : 0,
                 }}
               >
@@ -630,7 +682,7 @@ export default function Index() {
                   style={{
                     fontSize: 10,
                     fontWeight: "bold",
-                    color: timeframe === item ? "#2563eb" : "#6b7280",
+                    color: timeframe === item ? "#2563eb" : theme.textSecondary,
                   }}
                 >
                   {item.toUpperCase()}
@@ -649,22 +701,51 @@ export default function Index() {
       </View>
 
       {/* TABLE */}
-      <View className="flex-1 bg-white rounded-2xl p-2 shadow-sm">
-        <Text className="text-xl font-bold text-gray-800 mb-4 px-2 pt-2">
+      <View
+        className="flex-1 rounded-2xl p-2 shadow-sm"
+        style={{ backgroundColor: theme.card }}
+      >
+        <Text
+          className="text-xl font-bold mb-4 px-2 pt-2"
+          style={{ color: theme.textPrimary }}
+        >
           Pending Inventory (Unallocated Stock)
         </Text>
-        <View className="flex-row border-b border-gray-200 pb-3 mb-2 bg-gray-50 p-3 rounded-t-md">
-          <Text className="flex-1 font-bold text-gray-600 text-sm">TX ID</Text>
-          <Text className="flex-1 font-bold text-gray-600 text-sm">
+        <View
+          className="flex-row border-b pb-3 mb-2 p-3 rounded-t-md"
+          style={{
+            borderColor: theme.border,
+            backgroundColor: theme.subtleBg,
+          }}
+        >
+          <Text
+            className="flex-1 font-bold text-sm"
+            style={{ color: theme.textSecondary }}
+          >
+            TX ID
+          </Text>
+          <Text
+            className="flex-1 font-bold text-sm"
+            style={{ color: theme.textSecondary }}
+          >
             LINE ID
           </Text>
-          <Text className="flex-[2] font-bold text-gray-600 text-sm">
+          <Text
+            className="flex-[2] font-bold text-sm"
+            style={{ color: theme.textSecondary }}
+          >
             MATERIAL
           </Text>
-          <Text className="flex-[1.5] font-bold text-gray-600 text-sm text-right">
+          <Text
+            className="flex-[1.5] font-bold text-sm text-right"
+            style={{ color: theme.textSecondary }}
+          >
             UNALLOCATED
           </Text>
-          <Text className="flex-[1.5] font-bold text-gray-600 text-sm text-center">
+          <Text
+            className="flex-[1.5] font-bold text-sm text-center"
+            style={{ color: theme.textSecondary }}
+          >
             DATE
           </Text>
         </View>
@@ -675,23 +756,45 @@ export default function Index() {
           showsVerticalScrollIndicator={true}
           renderItem={({ item, index }) => {
             const remaining = item.originalWeight - item.totalAllocated;
+            // Alternate colors based on theme
+            const rowBg = index % 2 === 0 ? theme.card : theme.subtleBg;
+
             return (
               <View
-                className={`flex-row border-b border-gray-50 py-4 px-3 items-center ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                className="flex-row border-b py-4 px-3 items-center"
+                style={{
+                  borderColor: theme.border,
+                  backgroundColor: rowBg,
+                }}
               >
-                <Text className="flex-1 text-gray-700 font-medium text-sm">
+                <Text
+                  className="flex-1 font-medium text-sm"
+                  style={{ color: theme.textPrimary }}
+                >
                   #{item.txId}
                 </Text>
-                <Text className="flex-1 text-gray-700 font-medium text-sm">
+                <Text
+                  className="flex-1 font-medium text-sm"
+                  style={{ color: theme.textPrimary }}
+                >
                   #{item.lineId}
                 </Text>
-                <Text className="flex-[2] text-gray-900 font-bold text-sm">
+                <Text
+                  className="flex-[2] font-bold text-sm"
+                  style={{ color: theme.textPrimary }}
+                >
                   {item.material}
                 </Text>
-                <Text className="flex-[1.5] text-blue-700 font-bold text-sm text-right">
+                <Text
+                  className="flex-[1.5] font-bold text-sm text-right"
+                  style={{ color: "#3b82f6" }}
+                >
                   {remaining.toFixed(2)} {item.uom}
                 </Text>
-                <Text className="flex-[1.5] text-gray-600 text-sm text-center">
+                <Text
+                  className="flex-[1.5] text-sm text-center"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.date}
                 </Text>
               </View>
@@ -708,17 +811,31 @@ export default function Index() {
         onRequestClose={() => setErrorModalVisible(false)}
       >
         <View className="flex-1 justify-center items-center bg-black/50">
-          <View className="w-[80%] bg-white rounded-2xl p-6 items-center shadow-lg">
-            <XCircle size={50} color="#EF4444" style={{ marginBottom: 15 }} />
-            <Text className="text-xl font-bold text-gray-800 mb-2 text-center">
+          <View
+            className="w-[80%] rounded-2xl p-6 items-center shadow-lg"
+            style={{ backgroundColor: theme.card }}
+          >
+            <XCircle
+              size={50}
+              color={theme.danger}
+              style={{ marginBottom: 15 }}
+            />
+            <Text
+              className="text-xl font-bold mb-2 text-center"
+              style={{ color: theme.textPrimary }}
+            >
               Export Failed
             </Text>
-            <Text className="text-gray-600 text-center mb-6 leading-5">
+            <Text
+              className="text-center mb-6 leading-5"
+              style={{ color: theme.textSecondary }}
+            >
               {errorMessage}
             </Text>
             <Pressable
               onPress={() => setErrorModalVisible(false)}
-              className="bg-gray-800 px-8 py-3 rounded-full"
+              className="px-8 py-3 rounded-full"
+              style={{ backgroundColor: "#333" }}
             >
               <Text className="text-white font-bold">Close</Text>
             </Pressable>

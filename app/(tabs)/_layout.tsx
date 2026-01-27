@@ -15,64 +15,122 @@ import {
   Settings,
   User,
 } from "lucide-react-native";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-// --- CUSTOM DRAWER COMPONENT ---
-function CustomDrawerContent(props: any) {
-  return (
-    <DrawerContentScrollView {...props}>
-      {/* 1. Quick Access Section */}
-      <View style={styles.buttonsContainer}>
-        <Text style={styles.sectionTitle}>Quick Access</Text>
+export default function TabLayout() {
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
 
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("/transactionSummary")} // Adjust route if needed
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#ffffff",
+    drawerActiveBg: isDark ? "#1E1E1E" : "#f2f2f2",
+    drawerActiveText: isDark ? "#F2C94C" : "#000000",
+    drawerInactiveText: isDark ? "#A1A1AA" : "#666666",
+    separator: isDark ? "#333333" : "#f0f0f0",
+    sectionTitle: isDark ? "#888888" : "#888888",
+    primary: "#F2C94C",
+    buttonText: "#ffffff",
+  };
+
+  // --- CUSTOM DRAWER COMPONENT ---
+  function CustomDrawerContent(props: any) {
+    return (
+      <DrawerContentScrollView
+        {...props}
+        style={{ backgroundColor: theme.background }}
+      >
+        {/* 1. Quick Access Section */}
+        <View
+          style={[
+            styles.buttonsContainer,
+            { borderBottomColor: theme.separator },
+          ]}
         >
-          <View style={styles.buttonContent}>
-            <Plus size={18} color="#ffffff" />
-            <Text style={styles.buttonText}>New Transaction</Text>
-          </View>
-        </TouchableOpacity>
+          <Text style={[styles.sectionTitle, { color: theme.sectionTitle }]}>
+            Quick Access
+          </Text>
 
-        <TouchableOpacity
-          style={[styles.button, { marginTop: 8 }]}
-          onPress={() => router.push("/scanQR")} // Ensure you have a 'scan.tsx' route or adjust this
-        >
-          <View style={styles.buttonContent}>
-            <QrCode size={18} color="#ffffff" />
-            <Text style={styles.buttonText}>Scan QR Code</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: theme.primary }]}
+            onPress={() => router.push("/transactionSummary")}
+          >
+            <View style={styles.buttonContent}>
+              <Plus size={18} color="#ffffff" />
+              <Text style={[styles.buttonText, { color: theme.buttonText }]}>
+                New Transaction
+              </Text>
+            </View>
+          </TouchableOpacity>
 
-      {/* 2. Standard Drawer Items (Dashboard, Inventory, etc.) */}
-      <View style={{ marginTop: 10 }}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              { marginTop: 8, backgroundColor: theme.primary },
+            ]}
+            onPress={() => router.push("/scanQR")}
+          >
+            <View style={styles.buttonContent}>
+              <QrCode size={18} color="#ffffff" />
+              <Text style={[styles.buttonText, { color: theme.buttonText }]}>
+                Scan QR Code
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* 2. Standard Drawer Items */}
         <DrawerItemList {...props} />
-      </View>
-    </DrawerContentScrollView>
-  );
-}
+      </DrawerContentScrollView>
+    );
+  }
 
-export default function DrawerLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Drawer
         drawerContent={(props) => <CustomDrawerContent {...props} />}
         screenOptions={{
-          drawerActiveTintColor: "#F2C94C",
-          drawerType: "slide",
           headerShown: true,
-          // HEADER LOGO (Right Side)
+          // Header Styles (Colors Only)
+          headerStyle: {
+            backgroundColor: theme.background,
+            borderBottomColor: theme.separator,
+            borderBottomWidth: 1,
+            elevation: 0,
+            shadowOpacity: 0,
+          },
+          headerTintColor: isDark ? "#FFFFFF" : "#000000",
+          headerTitleStyle: { fontWeight: "bold" },
+
+          // --- LOGO RESTORED HERE ---
           headerRight: () => (
-            <View style={{ paddingRight: 15 }}>
-              <Image
-                source={require("../../assets/images/icon.png")}
-                style={{ width: 60, height: 60, resizeMode: "contain" }}
-              />
-            </View>
+            <Image
+              source={require("../../assets/images/icon.png")}
+              style={{
+                width: 40,
+                height: 40,
+                marginRight: 15,
+                resizeMode: "contain",
+              }}
+            />
           ),
+
+          // Drawer Styles (Colors Only - No Width/Margin changes)
+          drawerStyle: {
+            backgroundColor: theme.background,
+          },
+          drawerActiveBackgroundColor: theme.drawerActiveBg,
+          drawerActiveTintColor: theme.drawerActiveText,
+          drawerInactiveTintColor: theme.drawerInactiveText,
+          // Removed drawerLabelStyle to keep original spacing
         }}
       >
         <Drawer.Screen
@@ -144,30 +202,32 @@ const styles = StyleSheet.create({
   buttonsContainer: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
     marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 12,
-    color: "#888",
     marginBottom: 10,
     fontWeight: "600",
     textTransform: "uppercase",
   },
   button: {
-    backgroundColor: "#F2C94C",
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   buttonContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
   },
   buttonText: {
-    color: "#ffffff",
+    marginLeft: 8,
     fontWeight: "bold",
     fontSize: 14,
   },

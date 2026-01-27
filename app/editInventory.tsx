@@ -1,23 +1,26 @@
-import { Picker } from "@react-native-picker/picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Plus, Trash2, X } from "lucide-react-native";
+import { Check, ChevronDown, Plus, Trash2, X } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { db } from "../db/client";
 import {
   auditTrails,
   inventory,
@@ -26,80 +29,151 @@ import {
   transactionItems,
   transactions,
 } from "../db/schema";
-import { db } from "../db/client";
 
-// --- REUSABLE PICKER ---
+// --- REUSABLE PICKER (Custom Modal Implementation for Dark Mode Support) ---
 const CustomPicker = ({
   selectedValue,
   onValueChange,
   placeholder,
   items,
   disabled,
+  theme,
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
-  const truncate = (str, n) =>
-    str.length > n ? str.substr(0, n - 1) + "..." : str;
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const selectedItem = items.find((i) => i.value === selectedValue);
+  const displayLabel = selectedItem ? selectedItem.label : placeholder;
 
   return (
-    <View
-      style={[
-        styles.pickerContainer,
-        isFocused && styles.pickerFocused,
-        disabled && { backgroundColor: "#e5e7eb", borderColor: "#d1d5db" },
-      ]}
-    >
-      <View style={styles.visualContainer}>
+    <>
+      <Pressable
+        onPress={() => !disabled && setModalVisible(true)}
+        style={[
+          styles.pickerTrigger,
+          {
+            backgroundColor: theme.inputBg,
+            borderColor: theme.border,
+            opacity: disabled ? 0.5 : 1,
+          },
+        ]}
+      >
         <Text
           style={[
-            styles.pickerText,
-            !selectedValue && styles.placeholderText,
-            disabled && { color: "#6b7280" },
+            styles.pickerTriggerText,
+            {
+              color: selectedValue ? theme.textPrimary : theme.placeholder,
+            },
           ]}
           numberOfLines={1}
         >
-          {selectedValue
-            ? items.find((i) => i.value === selectedValue)?.label ||
-              selectedValue
-            : placeholder}
+          {displayLabel}
         </Text>
-        {!disabled && (
-          <View style={styles.arrowContainer}>
+        <ChevronDown size={20} color={theme.textSecondary} />
+      </Pressable>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <View
+            style={[
+              styles.pickerOptionsContainer,
+              { backgroundColor: theme.card },
+            ]}
+          >
             <View
-              style={[styles.roundedArrow, isFocused && styles.arrowOpen]}
+              style={[styles.pickerHeader, { borderBottomColor: theme.border }]}
+            >
+              <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
+                {placeholder}
+              </Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <X size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={items}
+              keyExtractor={(item) => String(item.value)}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.pickerOption,
+                    { borderBottomColor: theme.subtleBorder },
+                    selectedValue === item.value && {
+                      backgroundColor: theme.highlightBg, // Highlight selected
+                    },
+                  ]}
+                  onPress={() => {
+                    onValueChange(item.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerOptionText,
+                      { color: theme.textSecondary },
+                      selectedValue === item.value && {
+                        color: theme.primary,
+                        fontWeight: "bold",
+                      },
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {selectedValue === item.value && (
+                    <Check size={20} color={theme.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View className="p-4 items-center">
+                  <Text style={{ color: theme.placeholder }}>
+                    No items available
+                  </Text>
+                </View>
+              }
             />
           </View>
-        )}
-      </View>
-      <Picker
-        selectedValue={selectedValue}
-        onValueChange={(itemValue) => {
-          if (!disabled) {
-            onValueChange(itemValue);
-            setIsFocused(false);
-          }
-        }}
-        onFocus={() => !disabled && setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        style={styles.invisiblePicker}
-        enabled={!disabled}
-        mode="dropdown"
-      >
-        <Picker.Item label={placeholder} value={null} enabled={false} />
-        {items.map((item, index) => (
-          <Picker.Item
-            key={index}
-            label={truncate(item.label, 35)}
-            value={item.value}
-          />
-        ))}
-      </Picker>
-    </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 };
 
 export default function EditInventory() {
   const params = useLocalSearchParams();
   const batchIdParam = params.batchId;
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f9fafb", // Gray-50
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    border: isDark ? "#333333" : "#e5e7eb", // Gray-200
+    subtleBorder: isDark ? "#2C2C2C" : "#f3f4f6", // Gray-100
+    inputBg: isDark ? "#2C2C2C" : "#f3f4f6", // Gray-100
+    inputText: isDark ? "#FFFFFF" : "#374151", // Gray-700
+    placeholder: isDark ? "#888888" : "#9ca3af",
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb",
+    highlightBg: isDark ? "#1e3a8a" : "#eff6ff", // Blue-900 : Blue-50
+    headerBg: isDark ? "#0f0f0f" : "#1f2937", // Gray-800
+    primary: "#2563eb",
+    danger: "#ef4444",
+    // Specific highlights for this screen
+    highlightInputBg: isDark ? "#422006" : "#fef9c3", // Yellow-900/20 : Yellow-100
+    highlightInputBorder: isDark ? "#a16207" : "#fde047", // Yellow-700 : Yellow-300
+    highlightText: isDark ? "#60a5fa" : "#1e40af", // Blue-400 : Blue-800
+  };
 
   // --- STATE ---
   const [isPageLoading, setIsPageLoading] = useState(true);
@@ -393,8 +467,6 @@ export default function EditInventory() {
 
     try {
       // 1. Check Constraint: Are there linked transaction items?
-      // Even in a soft delete, we usually want to ensure 'active' weight allocations
-      // are cleared first so they don't sit in limbo.
       const dependencies = await db
         .select()
         .from(inventoryTransactionItems)
@@ -418,41 +490,34 @@ export default function EditInventory() {
             text: "Delete",
             style: "destructive",
             onPress: async () => {
-              // --- FIX: Use Local System Time ---
               const nowObj = new Date();
               const year = nowObj.getFullYear();
               const month = String(nowObj.getMonth() + 1).padStart(2, "0");
               const day = String(nowObj.getDate()).padStart(2, "0");
               const now = `${year}-${month}-${day}`;
-              // ----------------------------------
-
               const currentWeight = parseFloat(inventoryRecord.netWeight || 0);
 
               try {
                 await db.transaction(async (tx) => {
-                  // A. Soft Delete: Update Status to 'Deleted' and set weight to 0
                   await tx
                     .update(inventory)
                     .set({
-                      status: "Deleted", // Mark as deleted
-                      netWeight: 0, // Ensure no weight is counted in stock
-                      notes: (inventoryRecord.notes || "") + " [DELETED]", // Optional flag in notes
+                      status: "Deleted",
+                      netWeight: 0,
+                      notes: (inventoryRecord.notes || "") + " [DELETED]",
                     })
                     .where(eq(inventory.id, inventoryRecord.id));
 
-                  // B. Add "Deleted" Action to Audit Trail
-                  // Note: We DO NOT delete records from auditTrails table.
                   await tx.insert(auditTrails).values({
                     inventoryId: inventoryRecord.id,
-                    action: "Deleted", // New action type
+                    action: "Deleted",
                     notes: "Batch soft deleted by user. History preserved.",
-                    date: now, // Uses local date
+                    date: now,
                     previousWeight: currentWeight,
                     newWeight: 0,
                   });
                 });
 
-                // Redirect back to inventory list
                 router.replace("/inventory");
               } catch (error) {
                 Alert.alert(
@@ -484,72 +549,136 @@ export default function EditInventory() {
 
   if (isPageLoading)
     return (
-      <View className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color="#2563EB" />
+      <View
+        className="flex-1 justify-center items-center"
+        style={{ backgroundColor: theme.background }}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
 
   return (
-    <View className="flex-1 px-4 py-4 justify-start gap-4 bg-gray-50">
+    <View
+      className="flex-1 px-4 py-4 justify-start gap-4"
+      style={{ backgroundColor: theme.background }}
+    >
       {/* SECTION 1: HEADER */}
-      <View className="bg-white rounded-md p-4 shadow-sm border border-gray-200">
+      <View
+        className="rounded-md p-4 shadow-sm border"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
         <View className="flex-row justify-between items-center mb-3">
-          <Text className="text-lg font-bold text-gray-800">
+          <Text
+            className="text-lg font-bold"
+            style={{ color: theme.textPrimary }}
+          >
             Inventory Batch Details
           </Text>
         </View>
 
         <View className="flex-row gap-4 mb-4">
           <View className="flex-1">
-            <Text className="text-gray-700 font-bold mb-1 text-xs">
+            <Text
+              className="font-bold mb-1 text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Batch ID
             </Text>
             <TextInput
-              className="bg-gray-100 rounded-md px-3 h-12 border border-gray-200 text-sm text-gray-500"
+              className="rounded-md px-3 h-12 border text-sm"
+              style={{
+                backgroundColor: theme.inputBg,
+                borderColor: theme.border,
+                color: theme.textSecondary,
+              }}
               value={inventoryRecord?.batchId}
               editable={false}
             />
           </View>
           <View className="flex-1">
-            <Text className="text-gray-700 font-bold mb-1 text-xs">
+            <Text
+              className="font-bold mb-1 text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Material
             </Text>
-            <View className="h-12 bg-gray-100 rounded-md border border-gray-200 justify-center px-3">
-              <Text className="text-gray-500 text-sm" numberOfLines={1}>
+            <View
+              className="h-12 rounded-md border justify-center px-3"
+              style={{
+                backgroundColor: theme.inputBg,
+                borderColor: theme.border,
+              }}
+            >
+              <Text
+                className="text-sm"
+                style={{ color: theme.textSecondary }}
+                numberOfLines={1}
+              >
                 {materialName}
               </Text>
             </View>
           </View>
 
           <View className="flex-1">
-            <Text className="text-gray-700 font-bold mb-1 text-xs">
+            <Text
+              className="font-bold mb-1 text-xs"
+              style={{ color: theme.textSecondary }}
+            >
               Net Weight
             </Text>
             <TextInput
-              className="bg-yellow-100 rounded-md px-3 h-12 border border-yellow-300 text-sm text-blue-800 font-extrabold"
+              className="rounded-md px-3 h-12 border text-sm font-extrabold"
+              style={{
+                backgroundColor: theme.highlightInputBg,
+                borderColor: theme.highlightInputBorder,
+                color: theme.highlightText,
+              }}
               value={`${netWeight} ${uom}`}
               editable={false}
             />
           </View>
         </View>
 
-        <View>
-          <Text className="text-gray-700 font-bold mb-1 text-xs">Notes</Text>
+        {/* <View>
+          <Text
+            className="font-bold mb-1 text-xs"
+            style={{ color: theme.textSecondary }}
+          >
+            Notes
+          </Text>
           <TextInput
-            className="bg-gray-50 rounded-md p-3 h-24 text-sm border border-gray-200"
+            className="rounded-md p-3 h-24 text-sm border"
+            style={{
+              backgroundColor: theme.inputBg,
+              borderColor: theme.border,
+              color: theme.inputText,
+            }}
             multiline={true}
             numberOfLines={4}
             textAlignVertical="top"
             value={notes}
             onChangeText={setNotes}
             placeholder="Optional remarks..."
+            placeholderTextColor={theme.placeholder}
           />
-        </View>
+        </View> */}
       </View>
 
       {/* SECTION 2: ITEMS */}
-      <View className="flex-1 bg-white rounded-md border border-gray-200 overflow-hidden">
-        <View className="flex-row bg-gray-800 p-3 items-center">
+      <View
+        className="flex-1 rounded-md border overflow-hidden"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
+        <View
+          className="flex-row p-3 items-center"
+          style={{ backgroundColor: theme.headerBg }}
+        >
           <Text className="flex-1 font-bold text-white text-center text-xs">
             Line ID
           </Text>
@@ -572,26 +701,42 @@ export default function EditInventory() {
         <ScrollView className="flex-1">
           {linkedItems.length === 0 ? (
             <View className="p-8 items-center">
-              <Text className="text-gray-400 italic">No items linked.</Text>
+              <Text className="italic" style={{ color: theme.placeholder }}>
+                No items linked.
+              </Text>
             </View>
           ) : (
             linkedItems.map((item, index) => (
               <View
                 key={item.linkId}
-                className={`flex-row items-center p-3 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
+                className="flex-row items-center p-3 border-b"
+                style={{
+                  backgroundColor:
+                    index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                  borderColor: theme.subtleBorder,
+                }}
               >
-                <Text className="flex-1 text-gray-800 text-center text-xs font-medium">
+                <Text
+                  className="flex-1 text-center text-xs font-medium"
+                  style={{ color: theme.textPrimary }}
+                >
                   {item.txItemId}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-xs">
+                <Text
+                  className="flex-1 text-center text-xs"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.date}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-xs">
+                <Text
+                  className="flex-1 text-center text-xs"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.totalOriginal} {uom}
                 </Text>
 
                 <Text
-                  className={`flex-[1.5] text-center text-xs font-bold ${item.remaining === 0 ? "text-red-400" : "text-blue-700"}`}
+                  className={`flex-[1.5] text-center text-xs font-bold ${item.remaining === 0 ? "text-red-400" : "text-blue-600 dark:text-blue-400"}`}
                 >
                   {(item.remaining || 0).toFixed(2)} / {item.allocated}
                 </Text>
@@ -600,7 +745,7 @@ export default function EditInventory() {
                   onPress={() => confirmDelete(item.linkId, item.allocated)}
                   className="w-8 items-center justify-center"
                 >
-                  <Trash2 size={16} color="#ef4444" />
+                  <Trash2 size={16} color={theme.danger} />
                 </TouchableOpacity>
               </View>
             ))
@@ -639,139 +784,153 @@ export default function EditInventory() {
         visible={isAddModalVisible}
         onRequestClose={() => setIsAddModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setIsAddModalVisible(false)}
+        >
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.modalContent}
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
           >
-            <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
-              <Text className="text-lg font-bold text-gray-800">
-                Add Transaction Item
-              </Text>
-              <TouchableOpacity onPress={() => setIsAddModalVisible(false)}>
-                <X size={24} color="#9ca3af" />
-              </TouchableOpacity>
-            </View>
-            <Text className="text-gray-500 mb-4 text-xs">
-              Select source of type{" "}
-              <Text className="font-bold text-black">{materialName}</Text>.
-            </Text>
-
-            <View className="mb-4">
-              <Text className="text-gray-700 font-bold mb-1">Source Item</Text>
-              <View className="h-12 justify-center">
-                {isSourcesLoading ? (
-                  <View className="flex-row items-center justify-center bg-gray-100 h-full rounded-md border border-gray-200">
-                    <ActivityIndicator size="small" color="#2563EB" />
-                    <Text className="ml-2 text-gray-500">
-                      Finding available items...
-                    </Text>
-                  </View>
-                ) : (
-                  <CustomPicker
-                    selectedValue={selectedSourceId}
-                    onValueChange={handleSourceChange}
-                    placeholder={
-                      availableSourceItems.length > 0
-                        ? "Select..."
-                        : "No items available"
-                    }
-                    items={availableSourceItems}
-                    disabled={availableSourceItems.length === 0}
-                  />
-                )}
+            <Pressable onPress={() => {}}>
+              <View
+                className="flex-row justify-between items-center mb-4 border-b pb-2"
+                style={{ borderBottomColor: theme.border }}
+              >
+                <Text
+                  className="text-lg font-bold"
+                  style={{ color: theme.textPrimary }}
+                >
+                  Add Transaction Item
+                </Text>
+                <TouchableOpacity onPress={() => setIsAddModalVisible(false)}>
+                  <X size={24} color={theme.textSecondary} />
+                </TouchableOpacity>
               </View>
-            </View>
+              <Text
+                className="mb-4 text-xs"
+                style={{ color: theme.textSecondary }}
+              >
+                Select source of type{" "}
+                <Text
+                  className="font-bold"
+                  style={{ color: theme.textPrimary }}
+                >
+                  {materialName}
+                </Text>
+                .
+              </Text>
 
-            <View className="mb-6">
-              <Text className="text-gray-700 font-bold mb-1">
-                Allocate Weight ({uom})
-              </Text>
-              <Text className="text-xs text-gray-400 mb-1">
-                Max: {maxAllocatable.toFixed(2)} {uom}
-              </Text>
-              <TextInput
-                className="bg-gray-100 rounded-md p-3 text-lg border border-gray-300 text-center font-bold text-blue-600"
-                keyboardType="numeric"
-                value={weightToAllocate}
-                onChangeText={setWeightToAllocate}
-                placeholder="0.00"
-              />
-            </View>
-            <View className="flex-row gap-3">
-              <TouchableOpacity
-                onPress={() => setIsAddModalVisible(false)}
-                className="flex-1 bg-gray-200 p-3 rounded-md items-center"
-              >
-                <Text className="font-bold text-gray-700">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleAddLineItem}
-                className="flex-1 bg-blue-600 p-3 rounded-md items-center"
-              >
-                <Text className="font-bold text-white">Add</Text>
-              </TouchableOpacity>
-            </View>
+              <View className="mb-4">
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textPrimary }}
+                >
+                  Source Item
+                </Text>
+                <View className="h-12 justify-center">
+                  {isSourcesLoading ? (
+                    <View
+                      className="flex-row items-center justify-center h-full rounded-md border"
+                      style={{
+                        backgroundColor: theme.inputBg,
+                        borderColor: theme.border,
+                      }}
+                    >
+                      <ActivityIndicator size="small" color={theme.primary} />
+                      <Text
+                        className="ml-2"
+                        style={{ color: theme.textSecondary }}
+                      >
+                        Finding items...
+                      </Text>
+                    </View>
+                  ) : (
+                    <CustomPicker
+                      selectedValue={selectedSourceId}
+                      onValueChange={handleSourceChange}
+                      placeholder={
+                        availableSourceItems.length > 0
+                          ? "Select Source Item"
+                          : "No items available"
+                      }
+                      items={availableSourceItems}
+                      disabled={availableSourceItems.length === 0}
+                      theme={theme}
+                    />
+                  )}
+                </View>
+              </View>
+
+              <View className="mb-6">
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textPrimary }}
+                >
+                  Allocate Weight ({uom})
+                </Text>
+                <Text
+                  className="text-xs mb-1"
+                  style={{ color: theme.placeholder }}
+                >
+                  Max: {maxAllocatable.toFixed(2)} {uom}
+                </Text>
+                <TextInput
+                  className="rounded-md p-3 text-lg border text-center font-bold"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.primary,
+                  }}
+                  keyboardType="numeric"
+                  value={weightToAllocate}
+                  onChangeText={setWeightToAllocate}
+                  placeholder="0.00"
+                  placeholderTextColor={theme.placeholder}
+                />
+              </View>
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={() => setIsAddModalVisible(false)}
+                  className="flex-1 p-3 rounded-md items-center"
+                  style={{ backgroundColor: theme.inputBg }}
+                >
+                  <Text
+                    className="font-bold"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleAddLineItem}
+                  className="flex-1 bg-blue-600 p-3 rounded-md items-center"
+                >
+                  <Text className="font-bold text-white">Add</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
           </KeyboardAvoidingView>
-        </View>
+        </Pressable>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  pickerContainer: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 6,
-    justifyContent: "center",
-    position: "relative",
-    overflow: "hidden",
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  pickerFocused: {
-    borderColor: "#F2C94C",
-    backgroundColor: "white",
-    borderWidth: 2,
-  },
-  visualContainer: {
+  pickerTrigger: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 6,
     paddingHorizontal: 12,
     height: "100%",
     width: "100%",
   },
-  pickerText: { fontSize: 14, color: "black", flex: 1, marginRight: 10 },
-  placeholderText: { color: "#9ca3af" },
-  arrowContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    width: 20,
-    height: 20,
-  },
-  roundedArrow: {
-    width: 10,
-    height: 10,
-    borderBottomWidth: 2,
-    borderRightWidth: 2,
-    borderColor: "black",
-    transform: [{ rotate: "45deg" }],
-    marginTop: -4,
-    borderRadius: 2,
-  },
-  arrowOpen: { transform: [{ rotate: "225deg" }], marginTop: 4 },
-  invisiblePicker: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    width: "100%",
-    height: "100%",
+  pickerTriggerText: {
+    fontSize: 16,
+    flex: 1,
   },
   modalOverlay: {
     flex: 1,
@@ -781,7 +940,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: "white",
     width: "100%",
     maxWidth: 400,
     borderRadius: 12,
@@ -791,5 +949,40 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  // Custom Picker Styles
+  pickerOptionsContainer: {
+    width: "80%", // Wider on Edit Screen for transaction details
+    maxHeight: "60%",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 10,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    paddingBottom: 8,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  pickerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+  },
+  pickerOptionText: {
+    fontSize: 14,
   },
 });

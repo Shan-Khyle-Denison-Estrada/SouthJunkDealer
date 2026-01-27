@@ -1,7 +1,7 @@
-import * as ImagePicker from "expo-image-picker"; // Added
+import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Camera, Check, Edit, Printer } from "lucide-react-native"; // Added Camera
+import { Camera, Check, Edit, Printer } from "lucide-react-native";
 import React, { useCallback, useRef, useState } from "react";
 import {
   Alert,
@@ -10,17 +10,32 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native"; // Added TouchableOpacity
+  useColorScheme,
+} from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
-import { inventory, materials } from "../db/schema";
 import { db } from "../db/client";
+import { inventory, materials } from "../db/schema";
 
 export default function InventoryDetailed() {
   const params = useLocalSearchParams();
   const batchId = params.batchId;
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6", // Gray-100
+    card: isDark ? "#1E1E1E" : "#ffffff", // White
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#6b7280", // Gray-500
+    border: isDark ? "#333333" : "#e5e7eb", // Gray-200
+    placeholder: isDark ? "#666666" : "#9ca3af", // Gray-400
+    buttonDark: isDark ? "#374151" : "#1f2937", // Gray-700 : Gray-800
+    blueText: isDark ? "#60a5fa" : "#2563eb", // Blue-400 : Blue-600
+  };
 
   const [batchData, setBatchData] = useState(null);
   const [qrContainerSize, setQrContainerSize] = useState(0);
@@ -61,9 +76,8 @@ export default function InventoryDetailed() {
     }, [batchId]),
   );
 
-  // --- IMAGE UPLOAD HANDLER (NEW) ---
+  // --- IMAGE UPLOAD HANDLER ---
   const handleUpdatePhoto = async () => {
-    // 1. Request Permission
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
 
     if (permissionResult.granted === false) {
@@ -74,7 +88,6 @@ export default function InventoryDetailed() {
       return;
     }
 
-    // 2. Launch Camera
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -82,7 +95,6 @@ export default function InventoryDetailed() {
       quality: 0.5,
     });
 
-    // 3. Save to Database if successful
     if (!result.canceled) {
       try {
         const newUri = result.assets[0].uri;
@@ -92,7 +104,6 @@ export default function InventoryDetailed() {
           .set({ imageUri: newUri })
           .where(eq(inventory.batchId, batchId));
 
-        // Refresh the view
         loadBatchDetails();
         Alert.alert("Success", "Batch photo updated successfully.");
       } catch (error) {
@@ -107,9 +118,8 @@ export default function InventoryDetailed() {
     if (!batchData || !qrRef.current) return;
 
     try {
-      // 1. Get Base64 data from the QR Code component
       qrRef.current.toDataURL(async (base64Data) => {
-        // 2. Define the HTML for the Label
+        // Keep CSS hardcoded to black/white for physical paper printing
         const htmlContent = `
                 <html>
                   <head>
@@ -119,7 +129,6 @@ export default function InventoryDetailed() {
                         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
                         padding: 0; 
                         margin: 0; 
-                        /* Center content vertically and horizontally on the page */
                         display: flex;
                         justify-content: center;
                         align-items: center;
@@ -134,7 +143,6 @@ export default function InventoryDetailed() {
                       }
                       .header { font-size: 24px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
                       .batch-id { font-size: 42px; font-weight: 900; margin: 10px 0; color: #000; }
-                      /* Added 'Material:' label styling */
                       .material { font-size: 28px; color: #2563eb; font-weight: bold; margin-bottom: 20px; }
                       .material-label { color: #000; font-size: 24px; font-weight: normal; margin-right: 5px; }
                       
@@ -166,7 +174,6 @@ export default function InventoryDetailed() {
                 </html>
                 `;
 
-        // 3. Send to Printer
         await Print.printAsync({
           html: htmlContent,
         });
@@ -185,58 +192,89 @@ export default function InventoryDetailed() {
   };
 
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
+    const s = status?.toLowerCase();
+    switch (s) {
       case "in stock":
-        return "text-green-600";
+        return isDark ? "#4ade80" : "#16a34a"; // green-400 : green-600
       case "processing":
-        return "text-blue-600";
+        return isDark ? "#60a5fa" : "#2563eb"; // blue-400 : blue-600
       case "shipped":
-        return "text-gray-500";
+        return isDark ? "#9ca3af" : "#6b7280"; // gray-400 : gray-500
       case "sold":
-        return "text-red-500";
       case "sold out":
-        return "text-red-500";
+        return isDark ? "#f87171" : "#ef4444"; // red-400 : red-500
       default:
-        return "text-gray-800";
+        return theme.textPrimary;
     }
   };
 
-  if (!batchData) return <View className="flex-1 bg-gray-100" />;
+  if (!batchData)
+    return (
+      <View className="flex-1" style={{ backgroundColor: theme.background }} />
+    );
 
   return (
-    <View className="flex-1 bg-gray-100 p-4 gap-4">
+    <View
+      className="flex-1 p-4 gap-4"
+      style={{ backgroundColor: theme.background }}
+    >
       {/* 1. TOP HEADER SECTION */}
-      <View className="flex-row gap-4 h-24 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+      <View
+        className="flex-row gap-4 h-24 p-4 rounded-lg border shadow-sm"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        }}
+      >
         <View className="flex-1 justify-center">
-          <Text className="text-gray-500 text-xs font-bold uppercase">
+          <Text
+            className="text-xs font-bold uppercase"
+            style={{ color: theme.textSecondary }}
+          >
             Batch ID
           </Text>
-          <Text className="text-xl font-bold text-gray-800">
+          <Text
+            className="text-xl font-bold"
+            style={{ color: theme.textPrimary }}
+          >
             {batchData.batchId}
           </Text>
         </View>
         <View className="flex-1 justify-center">
-          <Text className="text-gray-500 text-xs font-bold uppercase">
+          <Text
+            className="text-xs font-bold uppercase"
+            style={{ color: theme.textSecondary }}
+          >
             Material
           </Text>
-          <Text className="text-lg font-bold text-blue-600">
+          <Text className="text-lg font-bold" style={{ color: theme.blueText }}>
             {batchData.materialName}
           </Text>
         </View>
         <View className="flex-1 justify-center">
-          <Text className="text-gray-500 text-xs font-bold uppercase">
+          <Text
+            className="text-xs font-bold uppercase"
+            style={{ color: theme.textSecondary }}
+          >
             Weight
           </Text>
-          <Text className="text-lg font-bold text-gray-800">
+          <Text
+            className="text-lg font-bold"
+            style={{ color: theme.textPrimary }}
+          >
             {(batchData.netWeight || 0).toFixed(2)} {batchData.uom}
           </Text>
         </View>
         <View className="flex-1 justify-center items-end">
-          <Text className="text-gray-500 text-xs font-bold uppercase">
+          <Text
+            className="text-xs font-bold uppercase"
+            style={{ color: theme.textSecondary }}
+          >
             Status
           </Text>
           <Text
-            className={`text-lg font-bold ${getStatusColor(batchData.status)}`}
+            className="text-lg font-bold"
+            style={{ color: getStatusColor(batchData.status) }}
           >
             {batchData.status}
           </Text>
@@ -248,7 +286,11 @@ export default function InventoryDetailed() {
         {/* UPDATED: Image Container is now Touchable for updates */}
         <TouchableOpacity
           onPress={handleUpdatePhoto}
-          className="flex-[3] bg-white rounded-lg border border-gray-200 p-2 items-center justify-center overflow-hidden relative"
+          className="flex-[3] rounded-lg border p-2 items-center justify-center overflow-hidden relative"
+          style={{
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }}
         >
           {batchData.imageUri ? (
             <>
@@ -269,8 +311,11 @@ export default function InventoryDetailed() {
             </>
           ) : (
             <View className="items-center justify-center gap-2">
-              <Camera size={40} color="#9ca3af" />
-              <Text className="text-gray-400 font-semibold">
+              <Camera size={40} color={theme.placeholder} />
+              <Text
+                className="font-semibold"
+                style={{ color: theme.placeholder }}
+              >
                 Tap to Add Photo
               </Text>
             </View>
@@ -278,14 +323,26 @@ export default function InventoryDetailed() {
         </TouchableOpacity>
 
         <View
-          className="flex-1 bg-white rounded-lg border border-gray-200 items-center justify-center p-2"
+          className="flex-1 rounded-lg border items-center justify-center p-2"
+          style={{
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          }}
           onLayout={(event) => {
             const { width, height } = event.nativeEvent.layout;
             setQrContainerSize(Math.min(width, height) - 20);
           }}
         >
           {batchData.qrContent ? (
-            <View style={{ alignItems: "center", justifyContent: "center" }}>
+            <View
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "white", // QR Codes need white background for contrast
+                padding: 4,
+                borderRadius: 4,
+              }}
+            >
               {qrContainerSize > 0 && (
                 <QRCode
                   value={batchData.qrContent}
@@ -295,7 +352,9 @@ export default function InventoryDetailed() {
               )}
             </View>
           ) : (
-            <Text className="text-gray-400 text-center">No QR</Text>
+            <Text className="text-center" style={{ color: theme.placeholder }}>
+              No QR
+            </Text>
           )}
         </View>
       </View>
@@ -304,7 +363,8 @@ export default function InventoryDetailed() {
       <View className="h-20 flex-row gap-4 mt-2">
         <Pressable
           onPress={handlePrint}
-          className="flex-1 bg-gray-800 rounded-lg flex-row items-center justify-center gap-2 active:bg-gray-900"
+          className="flex-1 rounded-lg flex-row items-center justify-center gap-2 active:opacity-80"
+          style={{ backgroundColor: theme.buttonDark }}
         >
           <Printer size={24} color="white" />
           <Text className="text-white font-bold text-xl">Print QR</Text>

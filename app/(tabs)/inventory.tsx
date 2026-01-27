@@ -4,8 +4,8 @@ import {
   ArrowDown,
   ArrowUp,
   Camera,
-  Check, // Added
-  ChevronDown, // Added
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -25,21 +25,28 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
 
 // --- DATABASE IMPORTS ---
 import { and, desc, eq, sql } from "drizzle-orm";
+import { db } from "../../db/client";
 import {
   inventory,
   inventoryTransactionItems,
   materials,
 } from "../../db/schema";
-import { db } from "../../db/client";
 
 const ITEMS_PER_PAGE = 9;
 
-// --- CUSTOM PICKER COMPONENT (Ported from Materials Page) ---
-const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
+// --- CUSTOM PICKER COMPONENT ---
+const CustomPicker = ({
+  selectedValue,
+  onValueChange,
+  placeholder,
+  items,
+  theme,
+}) => {
   const [modalVisible, setModalVisible] = useState(false);
 
   const selectedItem = items.find((i) => i.value === selectedValue);
@@ -47,18 +54,24 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
 
   return (
     <>
-      {/* 1. The Trigger Field - Fully Clickable */}
+      {/* 1. The Trigger Field */}
       <Pressable
         onPress={() => setModalVisible(true)}
-        style={styles.pickerTrigger}
+        style={[
+          styles.pickerTrigger,
+          { backgroundColor: theme.inputBg, borderColor: theme.border },
+        ]}
       >
         <Text
-          style={[styles.pickerText, !selectedValue && styles.placeholderText]}
+          style={[
+            styles.pickerText,
+            { color: selectedValue ? theme.textPrimary : theme.placeholder },
+          ]}
           numberOfLines={1}
         >
           {displayLabel}
         </Text>
-        <ChevronDown size={20} color="gray" />
+        <ChevronDown size={20} color={theme.textSecondary} />
       </Pressable>
 
       {/* 2. The Options Modal */}
@@ -72,21 +85,33 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-          <View style={styles.pickerOptionsContainer}>
-            <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>{placeholder}</Text>
+          <View
+            style={[
+              styles.pickerOptionsContainer,
+              { backgroundColor: theme.card },
+            ]}
+          >
+            <View
+              style={[styles.pickerHeader, { borderBottomColor: theme.border }]}
+            >
+              <Text style={[styles.pickerTitle, { color: theme.textPrimary }]}>
+                {placeholder}
+              </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="gray" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
             <FlatList
               data={items}
-              keyExtractor={(item) => item.value?.toString()} // Ensure key is string
+              keyExtractor={(item) => item.value?.toString()}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
                     styles.pickerOption,
-                    selectedValue === item.value && styles.pickerOptionSelected,
+                    { borderBottomColor: theme.subtleBorder },
+                    selectedValue === item.value && {
+                      backgroundColor: theme.highlightBg,
+                    },
                   ]}
                   onPress={() => {
                     onValueChange(item.value);
@@ -96,14 +121,17 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
                   <Text
                     style={[
                       styles.pickerOptionText,
-                      selectedValue === item.value &&
-                        styles.pickerOptionTextSelected,
+                      { color: theme.textSecondary },
+                      selectedValue === item.value && {
+                        color: theme.primary,
+                        fontWeight: "bold",
+                      },
                     ]}
                   >
                     {item.label}
                   </Text>
                   {selectedValue === item.value && (
-                    <Check size={20} color="#2563eb" />
+                    <Check size={20} color={theme.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -116,6 +144,27 @@ const CustomPicker = ({ selectedValue, onValueChange, placeholder, items }) => {
 };
 
 export default function InventoryIndex() {
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#f3f4f6",
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    border: isDark ? "#333333" : "#e5e7eb",
+    subtleBorder: isDark ? "#2C2C2C" : "#f9fafb",
+    inputBg: isDark ? "#2C2C2C" : "#ffffff",
+    inputText: isDark ? "#FFFFFF" : "#000000",
+    placeholder: isDark ? "#888888" : "#9ca3af",
+    rowEven: isDark ? "#1E1E1E" : "#ffffff",
+    rowOdd: isDark ? "#252525" : "#f9fafb",
+    highlightBg: isDark ? "#1e3a8a" : "#eff6ff", // Blue-900 : Blue-50
+    headerBg: isDark ? "#0f0f0f" : "#1f2937",
+    primary: "#2563eb",
+  };
+
   // --- STATE ---
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -381,24 +430,28 @@ export default function InventoryIndex() {
   };
 
   const getStatusColor = (status) => {
+    // Keep status colors distinct but readable in dark mode
     switch (status?.toLowerCase()) {
       case "in stock":
-        return "text-green-600";
+        return isDark ? "text-green-400" : "text-green-600";
       case "depleted":
-        return "text-red-600";
+        return isDark ? "text-red-400" : "text-red-600";
       case "deleted":
         return "text-gray-400";
       case "processing":
-        return "text-blue-600";
+        return isDark ? "text-blue-400" : "text-blue-600";
       case "shipped":
-        return "text-indigo-500";
+        return isDark ? "text-indigo-400" : "text-indigo-500";
       default:
-        return "text-gray-800";
+        return isDark ? "text-gray-300" : "text-gray-800";
     }
   };
 
   return (
-    <View className="flex-1 bg-gray-100 p-4 gap-4">
+    <View
+      className="flex-1 p-4 gap-4"
+      style={{ backgroundColor: theme.background }}
+    >
       {/* --- ADD MODAL --- */}
       <Modal
         animationType="fade"
@@ -410,19 +463,31 @@ export default function InventoryIndex() {
           style={styles.modalOverlay}
           onPress={() => setModalVisible(false)}
         >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
-            <View className="flex-row justify-between items-center mb-4 border-b border-gray-200 pb-2">
-              <Text className="text-xl font-bold text-gray-800">
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View
+              className="flex-row justify-between items-center mb-4 border-b pb-2"
+              style={{ borderBottomColor: theme.border }}
+            >
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 New Inventory Batch
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="#9ca3af" />
+                <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <View className="gap-4">
               <View>
-                <Text className="text-gray-700 font-bold mb-1">
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textSecondary }}
+                >
                   Material Category <Text className="text-red-500">*</Text>
                 </Text>
                 <View className="h-12">
@@ -431,20 +496,31 @@ export default function InventoryIndex() {
                     onValueChange={setSelectedMaterialId}
                     placeholder="Select Material..."
                     items={materialOptions}
+                    theme={theme}
                   />
                 </View>
               </View>
 
               <View>
-                <Text className="text-gray-700 font-bold mb-1">
+                <Text
+                  className="font-bold mb-1"
+                  style={{ color: theme.textSecondary }}
+                >
                   Batch Photo
                 </Text>
                 <TouchableOpacity
                   onPress={takePicture}
-                  className="h-12 bg-blue-100 border border-blue-300 rounded-md flex-row items-center justify-center gap-2"
+                  className="h-12 border rounded-md flex-row items-center justify-center gap-2"
+                  style={{
+                    backgroundColor: isDark ? "#1e3a8a" : "#eff6ff",
+                    borderColor: isDark ? "#2563eb" : "#93c5fd",
+                  }}
                 >
-                  <Camera size={20} color="#2563EB" />
-                  <Text className="text-blue-700 font-semibold">
+                  <Camera size={20} color={theme.primary} />
+                  <Text
+                    className="font-semibold"
+                    style={{ color: theme.primary }}
+                  >
                     {imageUri ? "Retake Photo" : "Take Photo"}
                   </Text>
                 </TouchableOpacity>
@@ -476,16 +552,22 @@ export default function InventoryIndex() {
 
       {/* --- TOP BAR --- */}
       <View className="h-14 flex-row items-center justify-between gap-2">
-        <View className="flex-1 h-full flex-row items-center bg-white rounded-md px-3 border border-gray-200">
-          <Search size={20} color="gray" />
+        <View
+          className="flex-1 h-full flex-row items-center rounded-md px-3 border"
+          style={{
+            backgroundColor: theme.inputBg,
+            borderColor: theme.border,
+          }}
+        >
+          <Search size={20} color={theme.placeholder} />
           <TextInput
             placeholder="Search Batch..."
-            className="flex-1 ml-2 text-lg text-gray-700 h-full"
-            style={{ textAlignVertical: "center" }}
+            placeholderTextColor={theme.placeholder}
+            className="flex-1 ml-2 text-lg h-full"
+            style={{ textAlignVertical: "center", color: theme.inputText }} // FIX: Explicit Color
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {/* Added Clear Button */}
           {searchQuery.length > 0 && (
             <TouchableOpacity
               onPress={() => {
@@ -493,7 +575,7 @@ export default function InventoryIndex() {
                 setCurrentPage(1);
               }}
             >
-              <XCircle size={20} color="gray" />
+              <XCircle size={20} color={theme.placeholder} />
             </TouchableOpacity>
           )}
         </View>
@@ -501,14 +583,26 @@ export default function InventoryIndex() {
         {/* Filter Button */}
         <Pressable
           onPress={() => setFilterModalVisible(true)}
-          className={`h-full aspect-square items-center justify-center rounded-md border ${selectedStatuses.length > 0 || selectedMaterials.length > 0 ? "bg-blue-100 border-blue-500" : "bg-white border-gray-200"}`}
+          className="h-full aspect-square items-center justify-center rounded-md border"
+          style={{
+            backgroundColor:
+              selectedStatuses.length > 0 || selectedMaterials.length > 0
+                ? isDark
+                  ? "#1e3a8a"
+                  : "#eff6ff"
+                : theme.card,
+            borderColor:
+              selectedStatuses.length > 0 || selectedMaterials.length > 0
+                ? theme.primary
+                : theme.border,
+          }}
         >
           <Filter
             size={24}
             color={
               selectedStatuses.length > 0 || selectedMaterials.length > 0
-                ? "#2563eb"
-                : "gray"
+                ? theme.primary
+                : theme.textSecondary
             }
           />
         </Pressable>
@@ -519,7 +613,8 @@ export default function InventoryIndex() {
               setModalVisible(true);
               setImageUri(null); // Reset photo
             }}
-            className="px-4 h-full flex-row items-center justify-center bg-primary rounded-md active:bg-blue-700"
+            className="px-4 h-full flex-row items-center justify-center rounded-md active:opacity-80"
+            style={{ backgroundColor: "#F2C94C" }}
           >
             <Plus size={24} color="white" />
             <Text className="text-white font-bold text-lg ml-2">New Batch</Text>
@@ -528,9 +623,15 @@ export default function InventoryIndex() {
       </View>
 
       {/* --- TABLE --- */}
-      <View className="flex-1 bg-white rounded-lg overflow-hidden border border-gray-200">
+      <View
+        className="flex-1 rounded-lg overflow-hidden border"
+        style={{ backgroundColor: theme.card, borderColor: theme.border }}
+      >
         {/* Header with Sort */}
-        <View className="flex-row bg-gray-800 p-4">
+        <View
+          className="flex-row p-4"
+          style={{ backgroundColor: theme.headerBg }}
+        >
           {[
             { label: "Batch ID", key: "batchId" },
             { label: "Material", key: "materialName" },
@@ -553,7 +654,9 @@ export default function InventoryIndex() {
           <View
             style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
           >
-            <Text style={{ color: "#888" }}>No inventory found.</Text>
+            <Text style={{ color: theme.textSecondary }}>
+              No inventory found.
+            </Text>
           </View>
         ) : (
           <FlatList
@@ -568,18 +671,35 @@ export default function InventoryIndex() {
                     params: { batchId: item.batchId },
                   })
                 }
-                className={`flex-row items-center p-5 border-b border-gray-100 ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} active:bg-blue-50`}
+                className="flex-row items-center p-5 border-b active:opacity-70"
+                style={{
+                  backgroundColor:
+                    index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                  borderColor: theme.border,
+                }}
               >
-                <Text className="flex-1 text-gray-800 text-center text-lg font-medium">
+                <Text
+                  className="flex-1 text-center text-lg font-medium"
+                  style={{ color: theme.textPrimary }}
+                >
                   {item.batchId}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+                <Text
+                  className="flex-1 text-center text-lg"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.materialName || "Unknown"}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+                <Text
+                  className="flex-1 text-center text-lg"
+                  style={{ color: theme.textSecondary }}
+                >
                   {(item.netWeight || 0).toFixed(2)} {item.uom || ""}
                 </Text>
-                <Text className="flex-1 text-gray-600 text-center text-lg">
+                <Text
+                  className="flex-1 text-center text-lg"
+                  style={{ color: theme.textSecondary }}
+                >
                   {item.date}
                 </Text>
                 <Text
@@ -598,12 +718,22 @@ export default function InventoryIndex() {
         <Pressable
           onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage === 1}
-          className={`h-full aspect-square items-center justify-center border rounded-md ${currentPage === 1 ? "bg-gray-100 border-gray-200" : "bg-white border-gray-300"}`}
+          className="h-full aspect-square items-center justify-center border rounded-md"
+          style={{
+            backgroundColor: currentPage === 1 ? theme.background : theme.card,
+            borderColor: theme.border,
+          }}
         >
-          <ChevronLeft size={24} color={currentPage === 1 ? "gray" : "black"} />
+          <ChevronLeft
+            size={24}
+            color={currentPage === 1 ? theme.textSecondary : theme.textPrimary}
+          />
         </Pressable>
 
-        <View className="h-full px-6 items-center justify-center bg-blue-600 rounded-md">
+        <View
+          className="h-full px-6 items-center justify-center rounded-md"
+          style={{ backgroundColor: "#F2C94C" }}
+        >
           <Text className="text-white text-xl font-bold">
             {currentPage} / {totalPages || 1}
           </Text>
@@ -612,11 +742,20 @@ export default function InventoryIndex() {
         <Pressable
           onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
           disabled={currentPage >= totalPages}
-          className={`h-full aspect-square items-center justify-center border rounded-md ${currentPage >= totalPages ? "bg-gray-100 border-gray-200" : "bg-white border-gray-300"}`}
+          className="h-full aspect-square items-center justify-center border rounded-md"
+          style={{
+            backgroundColor:
+              currentPage >= totalPages ? theme.background : theme.card,
+            borderColor: theme.border,
+          }}
         >
           <ChevronRight
             size={24}
-            color={currentPage >= totalPages ? "gray" : "black"}
+            color={
+              currentPage >= totalPages
+                ? theme.textSecondary
+                : theme.textPrimary
+            }
           />
         </Pressable>
       </View>
@@ -632,19 +771,30 @@ export default function InventoryIndex() {
           style={styles.modalOverlay}
           onPress={() => setFilterModalVisible(false)}
         >
-          <Pressable style={styles.modalContent} onPress={() => {}}>
-            <View className="flex-row justify-between items-center">
-              <Text className="text-xl font-bold text-gray-800">
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View className="flex-row justify-between items-center mb-4">
+              <Text
+                className="text-xl font-bold"
+                style={{ color: theme.textPrimary }}
+              >
                 Filter Inventory
               </Text>
               <Pressable onPress={() => setFilterModalVisible(false)}>
-                <X size={24} color="gray" />
+                <X size={24} color={theme.textSecondary} />
               </Pressable>
             </View>
 
             {/* Filter Section: Material */}
-            <View>
-              <Text className="text-gray-600 font-bold mb-2">Material</Text>
+            <View className="mb-4">
+              <Text
+                className="font-bold mb-2"
+                style={{ color: theme.textSecondary }}
+              >
+                Material
+              </Text>
               <View className="flex-row flex-wrap gap-2">
                 {uniqueMaterials.map((mat) => (
                   <TouchableOpacity
@@ -656,10 +806,25 @@ export default function InventoryIndex() {
                         mat,
                       )
                     }
-                    className={`px-4 py-2 rounded-full border ${selectedMaterials.includes(mat) ? "bg-blue-100 border-blue-500" : "bg-gray-50 border-gray-200"}`}
+                    className="px-4 py-2 rounded-full border"
+                    style={{
+                      backgroundColor: selectedMaterials.includes(mat)
+                        ? theme.highlightBg
+                        : theme.background,
+                      borderColor: selectedMaterials.includes(mat)
+                        ? theme.primary
+                        : theme.border,
+                    }}
                   >
                     <Text
-                      className={`${selectedMaterials.includes(mat) ? "text-blue-700 font-bold" : "text-gray-600"}`}
+                      style={{
+                        color: selectedMaterials.includes(mat)
+                          ? theme.primary
+                          : theme.textSecondary,
+                        fontWeight: selectedMaterials.includes(mat)
+                          ? "bold"
+                          : "normal",
+                      }}
                     >
                       {mat}
                     </Text>
@@ -670,7 +835,12 @@ export default function InventoryIndex() {
 
             {/* Filter Section: Status */}
             <View>
-              <Text className="text-gray-600 font-bold mb-2">Status</Text>
+              <Text
+                className="font-bold mb-2"
+                style={{ color: theme.textSecondary }}
+              >
+                Status
+              </Text>
               <View className="flex-row flex-wrap gap-2">
                 {uniqueStatuses.map((status) => (
                   <TouchableOpacity
@@ -682,10 +852,25 @@ export default function InventoryIndex() {
                         status,
                       )
                     }
-                    className={`px-4 py-2 rounded-full border ${selectedStatuses.includes(status) ? "bg-blue-100 border-blue-500" : "bg-gray-50 border-gray-200"}`}
+                    className="px-4 py-2 rounded-full border"
+                    style={{
+                      backgroundColor: selectedStatuses.includes(status)
+                        ? theme.highlightBg
+                        : theme.background,
+                      borderColor: selectedStatuses.includes(status)
+                        ? theme.primary
+                        : theme.border,
+                    }}
                   >
                     <Text
-                      className={`${selectedStatuses.includes(status) ? "text-blue-700 font-bold" : "text-gray-600"}`}
+                      style={{
+                        color: selectedStatuses.includes(status)
+                          ? theme.primary
+                          : theme.textSecondary,
+                        fontWeight: selectedStatuses.includes(status)
+                          ? "bold"
+                          : "normal",
+                      }}
                     >
                       {status}
                     </Text>
@@ -703,11 +888,17 @@ export default function InventoryIndex() {
                 }}
                 className="px-4 py-2"
               >
-                <Text className="text-gray-500 font-medium">Clear All</Text>
+                <Text
+                  className="font-medium"
+                  style={{ color: theme.textSecondary }}
+                >
+                  Clear All
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => setFilterModalVisible(false)}
-                className="px-6 py-2 bg-primary rounded-md"
+                className="px-6 py-2 rounded-md"
+                style={{ backgroundColor: theme.primary }}
               >
                 <Text className="text-white font-bold">Apply Filters</Text>
               </Pressable>
@@ -720,14 +911,12 @@ export default function InventoryIndex() {
 }
 
 const styles = StyleSheet.create({
-  // --- New Styles for Custom Picker (Matched to Materials page) ---
+  // --- Custom Picker Styles ---
   pickerTrigger: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#f3f4f6",
     borderWidth: 1,
-    borderColor: "#d1d5db",
     borderRadius: 6,
     paddingHorizontal: 12,
     height: "100%",
@@ -735,14 +924,9 @@ const styles = StyleSheet.create({
   },
   pickerText: {
     fontSize: 16,
-    color: "black",
     flex: 1,
   },
-  placeholderText: {
-    color: "#9ca3af",
-  },
   pickerOptionsContainer: {
-    backgroundColor: "white",
     width: "40%",
     maxHeight: "50%",
     borderRadius: 12,
@@ -759,13 +943,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
     paddingBottom: 8,
   },
   pickerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#374151",
   },
   pickerOption: {
     flexDirection: "row",
@@ -774,21 +956,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f9fafb",
-  },
-  pickerOptionSelected: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 6,
   },
   pickerOptionText: {
     fontSize: 16,
-    color: "#4b5563",
   },
-  pickerOptionTextSelected: {
-    color: "#2563eb",
-    fontWeight: "bold",
-  },
-  // --- Main Modal Styles ---
+  // --- Modal Styles ---
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -797,7 +969,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: "white",
     width: "50%",
     borderRadius: 12,
     padding: 24,

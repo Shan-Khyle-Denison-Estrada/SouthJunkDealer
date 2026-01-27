@@ -22,11 +22,37 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  useColorScheme,
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 
 export default function Profile() {
   const { user, updateUser, signOut } = useAuth();
+  const systemTheme = useColorScheme();
+  const isDark = systemTheme === "dark";
+
+  // --- THEME CONFIGURATION ---
+  const theme = {
+    background: isDark ? "#121212" : "#ffffff",
+    card: isDark ? "#1E1E1E" : "#ffffff",
+    textPrimary: isDark ? "#FFFFFF" : "#333333",
+    textSecondary: isDark ? "#A1A1AA" : "#666666",
+    label: isDark ? "#CCCCCC" : "#333333",
+    border: isDark ? "#333333" : "#e0e0e0",
+    subtleBorder: isDark ? "#2C2C2C" : "#eee",
+    inputBg: isDark ? "#2C2C2C" : "#f9f9f9",
+    inputText: isDark ? "#FFFFFF" : "#000000",
+    placeholder: isDark ? "#888888" : "#999999",
+    avatarPlaceholder: isDark ? "#2C2C2C" : "#f0f0f0",
+    // Modal Icon Backgrounds
+    successBg: isDark ? "#064e3b" : "#E7F9ED",
+    errorBg: isDark ? "#450a0a" : "#FEECEE",
+    infoBg: isDark ? "#172554" : "#E6F0FF",
+    confirmBg: isDark ? "#451a03" : "#FFF4E5",
+    // Colors
+    primary: "#F2C94C",
+    danger: "#FF6B6B",
+  };
 
   // --- FORM STATE ---
   const [firstName, setFirstName] = useState(user?.firstName || "");
@@ -86,13 +112,12 @@ export default function Profile() {
     }
 
     // 2. Validation with Rollback Logic
-    // Using .trim() ensures spaces aren't counted as valid input
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       showModal(
         "error",
         "Missing Fields",
         "First Name, Last Name, and Email are required.",
-        // ROLLBACK CALLBACK: Resets fields to original user values
+        // ROLLBACK CALLBACK
         () => {
           setFirstName(user?.firstName || "");
           setMiddleName(user?.middleName || "");
@@ -135,24 +160,21 @@ export default function Profile() {
   };
 
   const handleLogoutPress = () => {
-    // 1. Trigger Confirmation Modal
     showModal(
       "confirm",
       "Log Out",
       "Are you sure you want to sign out?",
-      performLogout, // Pass the actual logout function as callback
+      performLogout,
     );
   };
 
   const performLogout = () => {
-    // 2. Switch to Loading Modal immediately
     showModal(
       "loading",
       "Logging Out...",
       "Please wait while we sign you out.",
     );
 
-    // 3. Perform Sign Out with delay
     setTimeout(async () => {
       await signOut();
       setModalVisible(false);
@@ -171,38 +193,56 @@ export default function Profile() {
   };
 
   const Label = ({ text }: { text: string }) => (
-    <Text style={styles.label}>{text}</Text>
+    <Text style={[styles.label, { color: theme.label }]}>{text}</Text>
   );
 
   return (
     <>
       <ScrollView
-        style={{ flex: 1, backgroundColor: "#fff" }}
+        style={{ flex: 1, backgroundColor: theme.background }}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
         {/* HEADER: AVATAR */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
+          <TouchableOpacity
+            onPress={pickImage}
+            style={[
+              styles.avatarContainer,
+              {
+                backgroundColor: theme.avatarPlaceholder,
+                borderColor: theme.border,
+              },
+            ]}
+          >
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.avatar} />
             ) : (
-              <Camera size={40} color="#888" />
+              <Camera size={40} color={theme.textSecondary} />
             )}
             <View style={styles.editIcon}>
               <Pencil size={12} color="#fff" />
             </View>
           </TouchableOpacity>
-          <Text style={styles.userTitle}>
+          <Text style={[styles.userTitle, { color: theme.textPrimary }]}>
             {user?.firstName} {user?.lastName}
           </Text>
-          <Text style={styles.userRole}>Administrator</Text>
+          <Text style={[styles.userRole, { color: theme.textSecondary }]}>
+            Administrator
+          </Text>
         </View>
 
         <View style={styles.form}>
-          <View style={styles.sectionHeader}>
-            <UserIcon size={16} color="#F2C94C" />
-            <Text style={styles.sectionTitle}>Personal Details</Text>
+          <View
+            style={[
+              styles.sectionHeader,
+              { borderBottomColor: theme.subtleBorder },
+            ]}
+          >
+            <UserIcon size={16} color={theme.primary} />
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+              Personal Details
+            </Text>
           </View>
 
           <View style={styles.row}>
@@ -211,7 +251,15 @@ export default function Profile() {
               <TextInput
                 value={firstName}
                 onChangeText={setFirstName}
-                style={styles.input}
+                placeholderTextColor={theme.placeholder}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  },
+                ]}
               />
             </View>
             <View style={styles.col}>
@@ -219,7 +267,15 @@ export default function Profile() {
               <TextInput
                 value={middleName}
                 onChangeText={setMiddleName}
-                style={styles.input}
+                placeholderTextColor={theme.placeholder}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  },
+                ]}
               />
             </View>
             <View style={styles.col}>
@@ -227,26 +283,54 @@ export default function Profile() {
               <TextInput
                 value={lastName}
                 onChangeText={setLastName}
-                style={styles.input}
+                placeholderTextColor={theme.placeholder}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  },
+                ]}
               />
             </View>
           </View>
 
           <Label text="Email Address" />
-          <View style={styles.inputWithIcon}>
-            <Mail size={18} color="#888" style={{ marginRight: 10 }} />
+          <View
+            style={[
+              styles.inputWithIcon,
+              {
+                backgroundColor: theme.inputBg,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <Mail
+              size={18}
+              color={theme.placeholder}
+              style={{ marginRight: 10 }}
+            />
             <TextInput
               value={email}
               onChangeText={setEmail}
-              style={{ flex: 1 }}
+              style={{ flex: 1, color: theme.inputText }}
+              placeholderTextColor={theme.placeholder}
               keyboardType="email-address"
               autoCapitalize="none"
             />
           </View>
 
-          <View style={[styles.sectionHeader, { marginTop: 10 }]}>
-            <Lock size={16} color="#F2C94C" />
-            <Text style={styles.sectionTitle}>Security</Text>
+          <View
+            style={[
+              styles.sectionHeader,
+              { marginTop: 10, borderBottomColor: theme.subtleBorder },
+            ]}
+          >
+            <Lock size={16} color={theme.primary} />
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+              Security
+            </Text>
           </View>
 
           <View style={styles.row}>
@@ -255,9 +339,17 @@ export default function Profile() {
               <TextInput
                 value={password}
                 onChangeText={setPassword}
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  },
+                ]}
                 secureTextEntry
                 placeholder="Leave blank to keep"
+                placeholderTextColor={theme.placeholder}
               />
             </View>
             <View style={styles.col}>
@@ -265,20 +357,31 @@ export default function Profile() {
               <TextInput
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.border,
+                    color: theme.inputText,
+                  },
+                ]}
                 secureTextEntry
                 placeholder="Confirm change"
+                placeholderTextColor={theme.placeholder}
               />
             </View>
           </View>
 
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: theme.primary }]}
+              onPress={handleSave}
+            >
               <Text style={styles.buttonText}>Save Changes</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.logoutButton}
+              style={[styles.logoutButton, { backgroundColor: theme.danger }]}
               onPress={handleLogoutPress}
             >
               <LogOut size={20} color="#fff" style={{ marginRight: 8 }} />
@@ -297,17 +400,17 @@ export default function Profile() {
       >
         <TouchableWithoutFeedback
           onPress={() => {
-            // Only close on background click if NOT loading
             if (modalConfig.type !== "loading") {
               setModalVisible(false);
-              // ALSO EXECUTE CALLBACK HERE (To Fix Rollback Issue)
               if (modalConfig.onConfirm) modalConfig.onConfirm();
             }
           }}
         >
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
-              <View style={styles.modalContent}>
+              <View
+                style={[styles.modalContent, { backgroundColor: theme.card }]}
+              >
                 {/* ICON */}
                 <View
                   style={[
@@ -315,12 +418,12 @@ export default function Profile() {
                     {
                       backgroundColor:
                         modalConfig.type === "success"
-                          ? "#E7F9ED"
+                          ? theme.successBg
                           : modalConfig.type === "error"
-                            ? "#FEECEE"
+                            ? theme.errorBg
                             : modalConfig.type === "confirm"
-                              ? "#FFF4E5"
-                              : "#E6F0FF",
+                              ? theme.confirmBg
+                              : theme.infoBg,
                     },
                   ]}
                 >
@@ -339,25 +442,47 @@ export default function Profile() {
                   )}
                 </View>
 
-                <Text style={styles.modalTitle}>{modalConfig.title}</Text>
-                <Text style={styles.modalMessage}>{modalConfig.message}</Text>
+                <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
+                  {modalConfig.title}
+                </Text>
+                <Text
+                  style={[styles.modalMessage, { color: theme.textSecondary }]}
+                >
+                  {modalConfig.message}
+                </Text>
 
                 {/* BUTTONS LOGIC */}
                 {modalConfig.type === "confirm" ? (
                   <View style={styles.modalButtonRow}>
                     {/* Cancel Button */}
                     <TouchableOpacity
-                      style={[styles.modalButton, styles.cancelButton]}
+                      style={[
+                        styles.modalButton,
+                        styles.cancelButton,
+                        {
+                          backgroundColor: theme.background,
+                          borderColor: theme.border,
+                        },
+                      ]}
                       onPress={() => setModalVisible(false)}
                     >
-                      <Text style={[styles.modalButtonText, { color: "#666" }]}>
+                      <Text
+                        style={[
+                          styles.modalButtonText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
                         Cancel
                       </Text>
                     </TouchableOpacity>
 
                     {/* Confirm Button */}
                     <TouchableOpacity
-                      style={[styles.modalButton, styles.confirmButton]}
+                      style={[
+                        styles.modalButton,
+                        styles.confirmButton,
+                        { backgroundColor: theme.danger },
+                      ]}
                       onPress={modalConfig.onConfirm}
                     >
                       <Text style={styles.modalButtonText}>Yes, Log Out</Text>
@@ -380,7 +505,6 @@ export default function Profile() {
                       ]}
                       onPress={() => {
                         setModalVisible(false);
-                        // Execute callback (reset fields)
                         if (modalConfig.onConfirm) modalConfig.onConfirm();
                       }}
                     >
@@ -401,7 +525,6 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
-    backgroundColor: "#fff",
     justifyContent: "flex-start",
   },
 
@@ -411,12 +534,10 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#f0f0f0",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#ddd",
   },
   avatar: { width: "100%", height: "100%", borderRadius: 50 },
   editIcon: {
@@ -432,8 +553,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
-  userTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
-  userRole: { fontSize: 14, color: "#888" },
+  userTitle: { fontSize: 18, fontWeight: "bold" },
+  userRole: { fontSize: 14 },
 
   // Form Styles
   form: { flex: 1, gap: 15 },
@@ -443,13 +564,11 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 5,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
     paddingBottom: 5,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: "bold",
-    color: "#666",
     textTransform: "uppercase",
   },
   row: { flexDirection: "row", gap: 10 },
@@ -457,26 +576,21 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 5,
     marginLeft: 2,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
     padding: 12,
     borderRadius: 8,
-    backgroundColor: "#f9f9f9",
     fontSize: 14,
   },
   inputWithIcon: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#ccc",
     padding: 12,
     borderRadius: 8,
-    backgroundColor: "#f9f9f9",
   },
 
   // Action Buttons
@@ -488,7 +602,6 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     flex: 1,
-    backgroundColor: "#F2C94C",
     padding: 15,
     borderRadius: 8,
     alignItems: "center",
@@ -507,7 +620,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
-    backgroundColor: "#FF6B6B",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -525,7 +637,6 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "80%",
-    backgroundColor: "white",
     borderRadius: 20,
     padding: 25,
     alignItems: "center",
@@ -546,12 +657,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 10,
   },
   modalMessage: {
     fontSize: 14,
-    color: "#666",
     textAlign: "center",
     marginBottom: 20,
   },
@@ -569,9 +678,7 @@ const styles = StyleSheet.create({
   modalButtonRow: { flexDirection: "row", gap: 10, width: "100%" },
   cancelButton: {
     flex: 1,
-    backgroundColor: "#f0f0f0",
     borderWidth: 1,
-    borderColor: "#ddd",
   },
-  confirmButton: { flex: 1, backgroundColor: "#FF6B6B" },
+  confirmButton: { flex: 1 },
 });
