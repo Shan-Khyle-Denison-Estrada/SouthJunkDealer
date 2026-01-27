@@ -230,15 +230,15 @@ export default function EditInventory() {
       setMaterialName(mat.name);
       setUom(mat.uom);
 
-      // Fetch Linked Items
+      // Fetch Linked Items (LEDGER DATA)
       const links = await db
         .select({
           linkId: inventoryTransactionItems.id,
           txItemId: transactionItems.id,
-          txId: transactions.id,
+          txId: transactions.id, // Transaction ID
+          txType: transactions.type, // Transaction Type (Buying/Selling)
           date: transactions.date,
           allocated: inventoryTransactionItems.allocatedWeight,
-          totalOriginal: transactionItems.weight,
         })
         .from(inventoryTransactionItems)
         .leftJoin(
@@ -252,28 +252,7 @@ export default function EditInventory() {
         .where(eq(inventoryTransactionItems.inventoryId, inv.id))
         .orderBy(asc(transactions.date));
 
-      // --- FIFO CALCULATION ---
-      const totalOriginalAllocated = links.reduce(
-        (sum, item) => sum + (item.allocated || 0),
-        0,
-      );
-      const currentNetWeight = inv.netWeight || 0;
-
-      let lostWeight = Math.max(0, totalOriginalAllocated - currentNetWeight);
-
-      const linksWithRemaining = links.map((item) => {
-        let remaining = item.allocated || 0;
-
-        if (lostWeight > 0) {
-          const deduction = Math.min(remaining, lostWeight);
-          remaining -= deduction;
-          lostWeight -= deduction;
-        }
-
-        return { ...item, remaining };
-      });
-
-      setLinkedItems(linksWithRemaining);
+      setLinkedItems(links);
       setAreSourcesLoaded(false);
     } catch (error) {
       console.error(error);
@@ -295,6 +274,8 @@ export default function EditInventory() {
     setIsSourcesLoading(true);
 
     try {
+      // Note: We currently only fetch "Buying" items to ADD to the batch.
+      // If you wish to source from Adjustment-Gain as well, include it here.
       const recentItems = await db
         .select({
           itemId: transactionItems.id,
@@ -641,33 +622,9 @@ export default function EditInventory() {
             />
           </View>
         </View>
-
-        {/* <View>
-          <Text
-            className="font-bold mb-1 text-xs"
-            style={{ color: theme.textSecondary }}
-          >
-            Notes
-          </Text>
-          <TextInput
-            className="rounded-md p-3 h-24 text-sm border"
-            style={{
-              backgroundColor: theme.inputBg,
-              borderColor: theme.border,
-              color: theme.inputText,
-            }}
-            multiline={true}
-            numberOfLines={4}
-            textAlignVertical="top"
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Optional remarks..."
-            placeholderTextColor={theme.placeholder}
-          />
-        </View> */}
       </View>
 
-      {/* SECTION 2: ITEMS */}
+      {/* SECTION 2: ITEMS LEDGER */}
       <View
         className="flex-1 rounded-md border overflow-hidden"
         style={{
@@ -675,21 +632,25 @@ export default function EditInventory() {
           borderColor: theme.border,
         }}
       >
+        {/* TABLE HEADER */}
         <View
           className="flex-row p-3 items-center"
           style={{ backgroundColor: theme.headerBg }}
         >
-          <Text className="flex-1 font-bold text-white text-center text-xs">
-            Line ID
+          <Text className="flex-0.5 font-bold text-white text-center text-xs">
+            ID
           </Text>
           <Text className="flex-1 font-bold text-white text-center text-xs">
-            Tx Date
+            Type
+          </Text>
+          <Text className="flex-0.5 font-bold text-white text-center text-xs">
+            Line
           </Text>
           <Text className="flex-1 font-bold text-white text-center text-xs">
-            Original
+            Date
           </Text>
-          <Text className="flex-[1.5] font-bold text-white text-center text-xs">
-            Avail / Alloc
+          <Text className="flex-1 font-bold text-white text-center text-xs">
+            Weight
           </Text>
           <TouchableOpacity
             onPress={handleOpenAddModal}
@@ -698,6 +659,8 @@ export default function EditInventory() {
             <Plus size={16} color="white" />
           </TouchableOpacity>
         </View>
+
+        {/* TABLE BODY */}
         <ScrollView className="flex-1">
           {linkedItems.length === 0 ? (
             <View className="p-8 items-center">
@@ -706,49 +669,78 @@ export default function EditInventory() {
               </Text>
             </View>
           ) : (
-            linkedItems.map((item, index) => (
-              <View
-                key={item.linkId}
-                className="flex-row items-center p-3 border-b"
-                style={{
-                  backgroundColor:
-                    index % 2 === 0 ? theme.rowEven : theme.rowOdd,
-                  borderColor: theme.subtleBorder,
-                }}
-              >
-                <Text
-                  className="flex-1 text-center text-xs font-medium"
-                  style={{ color: theme.textPrimary }}
-                >
-                  {item.txItemId}
-                </Text>
-                <Text
-                  className="flex-1 text-center text-xs"
-                  style={{ color: theme.textSecondary }}
-                >
-                  {item.date}
-                </Text>
-                <Text
-                  className="flex-1 text-center text-xs"
-                  style={{ color: theme.textSecondary }}
-                >
-                  {item.totalOriginal} {uom}
-                </Text>
+            linkedItems.map((item, index) => {
+              // --- CHANGED LOGIC HERE ---
+              // Determine if this transaction ADDS (incoming) or REMOVES (outgoing) inventory
+              const isIncoming = ["Buying", "Adjustment-Gain"].includes(
+                item.txType || "",
+              );
 
-                <Text
-                  className={`flex-[1.5] text-center text-xs font-bold ${item.remaining === 0 ? "text-red-400" : "text-blue-600 dark:text-blue-400"}`}
-                >
-                  {(item.remaining || 0).toFixed(2)} / {item.allocated}
-                </Text>
+              const weightColor = isIncoming ? "#16a34a" : "#dc2626"; // Green (+) : Red (-)
+              const weightPrefix = isIncoming ? "+" : "-";
 
-                <TouchableOpacity
-                  onPress={() => confirmDelete(item.linkId, item.allocated)}
-                  className="w-8 items-center justify-center"
+              return (
+                <View
+                  key={item.linkId}
+                  className="flex-row items-center p-3 border-b"
+                  style={{
+                    backgroundColor:
+                      index % 2 === 0 ? theme.rowEven : theme.rowOdd,
+                    borderColor: theme.subtleBorder,
+                  }}
                 >
-                  <Trash2 size={16} color={theme.danger} />
-                </TouchableOpacity>
-              </View>
-            ))
+                  {/* Transaction ID */}
+                  <Text
+                    className="flex-0.5 text-center text-xs font-medium"
+                    style={{ color: theme.textPrimary }}
+                  >
+                    {item.txId}
+                  </Text>
+
+                  {/* Transaction Type */}
+                  <Text
+                    className="flex-1 text-center text-xs font-bold"
+                    style={{
+                      color: weightColor,
+                    }}
+                  >
+                    {item.txType}
+                  </Text>
+
+                  {/* Line ID (Tx Item ID) */}
+                  <Text
+                    className="flex-0.5 text-center text-xs"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    {item.txItemId}
+                  </Text>
+
+                  {/* Date */}
+                  <Text
+                    className="flex-1 text-center text-xs"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    {item.date}
+                  </Text>
+
+                  {/* Weight (Ledger Style) */}
+                  <Text
+                    className="flex-1 text-center text-xs font-bold"
+                    style={{ color: weightColor }}
+                  >
+                    {weightPrefix} {item.allocated}
+                  </Text>
+
+                  {/* Delete Button */}
+                  <TouchableOpacity
+                    onPress={() => confirmDelete(item.linkId, item.allocated)}
+                    className="w-8 items-center justify-center"
+                  >
+                    <Trash2 size={16} color={theme.danger} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })
           )}
         </ScrollView>
       </View>

@@ -390,8 +390,21 @@ export default function ScannedInventory() {
       Alert.alert("Error", "Please select a batch first.");
       return;
     }
+
+    // --- VALIDATION: Check for Evidence Image ---
+    if (evidenceImages.length === 0) {
+      Alert.alert(
+        "Validation Error",
+        "At least one evidence photo is required to submit the audit.",
+      );
+      return;
+    }
+
+    // --- UPDATED VALIDATION: Check for Adjusted or Damaged Weight ---
+    const isWeightAdjustmentNeeded =
+      status === "Adjusted" || status === "Damaged";
     if (
-      status === "Adjusted" &&
+      isWeightAdjustmentNeeded &&
       (!adjustedWeight || isNaN(parseFloat(adjustedWeight)))
     ) {
       Alert.alert("Error", "Please enter a valid new weight.");
@@ -409,8 +422,13 @@ export default function ScannedInventory() {
       const today = `${year}-${month}-${day}`;
 
       const currentWeight = parseFloat(scannedData.netWeight);
-      const newWeightVal =
-        status === "Adjusted" ? parseFloat(adjustedWeight) : null;
+
+      // --- UPDATED LOGIC: Trigger for both Adjusted and Damaged ---
+      const isWeightAdjustmentNeeded =
+        status === "Adjusted" || status === "Damaged";
+      const newWeightVal = isWeightAdjustmentNeeded
+        ? parseFloat(adjustedWeight)
+        : null;
 
       const evidenceJson =
         evidenceImages.length > 0 ? JSON.stringify(evidenceImages) : null;
@@ -422,11 +440,11 @@ export default function ScannedInventory() {
           notes: notes,
           date: today,
           evidenceImageUri: evidenceJson,
-          previousWeight: status === "Adjusted" ? currentWeight : null,
+          previousWeight: isWeightAdjustmentNeeded ? currentWeight : null,
           newWeight: newWeightVal,
         });
 
-        if (status === "Adjusted" && newWeightVal !== null) {
+        if (isWeightAdjustmentNeeded && newWeightVal !== null) {
           await tx
             .update(inventory)
             .set({ netWeight: newWeightVal })
@@ -436,6 +454,9 @@ export default function ScannedInventory() {
 
           if (weightDiff !== 0) {
             const isLoss = weightDiff > 0;
+            // Differentiate transaction type based on status if needed,
+            // or use generic Adjustment types.
+            // If Damaged, it's usually a loss, but logic remains strictly weight diff based here.
             const type = isLoss ? "Adjustment-Loss" : "Adjustment-Gain";
             const absWeight = Math.abs(weightDiff);
 
@@ -497,6 +518,8 @@ export default function ScannedInventory() {
     }
   };
 
+  const isWeightInputVisible = status === "Adjusted" || status === "Damaged";
+
   return (
     <View
       className="flex-1 p-4 gap-4"
@@ -519,7 +542,7 @@ export default function ScannedInventory() {
           className="font-bold mb-2 uppercase tracking-widest"
           style={{ color: theme.textSecondary }}
         >
-          Item Details
+          Item Details <Text className="text-red-500">*</Text>
         </Text>
         <View className="w-[80%] relative z-50">
           <View
@@ -626,7 +649,7 @@ export default function ScannedInventory() {
         </View>
         <View className="flex-1">
           <Text className="font-bold mb-1" style={{ color: theme.textPrimary }}>
-            Status Check
+            Status Check <Text className="text-red-500">*</Text>
           </Text>
           <View className="h-12">
             <CustomPicker
@@ -666,7 +689,7 @@ export default function ScannedInventory() {
             editable={false}
           />
         </View>
-        {status === "Adjusted" && (
+        {isWeightInputVisible && (
           <View className="flex-1">
             <Text className="text-blue-600 font-bold mb-1">
               New Weight (kg)
@@ -697,13 +720,14 @@ export default function ScannedInventory() {
             className="font-bold mb-1"
             style={{ color: theme.textSecondary }}
           >
-            Evidence ({evidenceImages.length})
+            Evidence ({evidenceImages.length}){" "}
+            <Text style={{ color: "red" }}>*</Text>
           </Text>
           <View
             className="h-48 border-2 border-dashed rounded-md p-2"
             style={{
               backgroundColor: theme.rowOdd,
-              borderColor: theme.border,
+              borderColor: evidenceImages.length === 0 ? "red" : theme.border,
             }}
           >
             <TouchableOpacity
@@ -728,7 +752,7 @@ export default function ScannedInventory() {
                   className="text-xs italic"
                   style={{ color: theme.placeholder }}
                 >
-                  No photos added
+                  Required
                 </Text>
               </View>
             ) : (
@@ -936,7 +960,7 @@ export default function ScannedInventory() {
               <Text style={{ color: theme.textPrimary }}>
                 Status: <Text className="font-bold">{status}</Text>
               </Text>
-              {status === "Adjusted" && (
+              {isWeightInputVisible && (
                 <Text className="text-blue-600 font-bold">
                   New Weight: {adjustedWeight} kg
                 </Text>

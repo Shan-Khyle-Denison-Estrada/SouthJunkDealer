@@ -1,8 +1,10 @@
+import * as Print from "expo-print"; // Added import for printing
 import { router, useLocalSearchParams } from "expo-router";
 import { Camera, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert, // Added Alert for error handling
   Dimensions,
   Image,
   Modal,
@@ -167,6 +169,148 @@ export default function DetailedAuditTrail() {
     }
     return `file://${uri}`;
   };
+
+  // --- PRINT FUNCTIONALITY ---
+  const handlePrint = async () => {
+    if (!auditDetails) return;
+
+    try {
+      // Create HTML Table rows from lineItems
+      const tableRows = lineItems
+        .map(
+          (item) => `
+        <tr>
+          <td>#${item.txId}</td>
+          <td>${item.type}</td>
+          <td>${item.date}</td>
+          <td style="text-align: right;">${item.allocated} kg</td>
+        </tr>
+      `,
+        )
+        .join("");
+
+      // Construct the HTML Page
+      const html = `
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+            <style>
+              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #333; }
+              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+              .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; }
+              .header p { margin: 5px 0 0; color: #666; }
+              
+              .section { margin-bottom: 25px; }
+              .section-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-left: 4px solid #2563eb; padding-left: 10px; text-transform: uppercase; }
+              
+              .grid { display: flex; flex-wrap: wrap; gap: 20px; }
+              .grid-item { flex: 1; min-width: 150px; }
+              .label { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+              .value { font-size: 16px; font-weight: bold; }
+              
+              .status-box { display: inline-block; padding: 4px 12px; border-radius: 4px; border: 1px solid #333; }
+              
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+              th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+              th { background-color: #f3f4f6; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+              tr:nth-child(even) { background-color: #f9fafb; }
+              
+              .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Audit Trail Report</h1>
+              <p>Generated on ${new Date().toLocaleDateString()}</p>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Record Details</div>
+              <div class="grid">
+                <div class="grid-item">
+                  <div class="label">Audit ID</div>
+                  <div class="value">AUD-${auditDetails.auditId}</div>
+                </div>
+                <div class="grid-item">
+                  <div class="label">Batch ID</div>
+                  <div class="value">${auditDetails.batchId}</div>
+                </div>
+                <div class="grid-item">
+                  <div class="label">Material</div>
+                  <div class="value">${auditDetails.materialName || "N/A"}</div>
+                </div>
+                 <div class="grid-item">
+                  <div class="label">Status</div>
+                  <div class="value status-box">${auditDetails.status}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Weight & Adjustments</div>
+              <div class="grid">
+                <div class="grid-item">
+                  <div class="label">Recorded Date</div>
+                  <div class="value">${auditDetails.date}</div>
+                </div>
+                <div class="grid-item">
+                  <div class="label">Original Weight</div>
+                  <div class="value">${auditDetails.prevWeight ? auditDetails.prevWeight + " kg" : "-"}</div>
+                </div>
+                <div class="grid-item">
+                  <div class="label">Adjusted/New Weight</div>
+                  <div class="value">${auditDetails.newWeight ? auditDetails.newWeight + " kg" : "-"}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Auditor Notes</div>
+              <div style="background: #f9fafb; padding: 15px; border-radius: 6px; border: 1px solid #eee;">
+                ${auditDetails.notes || "No notes recorded."}
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Source Transaction History</div>
+              ${
+                lineItems.length > 0
+                  ? `
+                <table>
+                  <thead>
+                    <tr>
+                      <th>TX ID</th>
+                      <th>Type</th>
+                      <th>Date</th>
+                      <th style="text-align: right;">Allocated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${tableRows}
+                  </tbody>
+                </table>
+              `
+                  : '<p style="font-style: italic; color: #666;">No source transactions found.</p>'
+              }
+            </div>
+
+            <div class="footer">
+              <p>End of Report | Internal Use Only</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Execute Print
+      await Print.printAsync({
+        html,
+      });
+    } catch (error) {
+      console.error("Print Error:", error);
+      Alert.alert("Export Error", "Failed to generate print layout.");
+    }
+  };
+  // -------------------------
 
   if (loading) {
     return (
@@ -499,6 +643,7 @@ export default function DetailedAuditTrail() {
             <Text className="font-semibold text-lg text-white">Back</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            onPress={handlePrint} // LINKED PRINT FUNCTION HERE
             className="flex-1 justify-center items-center rounded-md active:bg-blue-700"
             style={{ backgroundColor: theme.primary }}
           >
