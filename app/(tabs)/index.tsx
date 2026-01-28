@@ -215,17 +215,27 @@ export default function Index() {
         setErrorModalVisible(true);
         return;
       }
+
+      // 1. Fetch data including Amount Paid
       const allData = await db
         .select({
           txId: transactions.id,
           date: transactions.date,
           type: transactions.type,
-          payment: transactions.paymentMethod,
-          status: transactions.status,
+
+          // Fetch financial numbers for calculation
+          total: transactions.totalAmount,
+          paid: transactions.paidAmount, // <--- Make sure this matches your schema column name
+
+          paymentMethod: transactions.paymentMethod,
+          // workflowStatus: transactions.status, // The "Completed" status you saw earlier
+
+          itemId: transactionItems.id,
           material: materials.name,
+          uom: materials.uom,
           weight: transactionItems.weight,
           price: transactionItems.price,
-          subtotal: transactionItems.subtotal,
+          lineSubtotal: transactionItems.subtotal,
         })
         .from(transactionItems)
         .leftJoin(
@@ -240,23 +250,84 @@ export default function Index() {
         return;
       }
 
+      // 2. CSV Sanitization Helper
+      const escapeCsv = (field: any) => {
+        if (field === null || field === undefined) return "";
+        const stringField = String(field);
+        // If the field contains comma, newline, or double quote, wrap in quotes
+        if (
+          stringField.includes(",") ||
+          stringField.includes("\n") ||
+          stringField.includes('"')
+        ) {
+          return `"${stringField.replace(/"/g, '""')}"`;
+        }
+        return stringField;
+      };
+
+      // 3. Helper to Calculate Payment Status
+      const getPaymentStatus = (total: number | null, paid: number | null) => {
+        const t = parseFloat(String(total || 0));
+        const p = parseFloat(String(paid || 0));
+
+        // Use a small epsilon for float comparison safety
+        if (p >= t - 0.01) return "Paid";
+        if (p > 0) return "Partial";
+        return "Unpaid";
+      };
+
+      // 4. Define Headers
+      const headers = [
+        "Transaction ID",
+        "Date",
+        "Type",
+        "Payment Status", // <--- Derived Column
+        "Amount Paid", // <--- Added for reference
+        "Total Amount",
+        "Payment Method",
+        // "Workflow Status",
+        "Line Item ID",
+        "Material Name",
+        "UOM",
+        "Weight",
+        "Price",
+        "Line Subtotal",
+      ].join(",");
+
+      // 5. Generate Rows
       const rows = allData
-        .map(
-          (d) =>
-            `${d.txId},${d.date},${d.type},${d.payment},${d.status},${d.material},${d.weight},${d.price},${d.subtotal}`,
-        )
+        .map((d) => {
+          // Calculate status dynamically for this row
+          const derivedStatus = getPaymentStatus(d.total, d.paid);
+
+          return [
+            d.txId,
+            d.date,
+            d.type,
+            derivedStatus, // <--- Insert Calculated Status
+            d.paid,
+            d.total,
+            d.paymentMethod,
+            // d.workflowStatus,
+            d.itemId,
+            d.material,
+            d.uom,
+            d.weight,
+            d.price,
+            d.lineSubtotal,
+          ]
+            .map(escapeCsv)
+            .join(",");
+        })
         .join("\n");
 
       const fileUri = FileSystem.documentDirectory + "transactions_export.csv";
-      await FileSystem.writeAsStringAsync(
-        fileUri,
-        "Transaction ID,Date,Type,Payment,Status,Material,Weight,Price,Subtotal\n" +
-          rows,
-        { encoding: "utf8" },
-      );
+      await FileSystem.writeAsStringAsync(fileUri, headers + "\n" + rows, {
+        encoding: "utf8",
+      });
       await Sharing.shareAsync(fileUri);
     } catch (error) {
-      setErrorMessage("Export failed: " + error.message);
+      setErrorMessage("Export failed: " + (error as Error).message);
       setErrorModalVisible(true);
     }
   };
