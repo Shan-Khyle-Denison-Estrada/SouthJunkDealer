@@ -17,7 +17,12 @@ import {
 // --- DATABASE IMPORTS ---
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
-import { paymentMethods, unitOfMeasurements } from "../../db/schema";
+import {
+  materials,
+  paymentMethods,
+  transactions,
+  unitOfMeasurements,
+} from "../../db/schema";
 
 export default function DropdownManagement() {
   const systemTheme = useColorScheme();
@@ -27,8 +32,8 @@ export default function DropdownManagement() {
   const theme = {
     background: isDark ? "#121212" : "#f3f4f6",
     card: isDark ? "#1E1E1E" : "#ffffff",
-    textPrimary: isDark ? "#FFFFFF" : "#1f2937", // Gray-800
-    textSecondary: isDark ? "#A1A1AA" : "#4b5563", // Gray-600
+    textPrimary: isDark ? "#FFFFFF" : "#1f2937",
+    textSecondary: isDark ? "#A1A1AA" : "#4b5563",
     border: isDark ? "#333333" : "#e5e7eb",
     inputBg: isDark ? "#2C2C2C" : "#f3f4f6",
     inputText: isDark ? "#FFFFFF" : "#000000",
@@ -90,7 +95,6 @@ const UomSection = ({ data, onRefresh, theme }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
-  // Fields
   const [unit, setUnit] = useState("");
   const [name, setName] = useState("");
 
@@ -119,22 +123,48 @@ const UomSection = ({ data, onRefresh, theme }) => {
     }
     try {
       if (selectedItem) {
+        // --- UPDATE LOGIC WITH CASCADE ---
+        // 1. Update the definition
         await db
           .update(unitOfMeasurements)
           .set({ unit, name })
           .where(eq(unitOfMeasurements.id, selectedItem.id));
+
+        // 2. Cascade Update: If the symbol changed, update all materials using the old symbol
+        if (selectedItem.unit !== unit) {
+          await db
+            .update(materials)
+            .set({ uom: unit })
+            .where(eq(materials.uom, selectedItem.unit));
+        }
       } else {
         await db.insert(unitOfMeasurements).values({ unit, name });
       }
       setModalVisible(false);
       onRefresh();
     } catch (error) {
+      console.error(error);
       Alert.alert("Error", "Database error.");
     }
   };
 
   const handleDelete = async () => {
     if (!selectedItem) return;
+
+    // --- CHECK CONSTRAINT BEFORE DELETE ---
+    const associatedMaterials = await db
+      .select()
+      .from(materials)
+      .where(eq(materials.uom, selectedItem.unit));
+
+    if (associatedMaterials.length > 0) {
+      Alert.alert(
+        "Action Prohibited",
+        `Cannot delete "${selectedItem.unit}". It is currently used by ${associatedMaterials.length} material(s).`,
+      );
+      return;
+    }
+
     Alert.alert("Confirm Delete", `Delete "${selectedItem.name}"?`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -354,22 +384,48 @@ const PaymentSection = ({ data, onRefresh, theme }) => {
     if (!name) return Alert.alert("Error", "Name is required.");
     try {
       if (selectedItem) {
+        // --- UPDATE LOGIC WITH CASCADE ---
+        // 1. Update the definition
         await db
           .update(paymentMethods)
           .set({ name })
           .where(eq(paymentMethods.id, selectedItem.id));
+
+        // 2. Cascade Update: Update all transactions using the old payment name
+        if (selectedItem.name !== name) {
+          await db
+            .update(transactions)
+            .set({ paymentMethod: name })
+            .where(eq(transactions.paymentMethod, selectedItem.name));
+        }
       } else {
         await db.insert(paymentMethods).values({ name });
       }
       setModalVisible(false);
       onRefresh();
     } catch (error) {
+      console.error(error);
       Alert.alert("Error", "Database error.");
     }
   };
 
   const handleDelete = async () => {
     if (!selectedItem) return;
+
+    // --- CHECK CONSTRAINT BEFORE DELETE ---
+    const associatedTransactions = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.paymentMethod, selectedItem.name));
+
+    if (associatedTransactions.length > 0) {
+      Alert.alert(
+        "Action Prohibited",
+        `Cannot delete "${selectedItem.name}". It is currently used in ${associatedTransactions.length} transaction(s).`,
+      );
+      return;
+    }
+
     Alert.alert("Confirm Delete", `Delete "${selectedItem.name}"?`, [
       { text: "Cancel", style: "cancel" },
       {
