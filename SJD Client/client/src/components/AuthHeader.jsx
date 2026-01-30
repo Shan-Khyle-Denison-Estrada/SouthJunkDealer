@@ -91,6 +91,20 @@ const AuthHeader = () => {
           }`}
         >
           <Link
+            to="/home"
+            onClick={() => setIsDropdownOpen(false)}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#F2C94C] font-medium transition-colors"
+          >
+            Dashboard
+          </Link>
+          <Link
+            to="/transactions"
+            onClick={() => setIsDropdownOpen(false)}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#F2C94C] font-medium transition-colors"
+          >
+            Transactions
+          </Link>
+          <Link
             to="/account"
             onClick={() => setIsDropdownOpen(false)}
             className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#F2C94C] font-medium transition-colors"

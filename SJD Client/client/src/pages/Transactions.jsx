@@ -105,22 +105,28 @@ const Transactions = () => {
       amount: "₱ 360",
       status: "Completed",
     },
+    {
+      id: "TRX-1014",
+      date: "Sep 25, 2025",
+      item: "Bottles",
+      type: "Sold",
+      weight: "50 kg",
+      amount: "₱ 150",
+      status: "Completed",
+    },
   ];
 
-  const itemsPerPage = 6;
+  // CHANGED: Reduced to 9 items per page to "omit one row"
+  const itemsPerPage = 5;
 
-  // --- Filtering & Sorting Logic ---
-  const filteredData = allTransactions.filter((item) => {
-    const matchesSearch =
-      item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesType = filters.type === "All" || item.type === filters.type;
-    const matchesStatus =
-      filters.status === "All" || item.status === filters.status;
-
-    return matchesSearch && matchesType && matchesStatus;
-  });
+  // Logic
+  const filteredData = allTransactions.filter(
+    (item) =>
+      (item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (filters.type === "All" || item.type === filters.type) &&
+      (filters.status === "All" || item.status === filters.status),
+  );
 
   const sortedData = [...filteredData].sort((a, b) => {
     if (!sortConfig.key) return 0;
@@ -138,24 +144,32 @@ const Transactions = () => {
     currentPage * itemsPerPage,
   );
 
-  const requestSort = (key) => {
+  const handleSort = (key) => {
     let direction = "asc";
-    if (sortConfig.key === key && sortConfig.direction === "asc")
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
       direction = "desc";
+    }
     setSortConfig({ key, direction });
   };
 
-  const hasActiveFilters = filters.type !== "All" || filters.status !== "All";
+  // Helper for generating page numbers
+  const getPageNumbers = () => {
+    const pages = [];
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 font-sans text-slate-800 relative">
-      {/* --- 1. TITLE & TOOLBAR --- */}
-      <div className="px-8 py-6 shrink-0 flex flex-col md:flex-row justify-between items-center gap-6">
-        <div className="flex items-center gap-4 w-full md:w-auto">
+    <div className="h-full flex flex-col bg-white font-sans text-slate-900 overflow-hidden">
+      {/* --- UNIFIED HEADER --- */}
+      <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white z-20">
+        {/* Left: Back + Title */}
+        <div className="flex items-center gap-4">
           <Link
             to="/home"
-            className="h-10 w-10 bg-white rounded-full flex items-center justify-center text-slate-500 hover:text-[#F2C94C] hover:shadow-md transition-all border border-slate-200"
-            title="Back to Home"
+            className="h-9 w-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-[#F2C94C] hover:text-slate-900 transition-all border border-slate-100 hover:border-[#F2C94C] shrink-0"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -171,27 +185,21 @@ const Transactions = () => {
             </svg>
           </Link>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Transactions
+            <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">
+              Transaction History
             </h1>
-            <p className="text-slate-500 text-sm font-medium">
-              Manage your history
+            <p className="text-slate-500 text-xs mt-0.5 font-medium">
+              View and filter past activities
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* Search Bar - Elongated */}
-          <div className="relative group w-full md:w-96">
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2.5 w-full border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#F2C94C] focus:ring-2 focus:ring-[#F2C94C]/20 bg-white shadow-sm transition-all"
-            />
+        {/* Right: Search & Filter */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative flex-grow md:flex-grow-0">
             <svg
-              className="absolute left-3 top-3 h-4 w-4 text-slate-400 group-focus-within:text-[#F2C94C]"
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
+              xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -203,295 +211,282 @@ const Transactions = () => {
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
+            <input
+              type="text"
+              placeholder="Search ID or Item..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full md:w-64 pl-9 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:bg-white transition-all placeholder:text-slate-400"
+            />
           </div>
 
-          {/* Filter Trigger */}
-          <button
-            onClick={() => setIsFilterOpen(true)}
-            className={`p-2.5 border rounded-xl transition-all flex items-center gap-2 ${
-              hasActiveFilters
-                ? "bg-[#F2C94C] border-[#F2C94C] text-slate-900 shadow-md"
-                : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-            }`}
-            title="Filter"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+          {/* Filter Toggle */}
+          <div className="relative">
+            <button
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`h-[42px] px-3.5 rounded-xl border flex items-center justify-center transition-all ${
+                isFilterOpen
+                  ? "bg-[#F2C94C] border-[#F2C94C] text-slate-900"
+                  : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
+              }`}
             >
-              <path
-                fillRule="evenodd"
-                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                clipRule="evenodd"
-              />
-            </svg>
-            {hasActiveFilters && (
-              <span className="text-xs font-bold hidden sm:inline">Active</span>
-            )}
-          </button>
-
-          {/* New Button - bg-primary */}
-          <Link
-            to="/bookings"
-            className="flex items-center gap-2 bg-primary hover:opacity-90 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
-          >
-            <span className="text-white/80 text-lg leading-none font-black">
-              +
-            </span>
-            <span className="hidden sm:inline">New</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* --- 2. TABLE CARD --- */}
-      <div className="flex-grow px-8 pb-8 overflow-hidden flex flex-col min-h-0">
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 flex flex-col h-full overflow-hidden">
-          <div className="flex-grow overflow-auto">
-            <table className="w-full text-left border-collapse h-full">
-              <thead className="bg-slate-50/50 text-slate-500 uppercase font-bold text-[11px] tracking-wider sticky top-0 z-10 border-b border-slate-100">
-                <tr>
-                  {[
-                    { label: "ID", key: "id", width: "w-44" }, // Wider ID column
-                    { label: "Date", key: "date", width: "w-32" },
-                    { label: "Item", key: "item", width: "w-auto" },
-                    { label: "Type", key: "type", width: "w-28" },
-                    { label: "Weight", key: "weight", width: "w-28" },
-                    {
-                      label: "Amount",
-                      key: "amount",
-                      align: "right",
-                      width: "w-32",
-                    },
-                    {
-                      label: "Status",
-                      key: "status",
-                      align: "center",
-                      width: "w-32",
-                    },
-                  ].map((col) => (
-                    <th
-                      key={col.key}
-                      onClick={() => requestSort(col.key)}
-                      className={`px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors select-none ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.width}`}
-                    >
-                      <div
-                        className={`flex items-center gap-1.5 ${col.align === "right" ? "justify-end" : col.align === "center" ? "justify-center" : "justify-start"}`}
-                      >
-                        {col.label}
-                        {sortConfig.key === col.key && (
-                          <span className="text-[#F2C94C] font-black text-xs">
-                            {sortConfig.direction === "asc" ? "↑" : "↓"}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {currentData.length > 0 ? (
-                  currentData.map((t) => (
-                    <tr
-                      key={t.id}
-                      className="hover:bg-slate-50/80 transition-all group h-1/6"
-                    >
-                      <td className="px-6 py-3">
-                        <span className="font-mono text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 group-hover:border-[#F2C94C] group-hover:text-slate-600 transition-colors">
-                          {t.id}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-sm font-medium text-slate-500">
-                        {t.date}
-                      </td>
-                      <td className="px-6 py-3">
-                        <div className="font-bold text-slate-800 text-sm">
-                          {t.item}
-                        </div>
-                      </td>
-                      <td className="px-6 py-3">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold border ${t.type === "Sold" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-orange-50 text-orange-600 border-orange-100"}`}
-                        >
-                          {t.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-sm font-medium text-slate-600">
-                        {t.weight}
-                      </td>
-                      <td
-                        className={`px-6 py-3 text-right text-sm font-black tracking-tight ${t.amount === "Pending" ? "text-slate-400 italic" : t.amount === "Cancelled" ? "text-red-400 line-through decoration-2" : "text-emerald-600"}`}
-                      >
-                        {t.amount}
-                      </td>
-                      <td className="px-6 py-3 text-center">
-                        <div
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${t.status === "Completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100" : t.status === "In Progress" ? "bg-sky-50 text-sky-700 border-sky-100" : "bg-rose-50 text-rose-700 border-rose-100"}`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${t.status === "Completed" ? "bg-emerald-500" : t.status === "In Progress" ? "bg-sky-500" : "bg-rose-500"}`}
-                          />
-                          {t.status}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="7" className="h-full text-center">
-                      <div className="flex flex-col items-center justify-center text-slate-400 py-12">
-                        <p>No transactions found.</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                {/* Filler rows */}
-                {currentData.length > 0 &&
-                  currentData.length < itemsPerPage &&
-                  Array.from({ length: itemsPerPage - currentData.length }).map(
-                    (_, idx) => (
-                      <tr
-                        key={`empty-${idx}`}
-                        className="h-1/6 pointer-events-none"
-                      >
-                        <td colSpan="7"></td>
-                      </tr>
-                    ),
-                  )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="border-t border-slate-100 px-6 py-4 bg-white shrink-0 flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>
-              Showing{" "}
-              <span className="text-slate-900 font-bold">
-                {(currentPage - 1) * itemsPerPage + 1}
-              </span>{" "}
-              to{" "}
-              <span className="text-slate-900 font-bold">
-                {Math.min(currentPage * itemsPerPage, sortedData.length)}
-              </span>{" "}
-              of {sortedData.length}
-            </span>
-            <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
-                ←
-              </button>
-              <span className="px-3 py-1 text-slate-900 font-bold">
-                {currentPage}
-              </span>
-              <button
-                onClick={() =>
-                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                }
-                disabled={currentPage === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:hover:bg-transparent transition-all"
-              >
-                →
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+            </button>
 
-      {/* --- FILTER MODAL --- */}
-      {isFilterOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
-            onClick={() => setIsFilterOpen(false)}
-          ></div>
-
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm relative z-10 overflow-hidden transform transition-all scale-100">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="font-bold text-slate-800 text-lg">
-                Filter Transactions
-              </h3>
-              <button
-                onClick={() => setIsFilterOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  Transaction Type
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {["All", "Sold", "Pickup"].map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setFilters((prev) => ({ ...prev, type }))}
-                      className={`py-2 px-3 rounded-xl text-sm font-bold border transition-all ${
-                        filters.type === type
-                          ? "bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-900/20"
-                          : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                      }`}
+            {/* Dropdown */}
+            {isFilterOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 p-4 z-30">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
+                      Type
+                    </label>
+                    <select
+                      value={filters.type}
+                      onChange={(e) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          type: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium focus:border-[#F2C94C] outline-none"
                     >
-                      {type}
-                    </button>
-                  ))}
+                      <option value="All">All Types</option>
+                      <option value="Sold">Sold</option>
+                      <option value="Pickup">Pickup</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
+                      Status
+                    </label>
+                    <select
+                      value={filters.status}
+                      onChange={(e) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          status: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium focus:border-[#F2C94C] outline-none"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Completed">Completed</option>
+                      <option value="In Progress">In Progress</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFilters({ type: "All", status: "All" });
+                      setIsFilterOpen(false);
+                    }}
+                    className="w-full py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors"
+                  >
+                    Reset Filters
+                  </button>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  Status
-                </label>
-                <select
-                  value={filters.status}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, status: e.target.value }))
-                  }
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all appearance-none"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Completed">Completed</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 flex gap-3 bg-slate-50/30">
-              <button
-                onClick={() => setFilters({ type: "All", status: "All" })}
-                className="flex-1 px-4 py-2.5 rounded-xl text-slate-600 font-bold hover:bg-slate-100 transition-colors text-sm"
-              >
-                Reset
-              </button>
-              <button
-                onClick={() => setIsFilterOpen(false)}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-[#F2C94C] text-slate-900 font-bold shadow-md hover:bg-[#e6bd3f] transition-colors text-sm"
-              >
-                Apply Filters
-              </button>
-            </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
+
+      {/* --- FULL SCREEN BODY --- */}
+      <div className="flex-grow flex flex-col overflow-hidden relative">
+        {/* Scrollable Table Area */}
+        <div className="flex-grow overflow-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-sm">
+              <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <th
+                  className="px-8 py-4 cursor-pointer hover:text-slate-800 transition-colors"
+                  onClick={() => handleSort("id")}
+                >
+                  Transaction ID
+                </th>
+                <th
+                  className="px-6 py-4 cursor-pointer hover:text-slate-800 transition-colors"
+                  onClick={() => handleSort("date")}
+                >
+                  Date
+                </th>
+                <th className="px-6 py-4">Details</th>
+                <th className="px-6 py-4 text-right">Amount</th>
+                <th className="px-6 py-4 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm bg-white">
+              {currentData.map((t) => (
+                <tr
+                  key={t.id}
+                  className="hover:bg-slate-50/80 transition-colors group"
+                >
+                  <td className="px-8 py-5 font-mono font-bold text-slate-400 group-hover:text-[#F2C94C] transition-colors">
+                    {t.id}
+                  </td>
+                  <td className="px-6 py-5 font-medium text-slate-600">
+                    {t.date}
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${t.type === "Sold" ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}
+                      >
+                        {t.type === "Sold" ? (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                            <path
+                              fillRule="evenodd"
+                              d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                            <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0014 7z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-base">
+                          {t.item}
+                        </p>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                          {t.type} • {t.weight}
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+                  <td
+                    className={`px-6 py-5 text-right font-black text-base ${t.amount === "Pending" ? "text-slate-300 italic font-medium" : "text-slate-900"}`}
+                  >
+                    {t.amount}
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                        t.status === "Completed"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : t.status === "In Progress"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {t.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {currentData.length === 0 && (
+                <tr>
+                  <td
+                    colSpan="5"
+                    className="px-6 py-12 text-center text-slate-400 italic"
+                  >
+                    No transactions found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* --- IMPROVED PAGINATION --- */}
+        <div className="shrink-0 px-8 py-4 border-t border-slate-100 bg-white flex items-center justify-between z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+            Showing {(currentPage - 1) * itemsPerPage + 1} -{" "}
+            {Math.min(currentPage * itemsPerPage, sortedData.length)} of{" "}
+            {sortedData.length}
+          </span>
+
+          <div className="flex items-center gap-2">
+            {/* Previous Button */}
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
+
+            {/* Page Numbers */}
+            <div className="flex items-center gap-1 bg-slate-50/50 p-1 rounded-xl">
+              {getPageNumbers().map((pageNum) => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${
+                    currentPage === pageNum
+                      ? "bg-[#F2C94C] text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:bg-white hover:shadow-sm"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+
+            {/* Next Button */}
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

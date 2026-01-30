@@ -24,28 +24,23 @@ const Account = () => {
   const handleSave = (e) => {
     e.preventDefault();
     console.log("Saving Profile:", formData);
-    // Add save logic here
   };
 
   const handleDelete = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete your account? This action cannot be undone.",
-      )
-    ) {
-      console.log("Deleting Account...");
+    if (confirm("Are you sure? This action cannot be undone.")) {
+      console.log("Deleting...");
       navigate("/signin");
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 font-sans text-slate-900">
-      {/* --- HEADER --- */}
-      <div className="bg-white px-6 py-4 border-b border-slate-200 shrink-0 flex items-center justify-between gap-4 shadow-sm z-20">
-        <div className="flex items-center gap-3">
+    <div className="h-full flex flex-col bg-white font-sans text-slate-900 overflow-hidden">
+      {/* --- UNIFIED HEADER --- */}
+      <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex items-center justify-between gap-4 bg-white z-10">
+        <div className="flex items-center gap-4">
           <Link
-            to="/"
-            className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 hover:bg-[#F2C94C] hover:text-slate-900 transition-all border border-slate-200 hover:border-[#F2C94C]"
+            to="/home"
+            className="h-9 w-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-[#F2C94C] hover:text-slate-900 transition-all border border-slate-100 hover:border-[#F2C94C]"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -64,48 +59,23 @@ const Account = () => {
             <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">
               Account Settings
             </h1>
-            <p className="text-slate-500 text-xs mt-1">
-              Manage your personal profile
+            <p className="text-slate-500 text-xs mt-0.5 font-medium">
+              Update your personal details
             </p>
           </div>
         </div>
-
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="hidden md:block px-5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 border border-slate-200 transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-6 py-2 rounded-xl text-xs font-bold bg-[#F2C94C] text-slate-900 hover:bg-[#e0b83e] shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30 hover:-translate-y-0.5 transition-all flex items-center gap-2"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
-            </svg>
-            <span>Save Changes</span>
-          </button>
-        </div>
       </div>
 
-      {/* --- MAIN CONTENT --- */}
-      <div className="flex-grow p-4 md:p-6 overflow-hidden flex flex-col md:flex-row gap-6 min-h-0">
-        {/* --- LEFT: PROFILE CARD --- */}
-        <div className="w-full md:w-80 shrink-0 flex flex-col gap-4">
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 flex flex-col items-center text-center h-full">
-            <div className="relative group cursor-pointer mb-4">
-              <div className="w-32 h-32 rounded-full bg-slate-100 border-4 border-white shadow-lg overflow-hidden flex items-center justify-center text-slate-300">
-                {/* Placeholder for actual image */}
+      {/* --- CONTENT --- */}
+      <div className="flex-grow flex flex-col overflow-hidden">
+        <div className="flex-grow overflow-y-auto p-6 md:p-8">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-5 content-start">
+            {/* Avatar */}
+            <div className="md:col-span-2 md:row-span-2 flex flex-col items-center md:items-start pt-1">
+              <div className="aspect-square w-32 md:w-full rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-[#F2C94C] hover:bg-[#F2C94C]/5 transition-all cursor-pointer flex flex-col items-center justify-center group relative overflow-hidden">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-16 w-16"
+                  className="h-8 w-8 text-slate-400 group-hover:text-[#F2C94C] transition-colors mb-2"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -115,204 +85,197 @@ const Account = () => {
                     clipRule="evenodd"
                   />
                 </svg>
-              </div>
-              <div className="absolute inset-0 bg-slate-900/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-8 w-8 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide group-hover:text-slate-600">
+                  Change Photo
+                </span>
+                <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/5 transition-colors"></div>
               </div>
             </div>
 
-            <h2 className="text-lg font-black text-slate-900">
-              {formData.firstName} {formData.lastName}
-            </h2>
-            <p className="text-sm font-medium text-slate-500 mb-6">
-              {formData.affiliation}
-            </p>
+            {/* Names */}
+            <div className="md:col-span-10 grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  Middle Name
+                </label>
+                <input
+                  type="text"
+                  name="middleName"
+                  value={formData.middleName}
+                  onChange={handleChange}
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                />
+              </div>
+            </div>
 
-            <div className="w-full border-t border-slate-100 pt-6 mt-auto">
-              <button
-                onClick={handleDelete}
-                className="w-full py-2.5 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 transition-all flex items-center justify-center gap-2"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Delete Account
-              </button>
+            {/* Contact */}
+            <div className="md:col-span-10 grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  Phone Number
+                </label>
+                <input
+                  type="text"
+                  name="contactNumber"
+                  value={formData.contactNumber}
+                  onChange={handleChange}
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  Affiliation / Company
+                </label>
+                <input
+                  type="text"
+                  name="affiliation"
+                  value={formData.affiliation}
+                  onChange={handleChange}
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div className="md:col-span-12 space-y-1 mt-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                Complete Address
+              </label>
+              <input
+                type="text"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+              />
+            </div>
+
+            {/* Security */}
+            <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-100 mt-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* --- RIGHT: FORM FIELDS --- */}
-        <div className="flex-grow bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          <div className="flex-grow overflow-y-auto p-6 md:p-8">
-            <div className="max-w-4xl mx-auto space-y-8">
-              {/* Section 1: Personal Details */}
-              <section>
-                <div className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
-                  Personal Information
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      Middle Name
-                    </label>
-                    <input
-                      type="text"
-                      name="middleName"
-                      value={formData.middleName}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              {/* Section 2: Contact Info */}
-              <section>
-                <div className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
-                  Contact Details
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      Contact Number
-                    </label>
-                    <input
-                      type="text"
-                      name="contactNumber"
-                      value={formData.contactNumber}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      Affiliation / Company
-                    </label>
-                    <input
-                      type="text"
-                      name="affiliation"
-                      value={formData.affiliation}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      Address
-                    </label>
-                    <textarea
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      rows="2"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all resize-none"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              {/* Section 3: Security */}
-              <section>
-                <div className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
-                  Security
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      New Password
-                    </label>
-                    <input
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      placeholder="••••••••"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wide ml-1">
-                      Confirm Password
-                    </label>
-                    <input
-                      type="password"
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      placeholder="••••••••"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:ring-1 focus:ring-[#F2C94C] bg-slate-50 focus:bg-white transition-all"
-                    />
-                  </div>
-                </div>
-              </section>
+        {/* Footer */}
+        <div className="shrink-0 bg-white border-t border-slate-100 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
+          <div className="flex items-center gap-3 w-full md:w-auto p-3 bg-red-50 rounded-xl border border-red-100">
+            <div className="p-2 bg-white rounded-lg text-red-500 shadow-sm shrink-0">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
             </div>
+            <div className="flex-grow">
+              <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider">
+                Danger Zone
+              </p>
+              <p className="text-[10px] text-red-600/80">Irreversible action</p>
+            </div>
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-red-700 transition-colors shadow-sm"
+            >
+              Delete
+            </button>
+          </div>
+          <div className="flex gap-3 w-full md:w-auto">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="flex-1 md:flex-none px-6 py-3 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 transition-all uppercase tracking-wide"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="flex-1 md:flex-none px-8 py-3 rounded-xl text-xs font-black bg-[#F2C94C] text-slate-900 shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30 hover:bg-[#e0b83e] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 uppercase tracking-wide"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-4 w-4"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>Save Changes</span>
+            </button>
           </div>
         </div>
       </div>
