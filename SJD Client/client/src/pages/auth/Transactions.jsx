@@ -9,28 +9,8 @@ const Transactions = () => {
 
   // Ref for auto-height calculation
   const tableContainerRef = useRef(null);
+  // Default to a safe number initially to allow the first render to happen so we can measure
   const [itemsPerPage, setItemsPerPage] = useState(5);
-
-  // --- DYNAMIC HEIGHT CALCULATION ---
-  useLayoutEffect(() => {
-    const calculateItemsPerPage = () => {
-      if (tableContainerRef.current) {
-        const containerHeight = tableContainerRef.current.clientHeight;
-        const headerHeight = 48;
-        const rowHeight = 72;
-        const buffer = 40;
-
-        const availableHeight = containerHeight - headerHeight - buffer;
-        const calculatedItems = Math.floor(availableHeight / rowHeight);
-
-        setItemsPerPage(Math.max(3, calculatedItems));
-      }
-    };
-
-    calculateItemsPerPage();
-    window.addEventListener("resize", calculateItemsPerPage);
-    return () => window.removeEventListener("resize", calculateItemsPerPage);
-  }, []);
 
   // --- MOCK DATA ---
   const allData = [
@@ -185,6 +165,57 @@ const Transactions = () => {
       status: "Completed",
     },
   ];
+
+  // --- DYNAMIC HEIGHT CALCULATION (FULLY DYNAMIC) ---
+  useLayoutEffect(() => {
+    const calculateItems = () => {
+      const container = tableContainerRef.current;
+      if (!container) return;
+
+      // 1. Get the exact usable height of the container
+      const containerRect = container.getBoundingClientRect();
+      const containerHeight = containerRect.height;
+
+      // 2. Measure the ACTUAL Header height from the DOM
+      const headerElement = container.querySelector("thead");
+      const headerHeight = headerElement
+        ? headerElement.getBoundingClientRect().height
+        : 48; // Fallback only if render hasn't happened yet
+
+      // 3. Measure the ACTUAL Row height from the DOM
+      // We grab the first row to determine how tall a row is.
+      const rowElement = container.querySelector("tbody tr");
+      const rowHeight = rowElement
+        ? rowElement.getBoundingClientRect().height
+        : 72; // Fallback default if list is empty or rendering
+
+      // 4. Calculate available space
+      const availableHeight = containerHeight - headerHeight;
+
+      // 5. Determine count
+      // We use floor to ensure we don't show a half-row at the bottom
+      const calculatedItems = Math.floor(availableHeight / rowHeight);
+
+      // 6. Update state only if it changed to avoid infinite loops
+      // Ensure we show at least 1 item
+      const newCount = Math.max(1, calculatedItems);
+      setItemsPerPage((prev) => (prev !== newCount ? newCount : prev));
+    };
+
+    // Calculate once on mount/update
+    calculateItems();
+
+    // Use ResizeObserver to re-calculate whenever the container size changes
+    const observer = new ResizeObserver(() => {
+      calculateItems();
+    });
+
+    if (tableContainerRef.current) {
+      observer.observe(tableContainerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [allData]); // Re-run if data changes (in case row height depends on content)
 
   // --- FILTER & PAGINATION ---
   const getFilteredData = () => {
@@ -377,15 +408,13 @@ const Transactions = () => {
           className="flex-1 w-full overflow-x-auto overflow-y-hidden"
           ref={tableContainerRef}
         >
-          {/* Reduced min-width to 800px to fit tighter. 
-              Padding reduced to px-4 everywhere. */}
+          {/* Reduced min-width to 800px to fit tighter. */}
           <table className="w-full min-w-[800px] text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-white border-b border-slate-100 shadow-sm h-[48px]">
-              <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <thead className="sticky top-0 z-10 bg-white border-b border-slate-100 shadow-sm">
+              <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider h-[48px]">
                 <th className="px-4 py-3 bg-white w-24">ID</th>
                 <th className="px-4 py-3 bg-white w-28">Date</th>
                 <th className="px-4 py-3 bg-white w-24 text-center">Type</th>
-                {/* w-full makes this column "greedy" to take up extra space */}
                 <th className="px-4 py-3 bg-white w-full">Location</th>
                 <th className="px-4 py-3 bg-white text-right">Amount</th>
                 <th className="px-4 py-3 bg-white text-center">Status</th>
