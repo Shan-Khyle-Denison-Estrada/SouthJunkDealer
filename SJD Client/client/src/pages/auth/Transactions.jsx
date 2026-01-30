@@ -168,7 +168,7 @@ const Transactions = () => {
         {/* Left: Back + Title */}
         <div className="flex items-center gap-4">
           <Link
-            to="/home"
+            to="/auth/home"
             className="h-9 w-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-[#F2C94C] hover:text-slate-900 transition-all border border-slate-100 hover:border-[#F2C94C] shrink-0"
           >
             <svg

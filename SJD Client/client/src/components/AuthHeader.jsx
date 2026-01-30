@@ -60,7 +60,7 @@ const AuthHeader = () => {
           className="h-8 w-8 transition-transform duration-300 group-hover:rotate-12"
         />
         <span className="text-lg font-bold tracking-tight text-white group-hover:text-[#F2C94C] transition-colors">
-          SOUTH<span className="text-[#F2C94C]">JUNK</span>
+          SOUTH<span className="text-[#F2C94C]">JUNK</span>DEALER
         </span>
       </Link>
 

@@ -97,7 +97,7 @@ const Bookings = () => {
       <div className="shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex items-center justify-between gap-4 bg-white z-20">
         <div className="flex items-center gap-3 md:gap-4">
           <Link
-            to="/home"
+            to="/auth/home"
             className="h-8 w-8 md:h-9 md:w-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-[#F2C94C] hover:text-slate-900 transition-all border border-slate-100 hover:border-[#F2C94C]"
           >
             <svg
@@ -125,7 +125,7 @@ const Bookings = () => {
 
         <div className="flex gap-2 md:gap-3">
           <button
-            onClick={() => navigate("/home")}
+            onClick={() => navigate("/auth/home")}
             className="hidden md:block px-5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 transition-all uppercase tracking-wide"
           >
             Cancel

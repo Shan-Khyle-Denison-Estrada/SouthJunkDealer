@@ -101,7 +101,7 @@ const Home = () => {
           </div>
 
           <Link
-            to="/bookings"
+            to="/auth/bookings"
             className="group bg-[#F2C94C] hover:bg-yellow-400 text-slate-900 font-bold px-4 md:px-5 rounded-xl text-sm shadow-lg shadow-yellow-500/20 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
           >
             <div className="bg-slate-900/10 p-1 rounded-full group-hover:bg-slate-900/20 transition-colors">
@@ -188,7 +188,7 @@ const Home = () => {
               Recent Activity
             </h3>
             <Link
-              to="/transactions"
+              to="/auth/transactions"
               className="text-xs font-bold text-slate-400 hover:text-[#F2C94C] transition-colors"
             >
               View Full History &rarr;
