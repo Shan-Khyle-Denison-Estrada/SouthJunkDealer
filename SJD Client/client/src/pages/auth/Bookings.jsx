@@ -124,7 +124,7 @@ const Bookings = () => {
           </Link>
           <div>
             <h1 className="text-lg font-black text-slate-900 tracking-tight leading-none">
-              New Transaction
+              New Booking
             </h1>
             <p className="text-slate-500 text-[10px] mt-0.5 font-medium">
               Request buy or sell
