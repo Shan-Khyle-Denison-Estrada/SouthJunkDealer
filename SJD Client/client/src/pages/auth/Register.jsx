@@ -3,15 +3,19 @@ import { Link, useNavigate } from "react-router-dom";
 
 const Register = () => {
   const navigate = useNavigate();
+
+  // 1. NEW: State to store the actual Base64 image string
+  const [profilePhoto, setProfilePhoto] = useState(null);
+
+  // Visual preview state
   const [photoPreview, setPhotoPreview] = useState(null);
 
-  // 1. State for form inputs (Added affiliation)
   const [inputs, setInputs] = useState({
     firstName: "",
     middleName: "",
     lastName: "",
     address: "",
-    affiliation: "", // <--- Added here
+    affiliation: "",
     contactNumber: "",
     email: "",
     password: "",
@@ -23,27 +27,33 @@ const Register = () => {
     middleName,
     lastName,
     address,
-    affiliation, // <--- Destructured here
+    affiliation,
     contactNumber,
     email,
     password,
     confirmPassword,
   } = inputs;
 
-  // 2. Handle text changes
   const handleChange = (e) => {
     setInputs({ ...inputs, [e.target.name]: e.target.value });
   };
 
-  // 3. Handle image preview
+  // 2. UPDATED: Handle image preview AND conversion
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Visual Preview
       setPhotoPreview(URL.createObjectURL(file));
+
+      // Conversion to Base64 (Data for Backend)
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePhoto(reader.result); // Store the string result
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  // 4. Handle Form Submit
   const onSubmitForm = async (e) => {
     e.preventDefault();
 
@@ -53,7 +63,6 @@ const Register = () => {
     }
 
     try {
-      // Added affiliation to the body sent to backend
       const body = {
         firstName,
         middleName,
@@ -63,6 +72,7 @@ const Register = () => {
         contactNumber,
         email,
         password,
+        profilePhoto, // 3. INCLUDE THIS in the body sent to backend
       };
 
       const response = await fetch("http://localhost:5000/auth/register", {
@@ -88,7 +98,13 @@ const Register = () => {
 
   return (
     <div className="h-screen w-full flex overflow-hidden bg-white relative">
-      {/* --- BACK BUTTON --- */}
+      {/* ... (Rest of your UI/JSX remains exactly the same) ... */}
+
+      {/* NOTE: Ensure you keep the rest of your JSX here. 
+         I am hiding it for brevity, but do not delete your existing HTML structure.
+      */}
+
+      {/* BACK BUTTON */}
       <button
         onClick={() => navigate("/")}
         type="button"
@@ -114,7 +130,7 @@ const Register = () => {
         <div className="absolute inset-0 bg-[url('/large_bg.png')] opacity-10 bg-cover bg-center"></div>
         <img
           src="/seal.png"
-          alt="South Junk Dealer Seal"
+          alt="Seal"
           className="relative z-10 w-2/3 max-w-sm object-contain drop-shadow-2xl mb-8"
         />
         <h2 className="relative z-10 text-white text-3xl font-bold text-center">
@@ -179,12 +195,11 @@ const Register = () => {
             </label>
           </div>
 
-          {/* FORM */}
           <form
             className="flex flex-col gap-4 pb-8 lg:pb-0"
             onSubmit={onSubmitForm}
           >
-            {/* NAMES */}
+            {/* ... (Inputs remain exactly the same) ... */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="font-bold text-slate-700 text-[11px] uppercase tracking-wide ml-1">
@@ -226,7 +241,6 @@ const Register = () => {
               </div>
             </div>
 
-            {/* ADDRESS & AFFILIATION */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="font-bold text-slate-700 text-[11px] uppercase tracking-wide ml-1">
@@ -241,7 +255,6 @@ const Register = () => {
                   className="w-full p-3 lg:p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-[#F2C94C] focus:ring-2 focus:ring-[#F2C94C]/20 bg-slate-50 lg:bg-white text-sm transition-all"
                 />
               </div>
-              {/* NEW AFFILIATION INPUT */}
               <div className="flex flex-col gap-1">
                 <label className="font-bold text-slate-700 text-[11px] uppercase tracking-wide ml-1">
                   Affiliation / Company
@@ -257,7 +270,6 @@ const Register = () => {
               </div>
             </div>
 
-            {/* CONTACTS */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="font-bold text-slate-700 text-[11px] uppercase tracking-wide ml-1">
@@ -286,7 +298,6 @@ const Register = () => {
               </div>
             </div>
 
-            {/* PASSWORDS */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="font-bold text-slate-700 text-[11px] uppercase tracking-wide ml-1">
@@ -316,7 +327,6 @@ const Register = () => {
               </div>
             </div>
 
-            {/* SUBMIT */}
             <button className="mt-4 bg-[#F2C94C] hover:bg-yellow-400 text-slate-900 font-bold py-3 rounded-xl shadow-lg hover:shadow-yellow-400/30 transition-all transform hover:-translate-y-0.5 text-base">
               Create Account
             </button>

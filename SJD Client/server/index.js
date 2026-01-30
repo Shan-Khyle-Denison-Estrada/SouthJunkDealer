@@ -25,6 +25,7 @@ app.post("/auth/register", async (req, res) => {
       address,
       affiliation,
       password,
+      profilePhoto, // 1. GET THIS from request
     } = req.body;
 
     const user = await pool.query("SELECT * FROM users WHERE email = $1", [
@@ -37,9 +38,9 @@ app.post("/auth/register", async (req, res) => {
     const salt = await bcrypt.genSalt(saltRound);
     const bcryptPassword = await bcrypt.hash(password, salt);
 
-    // Note: We are not inserting profile_photo here, it starts null
+    // 2. INSERT into database (Added profile_photo column and value $9)
     const newUser = await pool.query(
-      "INSERT INTO users (first_name, middle_name, last_name, email, contact_number, address, affiliation, password_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+      "INSERT INTO users (first_name, middle_name, last_name, email, contact_number, address, affiliation, password_hash, profile_photo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
       [
         firstName,
         middleName,
@@ -49,6 +50,7 @@ app.post("/auth/register", async (req, res) => {
         address,
         affiliation,
         bcryptPassword,
+        profilePhoto, // Pass the Base64 string here
       ],
     );
 
@@ -129,24 +131,50 @@ app.put("/auth/account", async (req, res) => {
       affiliation,
       address,
       email,
-      profilePhoto, // Frontend sends this as 'profilePhoto' (camelCase)
+      profilePhoto,
+      password, // Receive password
     } = req.body;
 
-    // FIX: Updating 'profile_photo' (snake_case) in database
-    const updateUser = await pool.query(
-      "UPDATE users SET first_name = $1, middle_name = $2, last_name = $3, contact_number = $4, affiliation = $5, address = $6, email = $7, profile_photo = $8 WHERE user_id = $9 RETURNING *",
-      [
-        firstName,
-        middleName,
-        lastName,
-        contactNumber,
-        affiliation,
-        address,
-        email,
-        profilePhoto,
-        payload.user_id,
-      ],
-    );
+    let updateUser;
+
+    // CHECK: Is the user updating their password?
+    if (password && password.trim() !== "") {
+      const saltRound = 10;
+      const salt = await bcrypt.genSalt(saltRound);
+      const bcryptPassword = await bcrypt.hash(password, salt);
+
+      updateUser = await pool.query(
+        "UPDATE users SET first_name = $1, middle_name = $2, last_name = $3, contact_number = $4, affiliation = $5, address = $6, email = $7, profile_photo = $8, password_hash = $9 WHERE user_id = $10 RETURNING *",
+        [
+          firstName,
+          middleName,
+          lastName,
+          contactNumber,
+          affiliation,
+          address,
+          email,
+          profilePhoto,
+          bcryptPassword, // Update password
+          payload.user_id,
+        ],
+      );
+    } else {
+      // Logic if NO password change (original logic)
+      updateUser = await pool.query(
+        "UPDATE users SET first_name = $1, middle_name = $2, last_name = $3, contact_number = $4, affiliation = $5, address = $6, email = $7, profile_photo = $8 WHERE user_id = $9 RETURNING *",
+        [
+          firstName,
+          middleName,
+          lastName,
+          contactNumber,
+          affiliation,
+          address,
+          email,
+          profilePhoto,
+          payload.user_id,
+        ],
+      );
+    }
 
     res.json(updateUser.rows[0]);
   } catch (err) {
