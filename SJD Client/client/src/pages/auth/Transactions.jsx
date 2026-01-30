@@ -1,171 +1,500 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 const Transactions = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  const [activeTab, setActiveTab] = useState("bookings");
 
-  // Filter States
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    type: "All",
-    status: "All",
-  });
+  const [filters, setFilters] = useState({ type: "All", status: "All" });
 
-  // Mock Data
-  const allTransactions = [
+  // Ref to measure the available space for the table
+  const tableContainerRef = useRef(null);
+
+  // State for dynamic items per page
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  // --- DYNAMIC HEIGHT CALCULATION ---
+  useLayoutEffect(() => {
+    const calculateItemsPerPage = () => {
+      if (tableContainerRef.current) {
+        // Get the full height of the scrollable container
+        const containerHeight = tableContainerRef.current.clientHeight;
+
+        // Estimate Header Height (approx 54px based on padding/font)
+        const headerHeight = 54;
+
+        // Estimate Row Height (approx 76px based on h-10 icon + py-4 padding + borders)
+        const rowHeight = 76;
+
+        // Calculate available height for rows
+        const availableHeight = containerHeight - headerHeight;
+
+        // Calculate how many full rows fit.
+        // Math.floor ensures we don't include a row that would trigger a scrollbar.
+        const calculatedItems = Math.floor(availableHeight / rowHeight);
+
+        // Ensure at least 1 item is shown
+        setItemsPerPage(Math.max(1, calculatedItems));
+      }
+    };
+
+    // Calculate on mount
+    calculateItemsPerPage();
+
+    // Recalculate on window resize
+    window.addEventListener("resize", calculateItemsPerPage);
+    return () => window.removeEventListener("resize", calculateItemsPerPage);
+  }, []);
+
+  // --- MOCK DATA ---
+  const allData = [
+    // ACTIVE BOOKINGS
     {
-      id: "TRX-1024",
-      date: "Oct 24, 2025",
-      item: "Mixed Copper",
-      type: "Sold",
-      weight: "5.2 kg",
-      amount: "₱ 1,976",
-      status: "Completed",
+      id: "BK-2026-020",
+      date: "Feb 28, 2026",
+      type: "Sell",
+      item: "Industrial Generators",
+      estWeight: "500 kg",
+      address: "Power Plant, Sector 7",
+      status: "Pending Approval",
+      category: "bookings",
     },
     {
-      id: "TRX-1023",
-      date: "Oct 20, 2025",
-      item: "Aluminum Cans",
-      type: "Sold",
-      weight: "12 kg",
-      amount: "₱ 780",
-      status: "Completed",
-    },
-    {
-      id: "TRX-1022",
-      date: "Oct 28, 2025",
-      item: "Scheduled Pickup",
-      type: "Pickup",
-      weight: "---",
-      amount: "Pending",
+      id: "BK-2026-019",
+      date: "Feb 27, 2026",
+      type: "Buy",
+      item: "Copper Pipes",
+      estWeight: "45 kg",
+      address: "Plumbing Warehouse",
       status: "In Progress",
+      category: "bookings",
     },
     {
-      id: "TRX-1021",
-      date: "Oct 15, 2025",
-      item: "Old Electronics",
-      type: "Sold",
-      weight: "3.5 kg",
-      amount: "₱ 1,450",
-      status: "Completed",
+      id: "BK-2026-018",
+      date: "Feb 26, 2026",
+      type: "Sell",
+      item: "Office Monitors (CRT)",
+      estWeight: "120 kg",
+      address: "IT Park, Bldg C",
+      status: "Scheduled",
+      category: "bookings",
     },
     {
-      id: "TRX-1020",
-      date: "Oct 12, 2025",
-      item: "Steel Scraps",
-      type: "Sold",
-      weight: "45 kg",
-      amount: "₱ 810",
-      status: "Completed",
+      id: "BK-2026-017",
+      date: "Feb 25, 2026",
+      type: "Sell",
+      item: "Mixed Aluminum Siding",
+      estWeight: "30 kg",
+      address: "Renovation Site 4",
+      status: "Pending Approval",
+      category: "bookings",
     },
     {
-      id: "TRX-1019",
-      date: "Oct 10, 2025",
-      item: "Brass",
-      type: "Sold",
-      weight: "2 kg",
-      amount: "₱ 420",
-      status: "Completed",
+      id: "BK-2026-016",
+      date: "Feb 24, 2026",
+      type: "Buy",
+      item: "Steel Rebar (Rusted)",
+      estWeight: "250 kg",
+      address: "Construction Yard",
+      status: "Scheduled",
+      category: "bookings",
     },
     {
-      id: "TRX-1018",
-      date: "Oct 08, 2025",
-      item: "Cardboard Bulk",
-      type: "Sold",
-      weight: "15 kg",
-      amount: "₱ 60",
-      status: "Completed",
+      id: "BK-2026-015",
+      date: "Feb 22, 2026",
+      type: "Sell",
+      item: "Old Server Racks",
+      estWeight: "80 kg",
+      address: "Data Center, Uptown",
+      status: "Rejected",
+      category: "bookings",
     },
     {
-      id: "TRX-1017",
-      date: "Oct 05, 2025",
-      item: "Copper Wire",
-      type: "Sold",
-      weight: "8 kg",
-      amount: "₱ 3,040",
-      status: "Completed",
+      id: "BK-2026-014",
+      date: "Feb 20, 2026",
+      type: "Buy",
+      item: "Lead Acid Batteries",
+      estWeight: "60 kg",
+      address: "Auto Shop 2",
+      status: "In Progress",
+      category: "bookings",
     },
     {
-      id: "TRX-1016",
-      date: "Oct 01, 2025",
-      item: "Large Pickup",
-      type: "Pickup",
-      weight: "---",
-      amount: "Cancelled",
+      id: "BK-2026-013",
+      date: "Feb 18, 2026",
+      type: "Sell",
+      item: "Brass Shells",
+      estWeight: "5 kg",
+      address: "Shooting Range",
       status: "Cancelled",
+      category: "bookings",
     },
     {
-      id: "TRX-1015",
-      date: "Sep 28, 2025",
-      item: "Mixed Metal",
-      type: "Sold",
-      weight: "20 kg",
-      amount: "₱ 360",
+      id: "BK-2026-012",
+      date: "Feb 15, 2026",
+      type: "Sell",
+      item: "Assorted E-Waste",
+      estWeight: "20 kg",
+      address: "Tech Hub, Downtown",
+      status: "Pending Approval",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-011",
+      date: "Feb 14, 2026",
+      type: "Buy",
+      item: "Rebar Scraps (Grade A)",
+      estWeight: "200 kg",
+      address: "Construction Site B",
+      status: "In Progress",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-010",
+      date: "Feb 12, 2026",
+      type: "Sell",
+      item: "Old Car Batteries",
+      estWeight: "50 kg",
+      address: "Auto Shop, Mabini St",
+      status: "Scheduled",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-009",
+      date: "Feb 10, 2026",
+      type: "Sell",
+      item: "Copper Wires",
+      estWeight: "5 kg",
+      address: "Residential, Subd 2",
+      status: "Rejected",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-008",
+      date: "Feb 09, 2026",
+      type: "Buy",
+      item: "Aluminum Sheets",
+      estWeight: "30 kg",
+      address: "Warehouse 1",
+      status: "Pending Approval",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-007",
+      date: "Feb 08, 2026",
+      type: "Sell",
+      item: "Mixed Plastic Bottles",
+      estWeight: "10 kg",
+      address: "Recycle Center",
+      status: "Cancelled",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-006",
+      date: "Feb 05, 2026",
+      type: "Sell",
+      item: "Brass Fittings",
+      estWeight: "8 kg",
+      address: "Plumbing Co.",
+      status: "Scheduled",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-005",
+      date: "Feb 03, 2026",
+      type: "Buy",
+      item: "Scrap Iron",
+      estWeight: "150 kg",
+      address: "Industrial Park",
+      status: "In Progress",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-004",
+      date: "Feb 02, 2026",
+      type: "Sell",
+      item: "Old AC Units",
+      estWeight: "100 kg",
+      address: "Hotel Renovation",
+      status: "Pending Approval",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-003",
+      date: "Feb 01, 2026",
+      type: "Sell",
+      item: "Mixed Paper",
+      estWeight: "40 kg",
+      address: "Office Bldg 3",
+      status: "Scheduled",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-002",
+      date: "Jan 28, 2026",
+      type: "Buy",
+      item: "Zinc Plates",
+      estWeight: "15 kg",
+      address: "Print Shop",
+      status: "Scheduled",
+      category: "bookings",
+    },
+    {
+      id: "BK-2026-001",
+      date: "Jan 25, 2026",
+      type: "Sell",
+      item: "Glass Cullet",
+      estWeight: "500 kg",
+      address: "Bottle Factory",
+      status: "Pending Approval",
+      category: "bookings",
+    },
+
+    // HISTORY
+    {
+      id: "TRX-1045",
+      date: "Jan 30, 2026",
+      type: "Sell",
+      item: "Titanium Scrap",
+      finalWeight: "2 kg",
+      amount: "₱ 5,000",
       status: "Completed",
+      category: "history",
     },
     {
-      id: "TRX-1014",
-      date: "Sep 25, 2025",
-      item: "Bottles",
-      type: "Sold",
-      weight: "50 kg",
+      id: "TRX-1044",
+      date: "Jan 29, 2026",
+      type: "Buy",
+      item: "Stainless Steel 304",
+      finalWeight: "100 kg",
+      amount: "₱ 8,500",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1043",
+      date: "Jan 29, 2026",
+      type: "Sell",
+      item: "Cardboard Bales",
+      finalWeight: "200 kg",
+      amount: "₱ 600",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1042",
+      date: "Jan 28, 2026",
+      type: "Sell",
+      item: "Newspapers",
+      finalWeight: "50 kg",
       amount: "₱ 150",
       status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1041",
+      date: "Jan 27, 2026",
+      type: "Buy",
+      item: "Engine Blocks",
+      finalWeight: "300 kg",
+      amount: "₱ 9,000",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1040",
+      date: "Jan 27, 2026",
+      type: "Sell",
+      item: "Radiators (Copper)",
+      finalWeight: "15 kg",
+      amount: "₱ 2,200",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1039",
+      date: "Jan 26, 2026",
+      type: "Sell",
+      item: "Insulated Wire",
+      finalWeight: "---",
+      amount: "Cancelled",
+      status: "Cancelled",
+      category: "history",
+    },
+    {
+      id: "TRX-1038",
+      date: "Jan 26, 2026",
+      type: "Buy",
+      item: "HMS 1&2",
+      finalWeight: "1000 kg",
+      amount: "₱ 28,000",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1037",
+      date: "Jan 25, 2026",
+      type: "Sell",
+      item: "Electric Motors",
+      finalWeight: "25 kg",
+      amount: "₱ 1,500",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1036",
+      date: "Jan 25, 2026",
+      type: "Sell",
+      item: "Alternators",
+      finalWeight: "10 kg",
+      amount: "₱ 800",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1035",
+      date: "Jan 25, 2026",
+      type: "Sell",
+      item: "High Grade Copper",
+      finalWeight: "10.5 kg",
+      amount: "₱ 3,990",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1034",
+      date: "Jan 24, 2026",
+      type: "Sell",
+      item: "Mixed Scrap",
+      finalWeight: "50 kg",
+      amount: "₱ 950",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1033",
+      date: "Jan 22, 2026",
+      type: "Buy",
+      item: "Steel Beams",
+      finalWeight: "500 kg",
+      amount: "₱ 12,500",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1032",
+      date: "Jan 20, 2026",
+      type: "Sell",
+      item: "Brass",
+      finalWeight: "---",
+      amount: "Cancelled",
+      status: "Cancelled",
+      category: "history",
+    },
+    {
+      id: "TRX-1031",
+      date: "Jan 18, 2026",
+      type: "Sell",
+      item: "E-Waste Motherboards",
+      finalWeight: "2 kg",
+      amount: "₱ 800",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1030",
+      date: "Jan 15, 2026",
+      type: "Buy",
+      item: "Iron Sheets",
+      finalWeight: "200 kg",
+      amount: "₱ 4,200",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1029",
+      date: "Jan 12, 2026",
+      type: "Sell",
+      item: "Plastic Bottles",
+      finalWeight: "15 kg",
+      amount: "₱ 225",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1028",
+      date: "Jan 10, 2026",
+      type: "Sell",
+      item: "Car Battery",
+      finalWeight: "12 kg",
+      amount: "₱ 300",
+      status: "Completed",
+      category: "history",
+    },
+    {
+      id: "TRX-1027",
+      date: "Jan 08, 2026",
+      type: "Buy",
+      item: "Mixed Metal",
+      finalWeight: "---",
+      amount: "Refunded",
+      status: "Cancelled",
+      category: "history",
     },
   ];
 
-  // CHANGED: Reduced to 9 items per page to "omit one row"
-  const itemsPerPage = 5;
+  const getFilteredData = () => {
+    return allData.filter((item) => {
+      if (item.category !== activeTab) return false;
+      const matchesSearch =
+        item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = filters.type === "All" || item.type === filters.type;
+      const matchesStatus =
+        filters.status === "All" || item.status === filters.status;
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  };
 
-  // Logic
-  const filteredData = allTransactions.filter(
-    (item) =>
-      (item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.id.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filters.type === "All" || item.type === filters.type) &&
-      (filters.status === "All" || item.status === filters.status),
-  );
-
-  const sortedData = [...filteredData].sort((a, b) => {
-    if (!sortConfig.key) return 0;
-    const aValue = a[sortConfig.key];
-    const bValue = b[sortConfig.key];
-
-    if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-    return 0;
-  });
-
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
-  const currentData = sortedData.slice(
+  const filteredItems = getFilteredData();
+  const currentData = filteredItems.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
 
-  const handleSort = (key) => {
-    let direction = "asc";
-    if (sortConfig.key === key && sortConfig.direction === "asc") {
-      direction = "desc";
-    }
-    setSortConfig({ key, direction });
-  };
-
-  // Helper for generating page numbers
   const getPageNumbers = () => {
     const pages = [];
-    for (let i = 1; i <= totalPages; i++) {
-      pages.push(i);
-    }
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
     return pages;
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Completed":
+        return "bg-emerald-50 text-emerald-700 border-emerald-100";
+      case "Scheduled":
+        return "bg-blue-50 text-blue-700 border-blue-100";
+      case "Pending Approval":
+        return "bg-orange-50 text-orange-700 border-orange-100";
+      case "In Progress":
+        return "bg-purple-50 text-purple-700 border-purple-100";
+      case "Rejected":
+      case "Cancelled":
+        return "bg-red-50 text-red-700 border-red-100";
+      default:
+        return "bg-slate-50 text-slate-600 border-slate-200";
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col bg-white font-sans text-slate-900 overflow-hidden">
-      {/* --- UNIFIED HEADER --- */}
+    // FIX 1: Root container uses `h-full` (fits parent container) instead of `min-h-screen`
+    // This stops it from growing taller than the screen on desktop.
+    <div className="flex flex-col h-full w-full bg-white font-sans text-slate-900 overflow-hidden relative">
+      {/* --- HEADER --- */}
       <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white z-20">
-        {/* Left: Back + Title */}
         <div className="flex items-center gap-4">
           <Link
             to="/auth/home"
@@ -194,7 +523,6 @@ const Transactions = () => {
           </div>
         </div>
 
-        {/* Right: Search & Filter */}
         <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="relative flex-grow md:flex-grow-0">
             <svg
@@ -213,22 +541,19 @@ const Transactions = () => {
             </svg>
             <input
               type="text"
-              placeholder="Search ID or Item..."
+              placeholder="Search..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full md:w-64 pl-9 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 focus:outline-none focus:border-[#F2C94C] focus:bg-white transition-all placeholder:text-slate-400"
             />
           </div>
-
-          {/* Filter Toggle */}
           <div className="relative">
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className={`h-[42px] px-3.5 rounded-xl border flex items-center justify-center transition-all ${
-                isFilterOpen
-                  ? "bg-[#F2C94C] border-[#F2C94C] text-slate-900"
-                  : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
-              }`}
+              className={`h-[42px] px-3.5 rounded-xl border flex items-center justify-center transition-all ${isFilterOpen ? "bg-[#F2C94C] border-[#F2C94C] text-slate-900" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"}`}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -245,57 +570,38 @@ const Transactions = () => {
                 />
               </svg>
             </button>
-
-            {/* Dropdown */}
             {isFilterOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 p-4 z-30">
-                <div className="space-y-4">
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 p-4 z-30">
+                <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">
                       Type
                     </label>
                     <select
                       value={filters.type}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFilters((prev) => ({
                           ...prev,
                           type: e.target.value,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium focus:border-[#F2C94C] outline-none"
+                        }));
+                        setCurrentPage(1);
+                      }}
+                      className="w-full px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold focus:border-[#F2C94C] outline-none"
                     >
-                      <option value="All">All Types</option>
-                      <option value="Sold">Sold</option>
-                      <option value="Pickup">Pickup</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
-                      Status
-                    </label>
-                    <select
-                      value={filters.status}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          status: e.target.value,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium focus:border-[#F2C94C] outline-none"
-                    >
-                      <option value="All">All Statuses</option>
-                      <option value="Completed">Completed</option>
-                      <option value="In Progress">In Progress</option>
+                      <option value="All">All</option>
+                      <option value="Sell">Sold</option>
+                      <option value="Buy">Bought</option>
                     </select>
                   </div>
                   <button
                     onClick={() => {
                       setFilters({ type: "All", status: "All" });
                       setIsFilterOpen(false);
+                      setCurrentPage(1);
                     }}
                     className="w-full py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors"
                   >
-                    Reset Filters
+                    Reset
                   </button>
                 </div>
               </div>
@@ -304,48 +610,75 @@ const Transactions = () => {
         </div>
       </div>
 
-      {/* --- FULL SCREEN BODY --- */}
-      <div className="flex-grow flex flex-col overflow-hidden relative">
-        {/* Scrollable Table Area */}
-        <div className="flex-grow overflow-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200 shadow-sm">
-              <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <th
-                  className="px-8 py-4 cursor-pointer hover:text-slate-800 transition-colors"
-                  onClick={() => handleSort("id")}
-                >
-                  Transaction ID
-                </th>
-                <th
-                  className="px-6 py-4 cursor-pointer hover:text-slate-800 transition-colors"
-                  onClick={() => handleSort("date")}
-                >
-                  Date
-                </th>
-                <th className="px-6 py-4">Details</th>
-                <th className="px-6 py-4 text-right">Amount</th>
-                <th className="px-6 py-4 text-center">Status</th>
+      {/* --- TAB SWITCHER --- */}
+      <div className="shrink-0 px-6 bg-white border-b border-slate-100">
+        <div className="flex gap-6">
+          <button
+            onClick={() => {
+              setActiveTab("bookings");
+              setCurrentPage(1);
+            }}
+            className={`py-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all ${activeTab === "bookings" ? "border-[#F2C94C] text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
+          >
+            Active Bookings
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("history");
+              setCurrentPage(1);
+            }}
+            className={`py-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all ${activeTab === "history" ? "border-[#F2C94C] text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
+          >
+            History
+          </button>
+        </div>
+      </div>
+
+      {/* --- MAIN CONTENT CONTAINER --- */}
+      {/* FIX 2: flex-1, min-h-0, overflow-hidden 
+          This ensures the container fills the remaining space between Header and Bottom of screen,
+          but NEVER pushes the bottom boundary down.
+      */}
+      <div className="flex-1 flex flex-col min-h-0 w-full overflow-hidden relative">
+        {/* FIX 3: Scrollable Table Wrapper 
+          - flex-1: Fills the space above pagination
+          - overflow-auto: Handles BOTH Vertical (Y) and Horizontal (X) scrolling
+          - ref: Attached to this div to measure available height
+        */}
+        <div className="flex-1 w-full overflow-auto" ref={tableContainerRef}>
+          {/* min-w-[800px] ensures table triggers horizontal scroll on mobile instead of squishing */}
+          <table className="w-full min-w-[800px] text-left border-collapse">
+            <thead className="sticky top-0 z-10 bg-white border-b border-slate-100 shadow-sm">
+              <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <th className="px-6 py-4 bg-white">ID</th>
+                <th className="px-6 py-4 bg-white">Date</th>
+                <th className="px-6 py-4 bg-white">Details</th>
+                {activeTab === "bookings" ? (
+                  <th className="px-6 py-4 bg-white">Location</th>
+                ) : (
+                  <th className="px-6 py-4 bg-white text-right">Amount</th>
+                )}
+                <th className="px-6 py-4 bg-white text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm bg-white">
+            <tbody className="divide-y divide-slate-50 text-sm">
               {currentData.map((t) => (
                 <tr
                   key={t.id}
                   className="hover:bg-slate-50/80 transition-colors group"
                 >
-                  <td className="px-8 py-5 font-mono font-bold text-slate-400 group-hover:text-[#F2C94C] transition-colors">
+                  <td className="px-6 py-4 font-mono font-bold text-slate-400 text-xs group-hover:text-[#F2C94C] transition-colors">
                     {t.id}
                   </td>
-                  <td className="px-6 py-5 font-medium text-slate-600">
+                  <td className="px-6 py-4 font-medium text-slate-600 text-xs whitespace-nowrap">
                     {t.date}
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div
-                        className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${t.type === "Sold" ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}
+                        className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${t.type === "Sell" ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}
                       >
-                        {t.type === "Sold" ? (
+                        {t.type === "Sell" ? (
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
                             className="h-5 w-5"
@@ -372,63 +705,54 @@ const Transactions = () => {
                         )}
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 text-base">
+                        <p className="font-bold text-slate-900 text-sm whitespace-nowrap">
                           {t.item}
                         </p>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">
-                          {t.type} • {t.weight}
+                        <p className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">
+                          {t.type} •{" "}
+                          {activeTab === "bookings"
+                            ? `Est. ${t.estWeight}`
+                            : t.finalWeight}
                         </p>
                       </div>
                     </div>
                   </td>
-                  <td
-                    className={`px-6 py-5 text-right font-black text-base ${t.amount === "Pending" ? "text-slate-300 italic font-medium" : "text-slate-900"}`}
-                  >
-                    {t.amount}
-                  </td>
-                  <td className="px-6 py-5 text-center">
+                  {activeTab === "bookings" ? (
+                    <td className="px-6 py-4 text-xs font-medium text-slate-500 max-w-[150px] truncate">
+                      {t.address}
+                    </td>
+                  ) : (
+                    <td
+                      className={`px-6 py-4 text-right font-black text-base whitespace-nowrap ${t.amount.includes("Cancel") ? "text-red-300" : "text-slate-900"}`}
+                    >
+                      {t.amount}
+                    </td>
+                  )}
+                  <td className="px-6 py-4 text-center">
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
-                        t.status === "Completed"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : t.status === "In Progress"
-                            ? "bg-blue-100 text-blue-700"
-                            : "bg-slate-100 text-slate-600"
-                      }`}
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap border ${getStatusColor(t.status)}`}
                     >
                       {t.status}
                     </span>
                   </td>
                 </tr>
               ))}
-              {currentData.length === 0 && (
-                <tr>
-                  <td
-                    colSpan="5"
-                    className="px-6 py-12 text-center text-slate-400 italic"
-                  >
-                    No transactions found
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
 
-        {/* --- IMPROVED PAGINATION --- */}
-        <div className="shrink-0 px-8 py-4 border-t border-slate-100 bg-white flex items-center justify-between z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
-            Showing {(currentPage - 1) * itemsPerPage + 1} -{" "}
-            {Math.min(currentPage * itemsPerPage, sortedData.length)} of{" "}
-            {sortedData.length}
+        {/* --- PAGINATION (Sticky Footer) --- */}
+        <div className="shrink-0 px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between z-20">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+            {filteredItems.length > 0
+              ? `Showing ${(currentPage - 1) * itemsPerPage + 1}-${Math.min(currentPage * itemsPerPage, filteredItems.length)} of ${filteredItems.length}`
+              : "No Records"}
           </span>
-
-          <div className="flex items-center gap-2">
-            {/* Previous Button */}
+          <div className="flex items-center gap-1">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-30 disabled:hover:bg-white transition-all"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -445,29 +769,21 @@ const Transactions = () => {
                 />
               </svg>
             </button>
-
-            {/* Page Numbers */}
-            <div className="flex items-center gap-1 bg-slate-50/50 p-1 rounded-xl">
+            <div className="flex gap-1">
               {getPageNumbers().map((pageNum) => (
                 <button
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${
-                    currentPage === pageNum
-                      ? "bg-[#F2C94C] text-slate-900 shadow-sm"
-                      : "text-slate-500 hover:bg-white hover:shadow-sm"
-                  }`}
+                  className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${currentPage === pageNum ? "bg-[#F2C94C] text-slate-900 shadow-sm" : "text-slate-400 hover:bg-slate-50"}`}
                 >
                   {pageNum}
                 </button>
               ))}
             </div>
-
-            {/* Next Button */}
             <button
-              disabled={currentPage === totalPages}
+              disabled={currentPage === totalPages || totalPages === 0}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:hover:bg-white transition-all shadow-sm"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-100 bg-white hover:bg-slate-50 text-slate-500 disabled:opacity-30 disabled:hover:bg-white transition-all"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
