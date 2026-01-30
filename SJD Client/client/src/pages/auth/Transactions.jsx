@@ -4,450 +4,191 @@ import { Link } from "react-router-dom";
 const Transactions = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [activeTab, setActiveTab] = useState("bookings");
-
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ type: "All", status: "All" });
 
-  // Ref to measure the available space for the table
+  // Ref for auto-height calculation
   const tableContainerRef = useRef(null);
-
-  // State for dynamic items per page
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // --- DYNAMIC HEIGHT CALCULATION ---
   useLayoutEffect(() => {
     const calculateItemsPerPage = () => {
       if (tableContainerRef.current) {
-        // Get the full height of the scrollable container
         const containerHeight = tableContainerRef.current.clientHeight;
+        const headerHeight = 48;
+        const rowHeight = 72;
+        const buffer = 40;
 
-        // Estimate Header Height (approx 54px based on padding/font)
-        const headerHeight = 54;
-
-        // Estimate Row Height (approx 76px based on h-10 icon + py-4 padding + borders)
-        const rowHeight = 76;
-
-        // Calculate available height for rows
-        const availableHeight = containerHeight - headerHeight;
-
-        // Calculate how many full rows fit.
-        // Math.floor ensures we don't include a row that would trigger a scrollbar.
+        const availableHeight = containerHeight - headerHeight - buffer;
         const calculatedItems = Math.floor(availableHeight / rowHeight);
 
-        // Ensure at least 1 item is shown
-        setItemsPerPage(Math.max(1, calculatedItems));
+        setItemsPerPage(Math.max(3, calculatedItems));
       }
     };
 
-    // Calculate on mount
     calculateItemsPerPage();
-
-    // Recalculate on window resize
     window.addEventListener("resize", calculateItemsPerPage);
     return () => window.removeEventListener("resize", calculateItemsPerPage);
   }, []);
 
   // --- MOCK DATA ---
   const allData = [
-    // ACTIVE BOOKINGS
     {
       id: "BK-2026-020",
       date: "Feb 28, 2026",
       type: "Sell",
       item: "Industrial Generators",
-      estWeight: "500 kg",
+      weight: "Est. 500 kg",
       address: "Power Plant, Sector 7",
+      amount: null,
       status: "Pending Approval",
-      category: "bookings",
     },
     {
       id: "BK-2026-019",
       date: "Feb 27, 2026",
       type: "Buy",
       item: "Copper Pipes",
-      estWeight: "45 kg",
+      weight: "Est. 45 kg",
       address: "Plumbing Warehouse",
+      amount: null,
       status: "In Progress",
-      category: "bookings",
     },
     {
       id: "BK-2026-018",
       date: "Feb 26, 2026",
       type: "Sell",
-      item: "Office Monitors (CRT)",
-      estWeight: "120 kg",
+      item: "Office Monitors",
+      weight: "Est. 120 kg",
       address: "IT Park, Bldg C",
+      amount: null,
       status: "Scheduled",
-      category: "bookings",
     },
-    {
-      id: "BK-2026-017",
-      date: "Feb 25, 2026",
-      type: "Sell",
-      item: "Mixed Aluminum Siding",
-      estWeight: "30 kg",
-      address: "Renovation Site 4",
-      status: "Pending Approval",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-016",
-      date: "Feb 24, 2026",
-      type: "Buy",
-      item: "Steel Rebar (Rusted)",
-      estWeight: "250 kg",
-      address: "Construction Yard",
-      status: "Scheduled",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-015",
-      date: "Feb 22, 2026",
-      type: "Sell",
-      item: "Old Server Racks",
-      estWeight: "80 kg",
-      address: "Data Center, Uptown",
-      status: "Rejected",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-014",
-      date: "Feb 20, 2026",
-      type: "Buy",
-      item: "Lead Acid Batteries",
-      estWeight: "60 kg",
-      address: "Auto Shop 2",
-      status: "In Progress",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-013",
-      date: "Feb 18, 2026",
-      type: "Sell",
-      item: "Brass Shells",
-      estWeight: "5 kg",
-      address: "Shooting Range",
-      status: "Cancelled",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-012",
-      date: "Feb 15, 2026",
-      type: "Sell",
-      item: "Assorted E-Waste",
-      estWeight: "20 kg",
-      address: "Tech Hub, Downtown",
-      status: "Pending Approval",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-011",
-      date: "Feb 14, 2026",
-      type: "Buy",
-      item: "Rebar Scraps (Grade A)",
-      estWeight: "200 kg",
-      address: "Construction Site B",
-      status: "In Progress",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-010",
-      date: "Feb 12, 2026",
-      type: "Sell",
-      item: "Old Car Batteries",
-      estWeight: "50 kg",
-      address: "Auto Shop, Mabini St",
-      status: "Scheduled",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-009",
-      date: "Feb 10, 2026",
-      type: "Sell",
-      item: "Copper Wires",
-      estWeight: "5 kg",
-      address: "Residential, Subd 2",
-      status: "Rejected",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-008",
-      date: "Feb 09, 2026",
-      type: "Buy",
-      item: "Aluminum Sheets",
-      estWeight: "30 kg",
-      address: "Warehouse 1",
-      status: "Pending Approval",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-007",
-      date: "Feb 08, 2026",
-      type: "Sell",
-      item: "Mixed Plastic Bottles",
-      estWeight: "10 kg",
-      address: "Recycle Center",
-      status: "Cancelled",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-006",
-      date: "Feb 05, 2026",
-      type: "Sell",
-      item: "Brass Fittings",
-      estWeight: "8 kg",
-      address: "Plumbing Co.",
-      status: "Scheduled",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-005",
-      date: "Feb 03, 2026",
-      type: "Buy",
-      item: "Scrap Iron",
-      estWeight: "150 kg",
-      address: "Industrial Park",
-      status: "In Progress",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-004",
-      date: "Feb 02, 2026",
-      type: "Sell",
-      item: "Old AC Units",
-      estWeight: "100 kg",
-      address: "Hotel Renovation",
-      status: "Pending Approval",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-003",
-      date: "Feb 01, 2026",
-      type: "Sell",
-      item: "Mixed Paper",
-      estWeight: "40 kg",
-      address: "Office Bldg 3",
-      status: "Scheduled",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-002",
-      date: "Jan 28, 2026",
-      type: "Buy",
-      item: "Zinc Plates",
-      estWeight: "15 kg",
-      address: "Print Shop",
-      status: "Scheduled",
-      category: "bookings",
-    },
-    {
-      id: "BK-2026-001",
-      date: "Jan 25, 2026",
-      type: "Sell",
-      item: "Glass Cullet",
-      estWeight: "500 kg",
-      address: "Bottle Factory",
-      status: "Pending Approval",
-      category: "bookings",
-    },
-
-    // HISTORY
     {
       id: "TRX-1045",
       date: "Jan 30, 2026",
       type: "Sell",
       item: "Titanium Scrap",
-      finalWeight: "2 kg",
+      weight: "2 kg",
+      address: "Walk-in",
       amount: "₱ 5,000",
       status: "Completed",
-      category: "history",
     },
     {
       id: "TRX-1044",
       date: "Jan 29, 2026",
       type: "Buy",
       item: "Stainless Steel 304",
-      finalWeight: "100 kg",
+      weight: "100 kg",
+      address: "Delivered",
       amount: "₱ 8,500",
       status: "Completed",
-      category: "history",
     },
     {
-      id: "TRX-1043",
-      date: "Jan 29, 2026",
+      id: "BK-2026-017",
+      date: "Feb 25, 2026",
       type: "Sell",
-      item: "Cardboard Bales",
-      finalWeight: "200 kg",
-      amount: "₱ 600",
-      status: "Completed",
-      category: "history",
+      item: "Mixed Aluminum",
+      weight: "Est. 30 kg",
+      address: "Renovation Site 4",
+      amount: null,
+      status: "Pending Approval",
     },
     {
       id: "TRX-1042",
       date: "Jan 28, 2026",
       type: "Sell",
       item: "Newspapers",
-      finalWeight: "50 kg",
+      weight: "50 kg",
+      address: "Pick-up",
       amount: "₱ 150",
       status: "Completed",
-      category: "history",
     },
     {
-      id: "TRX-1041",
-      date: "Jan 27, 2026",
+      id: "BK-2026-016",
+      date: "Feb 24, 2026",
       type: "Buy",
-      item: "Engine Blocks",
-      finalWeight: "300 kg",
-      amount: "₱ 9,000",
-      status: "Completed",
-      category: "history",
-    },
-    {
-      id: "TRX-1040",
-      date: "Jan 27, 2026",
-      type: "Sell",
-      item: "Radiators (Copper)",
-      finalWeight: "15 kg",
-      amount: "₱ 2,200",
-      status: "Completed",
-      category: "history",
+      item: "Steel Rebar",
+      weight: "Est. 250 kg",
+      address: "Construction Yard",
+      amount: null,
+      status: "Scheduled",
     },
     {
       id: "TRX-1039",
       date: "Jan 26, 2026",
       type: "Sell",
       item: "Insulated Wire",
-      finalWeight: "---",
+      weight: "---",
+      address: "Main St",
       amount: "Cancelled",
       status: "Cancelled",
-      category: "history",
     },
     {
-      id: "TRX-1038",
-      date: "Jan 26, 2026",
-      type: "Buy",
-      item: "HMS 1&2",
-      finalWeight: "1000 kg",
-      amount: "₱ 28,000",
-      status: "Completed",
-      category: "history",
-    },
-    {
-      id: "TRX-1037",
-      date: "Jan 25, 2026",
+      id: "BK-2026-012",
+      date: "Feb 15, 2026",
       type: "Sell",
-      item: "Electric Motors",
-      finalWeight: "25 kg",
-      amount: "₱ 1,500",
-      status: "Completed",
-      category: "history",
-    },
-    {
-      id: "TRX-1036",
-      date: "Jan 25, 2026",
-      type: "Sell",
-      item: "Alternators",
-      finalWeight: "10 kg",
-      amount: "₱ 800",
-      status: "Completed",
-      category: "history",
+      item: "Assorted E-Waste",
+      weight: "Est. 20 kg",
+      address: "Tech Hub",
+      amount: null,
+      status: "Pending Approval",
     },
     {
       id: "TRX-1035",
       date: "Jan 25, 2026",
       type: "Sell",
       item: "High Grade Copper",
-      finalWeight: "10.5 kg",
+      weight: "10.5 kg",
+      address: "Walk-in",
       amount: "₱ 3,990",
       status: "Completed",
-      category: "history",
     },
     {
-      id: "TRX-1034",
-      date: "Jan 24, 2026",
+      id: "BK-2026-006",
+      date: "Feb 05, 2026",
       type: "Sell",
-      item: "Mixed Scrap",
-      finalWeight: "50 kg",
-      amount: "₱ 950",
-      status: "Completed",
-      category: "history",
-    },
-    {
-      id: "TRX-1033",
-      date: "Jan 22, 2026",
-      type: "Buy",
-      item: "Steel Beams",
-      finalWeight: "500 kg",
-      amount: "₱ 12,500",
-      status: "Completed",
-      category: "history",
-    },
-    {
-      id: "TRX-1032",
-      date: "Jan 20, 2026",
-      type: "Sell",
-      item: "Brass",
-      finalWeight: "---",
-      amount: "Cancelled",
-      status: "Cancelled",
-      category: "history",
-    },
-    {
-      id: "TRX-1031",
-      date: "Jan 18, 2026",
-      type: "Sell",
-      item: "E-Waste Motherboards",
-      finalWeight: "2 kg",
-      amount: "₱ 800",
-      status: "Completed",
-      category: "history",
+      item: "Brass Fittings",
+      weight: "Est. 8 kg",
+      address: "Plumbing Co.",
+      amount: null,
+      status: "Scheduled",
     },
     {
       id: "TRX-1030",
       date: "Jan 15, 2026",
       type: "Buy",
       item: "Iron Sheets",
-      finalWeight: "200 kg",
+      weight: "200 kg",
+      address: "Warehouse 2",
       amount: "₱ 4,200",
       status: "Completed",
-      category: "history",
+    },
+    {
+      id: "BK-2026-005",
+      date: "Feb 03, 2026",
+      type: "Buy",
+      item: "Scrap Iron",
+      weight: "Est. 150 kg",
+      address: "Industrial Park",
+      amount: null,
+      status: "In Progress",
     },
     {
       id: "TRX-1029",
       date: "Jan 12, 2026",
       type: "Sell",
       item: "Plastic Bottles",
-      finalWeight: "15 kg",
+      weight: "15 kg",
+      address: "Walk-in",
       amount: "₱ 225",
       status: "Completed",
-      category: "history",
-    },
-    {
-      id: "TRX-1028",
-      date: "Jan 10, 2026",
-      type: "Sell",
-      item: "Car Battery",
-      finalWeight: "12 kg",
-      amount: "₱ 300",
-      status: "Completed",
-      category: "history",
-    },
-    {
-      id: "TRX-1027",
-      date: "Jan 08, 2026",
-      type: "Buy",
-      item: "Mixed Metal",
-      finalWeight: "---",
-      amount: "Refunded",
-      status: "Cancelled",
-      category: "history",
     },
   ];
 
+  // --- FILTER & PAGINATION ---
   const getFilteredData = () => {
     return allData.filter((item) => {
-      if (item.category !== activeTab) return false;
       const matchesSearch =
         item.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -490,11 +231,9 @@ const Transactions = () => {
   };
 
   return (
-    // FIX 1: Root container uses `h-full` (fits parent container) instead of `min-h-screen`
-    // This stops it from growing taller than the screen on desktop.
     <div className="flex flex-col h-full w-full bg-white font-sans text-slate-900 overflow-hidden relative">
       {/* --- HEADER --- */}
-      <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white z-20">
+      <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white z-20 sticky top-0 md:relative">
         <div className="flex items-center gap-4">
           <Link
             to="/auth/home"
@@ -515,10 +254,10 @@ const Transactions = () => {
           </Link>
           <div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight leading-none">
-              Transaction History
+              All Transactions
             </h1>
             <p className="text-slate-500 text-xs mt-0.5 font-medium">
-              View and filter past activities
+              Manage bookings and view history
             </p>
           </div>
         </div>
@@ -593,6 +332,28 @@ const Transactions = () => {
                       <option value="Buy">Bought</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                      Status
+                    </label>
+                    <select
+                      value={filters.status}
+                      onChange={(e) => {
+                        setFilters((prev) => ({
+                          ...prev,
+                          status: e.target.value,
+                        }));
+                        setCurrentPage(1);
+                      }}
+                      className="w-full px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold focus:border-[#F2C94C] outline-none"
+                    >
+                      <option value="All">All</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Scheduled">Scheduled</option>
+                      <option value="Pending Approval">Pending</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
                   <button
                     onClick={() => {
                       setFilters({ type: "All", status: "All" });
@@ -610,127 +371,68 @@ const Transactions = () => {
         </div>
       </div>
 
-      {/* --- TAB SWITCHER --- */}
-      <div className="shrink-0 px-6 bg-white border-b border-slate-100">
-        <div className="flex gap-6">
-          <button
-            onClick={() => {
-              setActiveTab("bookings");
-              setCurrentPage(1);
-            }}
-            className={`py-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all ${activeTab === "bookings" ? "border-[#F2C94C] text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
-          >
-            Active Bookings
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("history");
-              setCurrentPage(1);
-            }}
-            className={`py-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-all ${activeTab === "history" ? "border-[#F2C94C] text-slate-900" : "border-transparent text-slate-400 hover:text-slate-600"}`}
-          >
-            History
-          </button>
-        </div>
-      </div>
-
-      {/* --- MAIN CONTENT CONTAINER --- */}
-      {/* FIX 2: flex-1, min-h-0, overflow-hidden 
-          This ensures the container fills the remaining space between Header and Bottom of screen,
-          but NEVER pushes the bottom boundary down.
-      */}
+      {/* --- TABLE CONTAINER --- */}
       <div className="flex-1 flex flex-col min-h-0 w-full overflow-hidden relative">
-        {/* FIX 3: Scrollable Table Wrapper 
-          - flex-1: Fills the space above pagination
-          - overflow-auto: Handles BOTH Vertical (Y) and Horizontal (X) scrolling
-          - ref: Attached to this div to measure available height
-        */}
-        <div className="flex-1 w-full overflow-auto" ref={tableContainerRef}>
-          {/* min-w-[800px] ensures table triggers horizontal scroll on mobile instead of squishing */}
+        <div
+          className="flex-1 w-full overflow-x-auto overflow-y-hidden"
+          ref={tableContainerRef}
+        >
+          {/* Reduced min-width to 800px to fit tighter. 
+              Padding reduced to px-4 everywhere. */}
           <table className="w-full min-w-[800px] text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-white border-b border-slate-100 shadow-sm">
+            <thead className="sticky top-0 z-10 bg-white border-b border-slate-100 shadow-sm h-[48px]">
               <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="px-6 py-4 bg-white">ID</th>
-                <th className="px-6 py-4 bg-white">Date</th>
-                <th className="px-6 py-4 bg-white">Details</th>
-                {activeTab === "bookings" ? (
-                  <th className="px-6 py-4 bg-white">Location</th>
-                ) : (
-                  <th className="px-6 py-4 bg-white text-right">Amount</th>
-                )}
-                <th className="px-6 py-4 bg-white text-center">Status</th>
+                <th className="px-4 py-3 bg-white w-24">ID</th>
+                <th className="px-4 py-3 bg-white w-28">Date</th>
+                <th className="px-4 py-3 bg-white w-24 text-center">Type</th>
+                {/* w-full makes this column "greedy" to take up extra space */}
+                <th className="px-4 py-3 bg-white w-full">Location</th>
+                <th className="px-4 py-3 bg-white text-right">Amount</th>
+                <th className="px-4 py-3 bg-white text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-sm">
               {currentData.map((t) => (
                 <tr
                   key={t.id}
-                  className="hover:bg-slate-50/80 transition-colors group"
+                  className="hover:bg-slate-50/80 transition-colors group h-[72px]"
                 >
-                  <td className="px-6 py-4 font-mono font-bold text-slate-400 text-xs group-hover:text-[#F2C94C] transition-colors">
+                  <td className="px-4 font-mono font-bold text-slate-400 text-xs group-hover:text-[#F2C94C] transition-colors whitespace-nowrap">
                     {t.id}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-600 text-xs whitespace-nowrap">
+                  <td className="px-4 font-medium text-slate-600 text-xs whitespace-nowrap">
                     {t.date}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${t.type === "Sell" ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}
-                      >
-                        {t.type === "Sell" ? (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
-                            <path
-                              fillRule="evenodd"
-                              d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                            <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0014 7z" />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900 text-sm whitespace-nowrap">
-                          {t.item}
-                        </p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap">
-                          {t.type} •{" "}
-                          {activeTab === "bookings"
-                            ? `Est. ${t.estWeight}`
-                            : t.finalWeight}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  {activeTab === "bookings" ? (
-                    <td className="px-6 py-4 text-xs font-medium text-slate-500 max-w-[150px] truncate">
-                      {t.address}
-                    </td>
-                  ) : (
-                    <td
-                      className={`px-6 py-4 text-right font-black text-base whitespace-nowrap ${t.amount.includes("Cancel") ? "text-red-300" : "text-slate-900"}`}
-                    >
-                      {t.amount}
-                    </td>
-                  )}
-                  <td className="px-6 py-4 text-center">
+                  <td className="px-4 text-center whitespace-nowrap">
                     <span
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap border ${getStatusColor(t.status)}`}
+                      className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                        t.type === "Sell"
+                          ? "bg-green-50 text-green-700 border-green-100"
+                          : "bg-blue-50 text-blue-700 border-blue-100"
+                      }`}
+                    >
+                      {t.type === "Sell" ? "Selling" : "Buying"}
+                    </span>
+                  </td>
+                  <td className="px-4 text-xs font-medium text-slate-500 max-w-[200px] truncate">
+                    {t.address}
+                  </td>
+                  <td className="px-4 text-right whitespace-nowrap">
+                    {t.amount ? (
+                      <span
+                        className={`font-black text-sm ${t.amount.includes("Cancel") ? "text-red-300" : "text-slate-900"}`}
+                      >
+                        {t.amount}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-slate-300">
+                        —
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 text-center whitespace-nowrap">
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap border ${getStatusColor(t.status)}`}
                     >
                       {t.status}
                     </span>
