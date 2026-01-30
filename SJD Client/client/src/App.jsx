@@ -45,25 +45,14 @@ const Layout = ({ children }) => {
   const navigate = useNavigate();
   const path = location.pathname;
 
-  // 1. Standalone Pages
-  if (["/auth/signin", "/auth/register"].includes(path)) {
-    return <>{children}</>;
-  }
+  // Determine layout type
+  const isAuthPage = path.startsWith("/auth");
 
-  // 2. Authenticated Dashboard Layout
-  const authRoutes = [
-    "/auth/home",
-    "/auth/bookings",
-    "/auth/transactions",
-    "/auth/transaction-details", // ADDED: Static Details Page
-    "/auth/account",
-  ];
-
-  // Check if current path matches any of the auth routes
-  const isAuthPage = authRoutes.some((route) => path.startsWith(route));
-
-  // --- Security Check ---
   useEffect(() => {
+    // 1. Scroll to top on route change
+    window.scrollTo(0, 0);
+
+    // 2. Protect /auth routes
     if (isAuthPage) {
       const token = localStorage.getItem("token");
       if (!token || isTokenExpired(token)) {
@@ -109,9 +98,9 @@ function App() {
 
           <Route path="/auth/transactions" element={<Transactions />} />
 
-          {/* STATIC ROUTE: No ID parameter here */}
+          {/* UPDATED: Added :id parameter */}
           <Route
-            path="/auth/transaction-details"
+            path="/auth/transaction-details/:id"
             element={<TransactionDetails />}
           />
 
