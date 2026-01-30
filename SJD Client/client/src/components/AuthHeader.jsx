@@ -7,6 +7,11 @@ const AuthHeader = () => {
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/auth/signin");
+  };
+
   // 1. Fetch User Data on Mount
   const getUserProfile = async () => {
     try {
@@ -14,6 +19,12 @@ const AuthHeader = () => {
         method: "GET",
         headers: { token: localStorage.getItem("token") },
       });
+
+      // --- FIX: Check for Expired Session (401/403) ---
+      if (response.status === 401 || response.status === 403) {
+        handleLogout();
+        return;
+      }
 
       if (response.ok) {
         const parseRes = await response.json();
@@ -38,11 +49,6 @@ const AuthHeader = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/auth/signin");
-  };
 
   return (
     <header className="bg-slate-900 text-white py-2 px-4 md:px-6 flex justify-between items-center shadow-md z-50 shrink-0">
