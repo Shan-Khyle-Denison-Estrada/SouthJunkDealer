@@ -1,16 +1,47 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Transactions = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ type: "All", status: "All" });
 
-  // Ref for auto-height calculation
   const tableContainerRef = useRef(null);
-  // Default to a safe number initially to allow the first render to happen so we can measure
   const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  // --- DYNAMIC HEIGHT LOGIC ---
+  useLayoutEffect(() => {
+    const calculateItems = () => {
+      const container = tableContainerRef.current;
+      if (!container) return;
+
+      const containerHeight = container.getBoundingClientRect().height;
+      const headerElement = container.querySelector("thead");
+      const headerHeight = headerElement
+        ? headerElement.getBoundingClientRect().height
+        : 48;
+
+      const rowElement = container.querySelector("tbody tr");
+      const rowHeight = rowElement
+        ? rowElement.getBoundingClientRect().height
+        : 72;
+
+      const availableHeight = containerHeight - headerHeight;
+      const calculatedItems = Math.floor(availableHeight / rowHeight);
+
+      setItemsPerPage(Math.max(1, calculatedItems));
+    };
+
+    calculateItems();
+
+    const observer = new ResizeObserver(calculateItems);
+    if (tableContainerRef.current) {
+      observer.observe(tableContainerRef.current);
+    }
+    return () => observer.disconnect();
+  }, []);
 
   // --- MOCK DATA ---
   const allData = [
@@ -166,58 +197,6 @@ const Transactions = () => {
     },
   ];
 
-  // --- DYNAMIC HEIGHT CALCULATION (FULLY DYNAMIC) ---
-  useLayoutEffect(() => {
-    const calculateItems = () => {
-      const container = tableContainerRef.current;
-      if (!container) return;
-
-      // 1. Get the exact usable height of the container
-      const containerRect = container.getBoundingClientRect();
-      const containerHeight = containerRect.height;
-
-      // 2. Measure the ACTUAL Header height from the DOM
-      const headerElement = container.querySelector("thead");
-      const headerHeight = headerElement
-        ? headerElement.getBoundingClientRect().height
-        : 48; // Fallback only if render hasn't happened yet
-
-      // 3. Measure the ACTUAL Row height from the DOM
-      // We grab the first row to determine how tall a row is.
-      const rowElement = container.querySelector("tbody tr");
-      const rowHeight = rowElement
-        ? rowElement.getBoundingClientRect().height
-        : 72; // Fallback default if list is empty or rendering
-
-      // 4. Calculate available space
-      const availableHeight = containerHeight - headerHeight;
-
-      // 5. Determine count
-      // We use floor to ensure we don't show a half-row at the bottom
-      const calculatedItems = Math.floor(availableHeight / rowHeight);
-
-      // 6. Update state only if it changed to avoid infinite loops
-      // Ensure we show at least 1 item
-      const newCount = Math.max(1, calculatedItems);
-      setItemsPerPage((prev) => (prev !== newCount ? newCount : prev));
-    };
-
-    // Calculate once on mount/update
-    calculateItems();
-
-    // Use ResizeObserver to re-calculate whenever the container size changes
-    const observer = new ResizeObserver(() => {
-      calculateItems();
-    });
-
-    if (tableContainerRef.current) {
-      observer.observe(tableContainerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [allData]); // Re-run if data changes (in case row height depends on content)
-
-  // --- FILTER & PAGINATION ---
   const getFilteredData = () => {
     return allData.filter((item) => {
       const matchesSearch =
@@ -263,7 +242,7 @@ const Transactions = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-white font-sans text-slate-900 overflow-hidden relative">
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white z-20 sticky top-0 md:relative">
         <div className="flex items-center gap-4">
           <Link
@@ -402,13 +381,12 @@ const Transactions = () => {
         </div>
       </div>
 
-      {/* --- TABLE CONTAINER --- */}
+      {/* TABLE CONTAINER */}
       <div className="flex-1 flex flex-col min-h-0 w-full overflow-hidden relative">
         <div
           className="flex-1 w-full overflow-x-auto overflow-y-hidden"
           ref={tableContainerRef}
         >
-          {/* Reduced min-width to 800px to fit tighter. */}
           <table className="w-full min-w-[800px] text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-white border-b border-slate-100 shadow-sm">
               <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider h-[48px]">
@@ -424,7 +402,9 @@ const Transactions = () => {
               {currentData.map((t) => (
                 <tr
                   key={t.id}
-                  className="hover:bg-slate-50/80 transition-colors group h-[72px]"
+                  // --- NAVIGATION TO STATIC PAGE ---
+                  onClick={() => navigate("/auth/transaction-details")}
+                  className="hover:bg-slate-50/80 transition-colors group h-[72px] cursor-pointer"
                 >
                   <td className="px-4 font-mono font-bold text-slate-400 text-xs group-hover:text-[#F2C94C] transition-colors whitespace-nowrap">
                     {t.id}
@@ -472,7 +452,7 @@ const Transactions = () => {
           </table>
         </div>
 
-        {/* --- PAGINATION (Sticky Footer) --- */}
+        {/* PAGINATION */}
         <div className="shrink-0 px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between z-20">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
             {filteredItems.length > 0

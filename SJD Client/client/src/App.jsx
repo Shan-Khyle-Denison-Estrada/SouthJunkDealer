@@ -1,10 +1,10 @@
-import { useEffect } from "react"; // Import useEffect
+import { useEffect } from "react";
 import {
   Route,
   BrowserRouter as Router,
   Routes,
   useLocation,
-  useNavigate, // Import useNavigate
+  useNavigate,
 } from "react-router-dom";
 
 import AuthHeader from "./components/AuthHeader";
@@ -16,6 +16,7 @@ import Bookings from "./pages/auth/Bookings";
 import Home from "./pages/auth/Home";
 import Register from "./pages/auth/Register";
 import SignIn from "./pages/auth/SignIn";
+import TransactionDetails from "./pages/auth/TransactionDetails";
 import Transactions from "./pages/auth/Transactions";
 import Index from "./pages/Index";
 
@@ -23,7 +24,6 @@ import Index from "./pages/Index";
 const isTokenExpired = (token) => {
   if (!token) return true;
   try {
-    // Decode the payload (2nd part of the token)
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const jsonPayload = decodeURIComponent(
@@ -34,16 +34,15 @@ const isTokenExpired = (token) => {
     );
 
     const { exp } = JSON.parse(jsonPayload);
-    // Check if expiration time is less than current time
     return exp * 1000 < Date.now();
   } catch (error) {
-    return true; // If we can't decode it, assume it's invalid
+    return true;
   }
 };
 
 const Layout = ({ children }) => {
   const location = useLocation();
-  const navigate = useNavigate(); // Get navigate hook
+  const navigate = useNavigate();
   const path = location.pathname;
 
   // 1. Standalone Pages
@@ -56,21 +55,23 @@ const Layout = ({ children }) => {
     "/auth/home",
     "/auth/bookings",
     "/auth/transactions",
+    "/auth/transaction-details", // ADDED: Static Details Page
     "/auth/account",
   ];
+
+  // Check if current path matches any of the auth routes
   const isAuthPage = authRoutes.some((route) => path.startsWith(route));
 
-  // --- NEW: Security Check ---
+  // --- Security Check ---
   useEffect(() => {
     if (isAuthPage) {
       const token = localStorage.getItem("token");
-      // If no token OR token is expired
       if (!token || isTokenExpired(token)) {
-        localStorage.removeItem("token"); // Clear invalid token
-        navigate("/auth/signin"); // Kick user out
+        localStorage.removeItem("token");
+        navigate("/auth/signin");
       }
     }
-  }, [isAuthPage, navigate, path]); // Runs whenever path changes
+  }, [isAuthPage, navigate, path]);
 
   if (isAuthPage) {
     return (
@@ -105,7 +106,15 @@ function App() {
           <Route path="/auth/register" element={<Register />} />
           <Route path="/auth/home" element={<Home />} />
           <Route path="/auth/bookings" element={<Bookings />} />
+
           <Route path="/auth/transactions" element={<Transactions />} />
+
+          {/* STATIC ROUTE: No ID parameter here */}
+          <Route
+            path="/auth/transaction-details"
+            element={<TransactionDetails />}
+          />
+
           <Route path="/auth/account" element={<Account />} />
         </Routes>
       </Layout>

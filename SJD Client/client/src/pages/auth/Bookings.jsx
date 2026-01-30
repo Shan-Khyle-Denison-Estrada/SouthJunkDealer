@@ -15,7 +15,7 @@ const Bookings = () => {
     notes: "",
   });
 
-  // Photo Uploads (Base64 strings)
+  // Photo Uploads
   const [scrapPhotos, setScrapPhotos] = useState([]);
 
   // Line Items
@@ -101,9 +101,13 @@ const Bookings = () => {
   );
 
   return (
-    <div className="flex flex-col h-full w-full bg-slate-50 overflow-hidden font-sans text-slate-900">
+    // ROOT CONTAINER
+    // 1. h-full: Fits parent container exactly (Fixes desktop overflow).
+    // 2. overflow-y-auto (Mobile): Allows THIS page to scroll vertically.
+    // 3. md:overflow-hidden (Desktop): Locks page scroll, enables internal panel scroll.
+    <div className="flex flex-col h-full w-full bg-slate-50 font-sans text-slate-900 overflow-y-auto md:overflow-hidden">
       {/* --- PAGE HEADER --- */}
-      <div className="shrink-0 px-4 md:px-6 py-3 border-b border-slate-100 flex items-center justify-between gap-4 bg-white z-20">
+      <div className="shrink-0 px-4 md:px-6 py-3 border-b border-slate-100 flex items-center justify-between gap-4 bg-white sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <Link
             to="/auth/home"
@@ -133,15 +137,17 @@ const Bookings = () => {
         </div>
       </div>
 
-      {/* --- MAIN CONTENT WRAPPER --- */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
-        {/* MOBILE TOGGLE (Top) */}
+      {/* --- CONTENT LAYOUT --- */}
+      {/* md:min-h-0 is crucial for nested scrolling on desktop */}
+      <div className="flex-1 flex flex-col md:flex-row md:min-h-0">
+        {/* MOBILE TOGGLE (Scrolls with page) */}
         <div className="md:hidden shrink-0 p-4 pb-0 flex justify-center bg-slate-50 z-10">
           <ToggleControl />
         </div>
 
-        {/* --- LEFT COLUMN: LOGISTICS --- */}
-        <div className="w-full md:w-[350px] shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-10 h-auto md:h-full md:overflow-y-auto">
+        {/* --- LEFT: LOGISTICS SIDEBAR --- */}
+        {/* Mobile: Part of flow. Desktop: Fixed width, internal scroll. */}
+        <div className="w-full md:w-[350px] shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-10 md:h-full md:overflow-y-auto custom-scrollbar">
           <div className="p-5 space-y-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-[#F2C94C]"></span>
@@ -284,17 +290,20 @@ const Bookings = () => {
           </div>
         </div>
 
-        {/* --- RIGHT COLUMN: FLEX LAYOUT FOR INTERNAL SCROLLING --- */}
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 h-auto md:h-full overflow-hidden">
+        {/* --- RIGHT: TABLE CONTENT --- */}
+        {/* Mobile: Part of flow. Desktop: Fills space, internal scroll. */}
+        <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 md:h-full md:overflow-hidden">
           {/* DESKTOP TOGGLE */}
           <div className="hidden md:flex shrink-0 p-4 pb-0 justify-center">
             <ToggleControl />
           </div>
 
-          {/* TABLE CONTAINER - flex-1 and min-h-0 ensure it takes space but allows internal scrolling */}
-          <div className="flex-1 p-4 md:p-4 min-h-0 flex flex-col">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 overflow-hidden">
-              {/* TABLE HEADER (Fixed) */}
+          {/* TABLE CONTAINER */}
+          <div className="flex-1 p-4 flex flex-col md:min-h-0">
+            {/* Table Card */}
+            {/* Mobile: min-h-[500px] ensures it's tall enough to use. Desktop: md:min-h-0 fits parent. */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[500px] md:min-h-0 md:overflow-hidden">
+              {/* HEADER */}
               <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   {transactionType === "sell"
@@ -321,9 +330,9 @@ const Bookings = () => {
                 </button>
               </div>
 
-              {/* SCROLLABLE TABLE BODY AREA */}
-              <div className="flex-1 overflow-y-auto">
-                <table className="w-full text-left border-collapse">
+              {/* TABLE BODY (Internal Scroll) */}
+              <div className="flex-1 overflow-x-auto md:overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[500px] md:min-w-0">
                   <thead className="bg-white border-b border-slate-100 sticky top-0 z-10 shadow-sm">
                     <tr className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">
                       <th className="px-4 py-3 bg-white">Material</th>
@@ -407,8 +416,8 @@ const Bookings = () => {
             </div>
           </div>
 
-          {/* BOTTOM BUTTONS (Fixed Footer) */}
-          <div className="shrink-0 p-4 md:p-6 pt-2 bg-slate-50/50 backdrop-blur-sm border-t border-slate-200/50">
+          {/* FOOTER BUTTONS */}
+          <div className="shrink-0 p-4 md:p-6 pt-2 bg-slate-50/50 backdrop-blur-sm border-t border-slate-200/50 z-20">
             <div className="flex gap-3">
               <button
                 onClick={() => navigate("/auth/home")}
