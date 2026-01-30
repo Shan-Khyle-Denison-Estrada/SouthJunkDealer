@@ -62,7 +62,7 @@ const AuthHeader = () => {
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center gap-3 focus:outline-none group p-1 rounded-full hover:bg-white/10 transition-all"
+          className="flex items-center gap-3 focus:outline-none group p-1 rounded-full hover:bg-white/10 transition-all px-4"
         >
           <div className="text-right hidden md:block">
             <p className="text-sm font-bold text-white group-hover:text-[#F2C94C] transition-colors">
@@ -112,6 +112,13 @@ const AuthHeader = () => {
             className="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#F2C94C] font-medium transition-colors border-b border-slate-50"
           >
             Dashboard
+          </Link>
+          <Link
+            to="/auth/transactions"
+            onClick={() => setIsDropdownOpen(false)}
+            className="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#F2C94C] font-medium transition-colors border-b border-slate-50"
+          >
+            Transactions
           </Link>
           <Link
             to="/auth/account"
