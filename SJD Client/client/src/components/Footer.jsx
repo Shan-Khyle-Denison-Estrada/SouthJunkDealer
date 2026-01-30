@@ -141,9 +141,11 @@ const Footer = () => {
               Get the best rates for your scrap today.
             </p>
             {/* BUTTON: #F2C94C + Dark Text */}
-            <button className="bg-[#F2C94C] hover:bg-yellow-400 text-slate-900 font-bold py-3 px-8 rounded-full transition-all shadow-lg hover:shadow-yellow-400/30 transform hover:-translate-y-1 w-full md:w-auto">
-              Get Started
-            </button>
+            <Link to="/auth/register">
+              <button className="bg-[#F2C94C] hover:bg-yellow-400 text-slate-900 font-bold py-3 px-8 rounded-full transition-all shadow-lg hover:shadow-yellow-400/30 transform hover:-translate-y-1 w-full md:w-auto">
+                Get Started
+              </button>
+            </Link>
           </div>
         </div>
 

@@ -115,7 +115,7 @@ const Navbar = () => {
 
           {/* GET STARTED BUTTON (Desktop) */}
           <Link
-            to="/register"
+            to="/auth/register"
             className="flex items-center justify-center w-36 bg-[#F2C94C] hover:bg-yellow-400 text-slate-900 font-bold py-2.5 rounded-full shadow-lg hover:shadow-yellow-400/30 transition-all transform hover:-translate-y-1 text-sm"
           >
             Get Started!
@@ -211,7 +211,7 @@ const Navbar = () => {
 
         {/* GET STARTED BUTTON (Mobile Menu) */}
         <Link
-          to="/register"
+          to="/auth/register"
           onClick={() => setIsMenuOpen(false)}
           className="mt-4 flex items-center justify-center w-48 bg-[#F2C94C] hover:bg-yellow-400 text-slate-900 font-bold py-3 rounded-full shadow-lg text-lg transition-transform active:scale-95"
         >

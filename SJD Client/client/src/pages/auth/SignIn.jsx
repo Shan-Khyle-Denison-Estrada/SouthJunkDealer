@@ -1,7 +1,43 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 const SignIn = () => {
   const navigate = useNavigate();
+
+  const [inputs, setInputs] = useState({
+    email: "",
+    password: "",
+  });
+
+  const { email, password } = inputs;
+
+  const handleChange = (e) =>
+    setInputs({ ...inputs, [e.target.name]: e.target.value });
+
+  const onSubmitForm = async (e) => {
+    e.preventDefault();
+    try {
+      const body = { email, password };
+      const response = await fetch("http://localhost:5000/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const parseRes = await response.json();
+
+      if (response.ok && parseRes.token) {
+        localStorage.setItem("token", parseRes.token);
+        // Navigate to home after successful login
+        navigate("/auth/home");
+      } else {
+        alert(parseRes || "Login Failed");
+      }
+    } catch (err) {
+      console.error(err.message);
+      alert("Server connection error");
+    }
+  };
 
   return (
     <div className="h-screen w-full flex overflow-hidden relative bg-white">
@@ -25,7 +61,7 @@ const SignIn = () => {
         <span className="text-sm font-medium">Back to Home</span>
       </button>
 
-      {/* COLUMN 1: LEFT SIDE (Dark Branding) - Hidden on Mobile */}
+      {/* LEFT SIDE */}
       <div className="hidden lg:flex w-1/2 bg-slate-900 items-center justify-center relative shadow-2xl z-10">
         <div className="absolute inset-0 bg-[url('/large_bg.png')] opacity-10 bg-cover bg-center"></div>
         <img
@@ -35,7 +71,7 @@ const SignIn = () => {
         />
       </div>
 
-      {/* COLUMN 2: RIGHT SIDE (Form) */}
+      {/* RIGHT SIDE */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 md:px-16 lg:px-24 h-full relative z-0">
         <div className="w-full max-w-md mx-auto flex flex-col justify-center h-full py-6">
           <div className="mb-8 lg:mb-10 text-center lg:text-left">
@@ -47,7 +83,10 @@ const SignIn = () => {
             </p>
           </div>
 
-          <form className="flex flex-col gap-5 lg:gap-6">
+          <form
+            className="flex flex-col gap-5 lg:gap-6"
+            onSubmit={onSubmitForm}
+          >
             {/* Email Field */}
             <div className="flex flex-col gap-2">
               <label className="font-bold text-slate-700 text-sm ml-1">
@@ -55,6 +94,9 @@ const SignIn = () => {
               </label>
               <input
                 type="email"
+                name="email"
+                value={email}
+                onChange={handleChange}
                 placeholder="juan@example.com"
                 className="w-full p-4 border border-slate-200 rounded-xl focus:outline-none focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/20 transition-all bg-slate-50 lg:bg-white shadow-sm"
               />
@@ -67,12 +109,14 @@ const SignIn = () => {
               </label>
               <input
                 type="password"
+                name="password"
+                value={password}
+                onChange={handleChange}
                 placeholder="••••••••"
                 className="w-full p-4 border border-slate-200 rounded-xl focus:outline-none focus:border-[#F2C94C] focus:ring-4 focus:ring-[#F2C94C]/20 transition-all bg-slate-50 lg:bg-white shadow-sm"
               />
             </div>
 
-            {/* Remember Me & Forgot Password */}
             <div className="flex justify-between items-center text-sm text-slate-500 font-medium px-1">
               <label className="flex items-center gap-2 cursor-pointer hover:text-slate-700 transition-colors">
                 <input
@@ -89,17 +133,15 @@ const SignIn = () => {
               </a>
             </div>
 
-            {/* Submit Button */}
             <button className="mt-2 bg-[#F2C94C] hover:bg-yellow-400 text-slate-900 font-bold py-4 rounded-xl shadow-lg hover:shadow-yellow-400/30 transition-all transform hover:-translate-y-1 text-lg">
               Sign In
             </button>
           </form>
 
-          {/* Footer Link */}
           <div className="mt-8 text-center text-sm lg:text-base text-slate-500">
             Don't have an account?{" "}
             <Link
-              to="/register"
+              to="/auth/register"
               className="font-bold text-[#F2C94C] hover:text-yellow-600 hover:underline transition-all"
             >
               Create an account

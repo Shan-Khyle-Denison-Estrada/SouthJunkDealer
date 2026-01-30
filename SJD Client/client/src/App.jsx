@@ -9,31 +9,30 @@ import AuthHeader from "./components/AuthHeader"; // Ensure this path is correct
 import Footer from "./components/Footer";
 import Navbar from "./components/Navbar";
 
-import Account from "./pages/Account";
-import Bookings from "./pages/Bookings";
-import Home from "./pages/Home";
+import Account from "./pages/auth/Account";
+import Bookings from "./pages/auth/Bookings";
+import Home from "./pages/auth/Home";
+import Register from "./pages/auth/Register";
+import SignIn from "./pages/auth/SignIn";
+import Transactions from "./pages/auth/Transactions";
 import Index from "./pages/Index";
-import Register from "./pages/Register";
-import SignIn from "./pages/SignIn";
-import Transactions from "./pages/Transactions";
 
 const Layout = ({ children }) => {
   const location = useLocation();
   const path = location.pathname;
 
   // 1. Standalone Pages (No Headers/Footers)
-  if (["/signin", "/register"].includes(path)) {
+  if (["/auth/signin", "/auth/register"].includes(path)) {
     return <>{children}</>;
   }
 
   // 2. Authenticated Dashboard Layout (Fixed Screen, No Scroll)
   // This layout forces the header to be fixed and the content to fill the rest.
   const authRoutes = [
-    "/home",
-    "/bookings",
-    "/transactions",
-    "/account",
-    "/account",
+    "/auth/home",
+    "/auth/bookings",
+    "/auth/transactions",
+    "/auth/account",
   ];
   const isAuthPage = authRoutes.some((route) => path.startsWith(route));
 
@@ -70,12 +69,12 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/bookings" element={<Bookings />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/account" element={<Account />} />
+          <Route path="/auth/signin" element={<SignIn />} />
+          <Route path="/auth/register" element={<Register />} />
+          <Route path="/auth/home" element={<Home />} />
+          <Route path="/auth/bookings" element={<Bookings />} />
+          <Route path="/auth/transactions" element={<Transactions />} />
+          <Route path="/auth/account" element={<Account />} />
         </Routes>
       </Layout>
     </Router>

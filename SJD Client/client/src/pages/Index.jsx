@@ -96,7 +96,7 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row gap-4">
             {/* LINKED BUTTON */}
             <Link
-              to="/register"
+              to="/auth/register"
               className="px-8 py-4 bg-[#F2C94C] hover:bg-yellow-400 text-slate-900 text-lg font-bold rounded-full shadow-lg hover:shadow-yellow-400/30 transition-all transform hover:-translate-y-1 flex items-center justify-center"
             >
               Get Started

@@ -1,34 +1,98 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 const Account = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    firstName: "Juan",
-    middleName: "D.",
-    lastName: "Dela Cruz",
-    contactNumber: "0917-123-4567",
-    email: "juan@southscrappers.com",
-    address: "123 Mabini St, Barangay 40, Cagayan de Oro City",
-    affiliation: "South Scrappers Co.",
-    password: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    contactNumber: "",
+    email: "",
+    address: "",
+    affiliation: "",
+    password: "", // Optional: Logic to update password could be added later
     confirmPassword: "",
   });
+
+  // 1. FETCH PROFILE ON LOAD
+  const getUserProfile = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/auth/account", {
+        method: "GET",
+        headers: { token: localStorage.getItem("token") },
+      });
+
+      if (response.ok) {
+        const parseRes = await response.json();
+        // Map database columns (snake_case) to frontend state (camelCase)
+        setFormData({
+          firstName: parseRes.first_name,
+          middleName: parseRes.middle_name || "",
+          lastName: parseRes.last_name,
+          contactNumber: parseRes.contact_number || "",
+          email: parseRes.email,
+          address: parseRes.address || "",
+          affiliation: parseRes.affiliation || "",
+          password: "",
+          confirmPassword: "",
+        });
+      } else {
+        console.error("Failed to load profile");
+      }
+    } catch (err) {
+      console.error(err.message);
+    }
+  };
+
+  useEffect(() => {
+    getUserProfile();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = (e) => {
+  // 2. SAVE CHANGES
+  const handleSave = async (e) => {
     e.preventDefault();
-    console.log("Saving Profile:", formData);
+    try {
+      const body = {
+        firstName: formData.firstName,
+        middleName: formData.middleName,
+        lastName: formData.lastName,
+        contactNumber: formData.contactNumber,
+        affiliation: formData.affiliation,
+        address: formData.address,
+        email: formData.email,
+      };
+
+      const response = await fetch("http://localhost:5000/auth/account", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          token: localStorage.getItem("token"),
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        alert("Profile Updated Successfully!");
+      } else {
+        alert("Error updating profile");
+      }
+    } catch (err) {
+      console.error(err.message);
+    }
   };
 
   const handleDelete = () => {
     if (confirm("Are you sure? This action cannot be undone.")) {
       console.log("Deleting...");
+      // Add fetch delete logic here if needed
+      localStorage.removeItem("token");
       navigate("/signin");
     }
   };
@@ -88,7 +152,6 @@ const Account = () => {
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide group-hover:text-slate-600">
                   Change Photo
                 </span>
-                <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/5 transition-colors"></div>
               </div>
             </div>
 
@@ -253,7 +316,7 @@ const Account = () => {
           <div className="flex gap-3 w-full md:w-auto">
             <button
               type="button"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/home")}
               className="flex-1 md:flex-none px-6 py-3 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 transition-all uppercase tracking-wide"
             >
               Cancel
