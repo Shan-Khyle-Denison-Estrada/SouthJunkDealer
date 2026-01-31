@@ -7,6 +7,7 @@ const Bookings = () => {
   // --- STATE ---
   const [transactionType, setTransactionType] = useState("sell");
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Added loading state
 
   // Logistics Data
   const [formData, setFormData] = useState({
@@ -62,14 +63,53 @@ const Bookings = () => {
     setLineItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleSave = () => {
-    console.log("Submitting:", {
-      type: transactionType,
-      ...formData,
-      items: lineItems,
-      photos: scrapPhotos,
-    });
-    navigate("/auth/home");
+  // --- SUBMIT HANDLER (Updated for Backend Integration) ---
+  const handleSave = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+
+      // Basic validation
+      const validItems = lineItems.filter(
+        (item) => item.material.trim() !== "",
+      );
+      if (validItems.length === 0) {
+        alert("Please add at least one item with a material name.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Prepare payload
+      const body = {
+        transactionType,
+        ...formData,
+        scrapPhotos,
+        lineItems: validItems,
+      };
+
+      const response = await fetch("http://localhost:5000/auth/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          token: token,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const parseRes = await response.json();
+
+      if (response.ok) {
+        alert("Booking Submitted Successfully!");
+        navigate("/auth/transactions"); // Redirect to transactions list
+      } else {
+        alert(parseRes || "Failed to submit booking");
+      }
+    } catch (err) {
+      console.error(err.message);
+      alert("Server Error: Could not submit booking");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // --- TOGGLE COMPONENT ---
@@ -102,9 +142,6 @@ const Bookings = () => {
 
   return (
     // ROOT CONTAINER
-    // 1. h-full: Fits parent container exactly (Fixes desktop overflow).
-    // 2. overflow-y-auto (Mobile): Allows THIS page to scroll vertically.
-    // 3. md:overflow-hidden (Desktop): Locks page scroll, enables internal panel scroll.
     <div className="flex flex-col h-full w-full bg-slate-50 font-sans text-slate-900 overflow-y-auto md:overflow-hidden">
       {/* --- PAGE HEADER --- */}
       <div className="shrink-0 px-4 md:px-6 py-3 border-b border-slate-100 flex items-center justify-between gap-4 bg-white sticky top-0 z-30">
@@ -135,10 +172,18 @@ const Bookings = () => {
             </p>
           </div>
         </div>
+
+        {/* NEW: Save Button in Header for Mobile */}
+        <button
+          onClick={handleSave}
+          disabled={isLoading}
+          className="md:hidden px-4 py-2 bg-[#F2C94C] text-slate-900 text-xs font-bold uppercase rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+        >
+          {isLoading ? "..." : "Save"}
+        </button>
       </div>
 
       {/* --- CONTENT LAYOUT --- */}
-      {/* md:min-h-0 is crucial for nested scrolling on desktop */}
       <div className="flex-1 flex flex-col md:flex-row md:min-h-0">
         {/* MOBILE TOGGLE (Scrolls with page) */}
         <div className="md:hidden shrink-0 p-4 pb-0 flex justify-center bg-slate-50 z-10">
@@ -146,7 +191,6 @@ const Bookings = () => {
         </div>
 
         {/* --- LEFT: LOGISTICS SIDEBAR --- */}
-        {/* Mobile: Part of flow. Desktop: Fixed width, internal scroll. */}
         <div className="w-full md:w-[350px] shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-10 md:h-full md:overflow-y-auto custom-scrollbar">
           <div className="p-5 space-y-4">
             <div className="flex items-center gap-2 mb-1">
@@ -291,7 +335,6 @@ const Bookings = () => {
         </div>
 
         {/* --- RIGHT: TABLE CONTENT --- */}
-        {/* Mobile: Part of flow. Desktop: Fills space, internal scroll. */}
         <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 md:h-full md:overflow-hidden">
           {/* DESKTOP TOGGLE */}
           <div className="hidden md:flex shrink-0 p-4 pb-0 justify-center">
@@ -301,18 +344,17 @@ const Bookings = () => {
           {/* TABLE CONTAINER */}
           <div className="flex-1 p-4 flex flex-col md:min-h-0">
             {/* Table Card */}
-            {/* Mobile: min-h-[500px] ensures it's tall enough to use. Desktop: md:min-h-0 fits parent. */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[500px] md:min-h-0 md:overflow-hidden">
-              {/* HEADER */}
-              <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {transactionType === "sell"
-                    ? "Items to Dispose"
-                    : "Items to Purchase"}
-                </h3>
+            <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col h-full md:overflow-hidden">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div>
+                  <h3 className="font-bold text-slate-800">Line Items</h3>
+                  <p className="text-xs text-slate-500">
+                    What materials are involved?
+                  </p>
+                </div>
                 <button
                   onClick={addLineItem}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-[10px] font-bold text-slate-600 hover:text-[#F2C94C] hover:border-[#F2C94C] transition-all uppercase tracking-wide shadow-sm"
+                  className="px-3 py-1.5 bg-slate-50 hover:bg-[#F2C94C]/10 text-slate-600 hover:text-[#F2C94C] border border-slate-200 hover:border-[#F2C94C] rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -322,7 +364,7 @@ const Bookings = () => {
                   >
                     <path
                       fillRule="evenodd"
-                      d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                      d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
                       clipRule="evenodd"
                     />
                   </svg>
@@ -330,34 +372,34 @@ const Bookings = () => {
                 </button>
               </div>
 
-              {/* TABLE BODY (Internal Scroll) */}
-              <div className="flex-1 overflow-x-auto md:overflow-y-auto custom-scrollbar">
-                <table className="w-full text-left border-collapse min-w-[500px] md:min-w-0">
-                  <thead className="bg-white border-b border-slate-100 sticky top-0 z-10 shadow-sm">
-                    <tr className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">
-                      <th className="px-4 py-3 bg-white">Material</th>
-                      <th className="px-4 py-3 w-24 md:w-32 bg-white">
+              {/* SCROLLABLE TABLE AREA */}
+              <div className="overflow-y-auto flex-1 custom-scrollbar p-2">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50 sticky top-0 z-10">
+                    <tr>
+                      <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider rounded-tl-lg">
+                        Material
+                      </th>
+                      <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">
                         {transactionType === "sell"
                           ? "Est. Weight"
-                          : "Qty Needed"}
+                          : "Quantity"}
                       </th>
-                      <th className="px-4 py-3 w-12 md:w-16 text-center bg-white"></th>
+                      <th className="p-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-10 rounded-tr-lg">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-slate-100">
                     {lineItems.map((item) => (
                       <tr
                         key={item.id}
                         className="group hover:bg-slate-50/50 transition-colors"
                       >
-                        <td className="px-4 py-2">
+                        <td className="p-2">
                           <input
                             type="text"
-                            placeholder={
-                              transactionType === "sell"
-                                ? "e.g. Mixed Copper"
-                                : "e.g. Clean Aluminum"
-                            }
+                            placeholder="e.g. Copper Wire, Aluminum..."
                             value={item.material}
                             onChange={(e) =>
                               updateLineItem(
@@ -366,106 +408,97 @@ const Bookings = () => {
                                 e.target.value,
                               )
                             }
-                            className="w-full h-10 px-3 rounded-lg bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-2 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
+                            className="w-full p-2 bg-transparent border-b border-transparent focus:border-[#F2C94C] focus:bg-white text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-300"
                           />
                         </td>
-                        <td className="px-4 py-2">
-                          <div className="relative">
-                            <input
-                              type="number"
-                              placeholder="0"
-                              value={item.estimatedWeight}
-                              onChange={(e) =>
-                                updateLineItem(
-                                  item.id,
-                                  "estimatedWeight",
-                                  e.target.value,
-                                )
-                              }
-                              className="w-full h-10 pl-3 pr-8 rounded-lg bg-slate-50 border border-transparent focus:bg-white focus:border-[#F2C94C] focus:ring-2 focus:ring-[#F2C94C]/10 text-slate-900 font-bold text-sm transition-all outline-none"
-                            />
-                            <span className="absolute right-3 top-3 text-[10px] font-bold text-slate-400 pointer-events-none">
-                              kg
-                            </span>
-                          </div>
+                        <td className="p-2 text-center">
+                          <input
+                            type="text"
+                            placeholder="0"
+                            value={item.estimatedWeight}
+                            onChange={(e) =>
+                              updateLineItem(
+                                item.id,
+                                "estimatedWeight",
+                                e.target.value,
+                              )
+                            }
+                            className="w-24 p-2 bg-transparent border-b border-transparent focus:border-[#F2C94C] focus:bg-white text-sm font-bold text-slate-900 text-right outline-none transition-all placeholder:text-slate-300 ml-auto block"
+                          />
                         </td>
-                        <td className="px-4 py-2 text-center">
-                          <button
-                            onClick={() => removeLineItem(item.id)}
-                            className="p-2 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-5 w-5"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
+                        <td className="p-2 text-center">
+                          {lineItems.length > 1 && (
+                            <button
+                              onClick={() => removeLineItem(item.id)}
+                              className="text-slate-300 hover:text-red-500 transition-colors p-1"
                             >
-                              <path
-                                fillRule="evenodd"
-                                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </button>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
 
-          {/* FOOTER BUTTONS */}
-          <div className="shrink-0 p-4 md:p-6 pt-2 bg-slate-50/50 backdrop-blur-sm border-t border-slate-200/50 z-20">
-            <div className="flex gap-3">
-              <button
-                onClick={() => navigate("/auth/home")}
-                className="flex-1 py-3.5 rounded-xl text-xs font-bold text-slate-500 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all uppercase tracking-wide shadow-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                className="flex-[2] py-3.5 rounded-xl text-sm font-black bg-gradient-to-r from-[#F2C94C] to-[#F2994A] text-slate-900 shadow-lg shadow-orange-500/20 hover:shadow-orange-500/30 hover:to-[#f28e36] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 uppercase tracking-wide relative overflow-hidden group"
-              >
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                <span className="relative">
-                  Confirm {transactionType === "sell" ? "Sale" : "Purchase"}
-                </span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-slate-900 relative"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
+              {/* FOOTER ACTIONS */}
+              <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-xl flex justify-end shrink-0">
+                <button
+                  onClick={handleSave}
+                  disabled={isLoading}
+                  className="px-6 py-3 bg-[#F2C94C] hover:bg-[#E0B843] text-slate-900 text-sm font-bold uppercase tracking-wide rounded-xl shadow-lg shadow-[#F2C94C]/20 hover:shadow-xl hover:shadow-[#F2C94C]/30 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  <path
-                    fillRule="evenodd"
-                    d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
+                  {isLoading ? (
+                    "Processing..."
+                  ) : (
+                    <>
+                      Submit Booking
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- MODAL --- */}
+      {/* --- PHOTO MODAL --- */}
       {isPhotoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900">
-                Captured Photos ({scrapPhotos.length})
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+              <h3 className="font-bold text-slate-800">Photo Gallery</h3>
               <button
                 onClick={() => setIsPhotoModalOpen(false)}
-                className="text-slate-400 hover:text-slate-900"
+                className="p-1 rounded-full hover:bg-slate-200 transition-colors"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
+                  className="h-6 w-6 text-slate-500"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -479,16 +512,13 @@ const Bookings = () => {
                 </svg>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="p-4 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-4">
               {scrapPhotos.map((photo, index) => (
-                <div
-                  key={index}
-                  className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200"
-                >
+                <div key={index} className="relative group aspect-square">
                   <img
                     src={photo}
-                    alt="Scrap Full"
-                    className="w-full h-full object-cover"
+                    alt="Detail"
+                    className="w-full h-full object-cover rounded-xl"
                   />
                   <button
                     onClick={() => removePhoto(index)}

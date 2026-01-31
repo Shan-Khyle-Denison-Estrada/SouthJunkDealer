@@ -1,89 +1,116 @@
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 const TransactionDetails = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams(); // This is likely the DB ID (e.g., "15") based on previous navigation
   const [data, setData] = useState(null);
 
-  // --- MOCK DATABASE FETCH ---
-  useLayoutEffect(() => {
-    // Determine if it is a Booking (BK) or Transaction (TRX) based on ID prefix
-    const isBooking = id?.startsWith("BK");
+  // --- FETCH REAL DATA ---
+  useEffect(() => {
+    const fetchTransactionDetails = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/bookings/my-bookings",
+          {
+            method: "GET",
+            headers: {
+              token: localStorage.getItem("token"),
+            },
+          },
+        );
 
-    if (isBooking) {
-      // --- BOOKING PHASE MOCK DATA ---
-      setData({
-        table: "bookings",
-        id: id,
-        type: "Sell",
-        status: "Pending Approval",
-        date: "Feb 28, 2026",
-        pickup_address: "Power Plant, Sector 7, Industrial District, Zone 4",
-        vehicle_type: "Truck (6-Wheeler)",
-        estimated_weight: "Est. 500 kg",
-        notes: "Requires crane for lifting. Gate pass needed.",
-        // Bookings usually have 1 main material category
-        material: {
-          name: "Industrial Generators",
-          category: "Heavy Equipment",
-        },
-        items: [], // Bookings might not have broken down line items yet
-      });
-    } else {
-      // --- COMPLETED TRANSACTION MOCK DATA ---
-      // Generate 15 Line Items to demonstrate scrolling
-      const generatedItems = Array.from({ length: 15 }).map((_, i) => {
-        const materials = [
-          "Copper Wire",
-          "Aluminum Sheet",
-          "Scrap Iron",
-          "Brass Fittings",
-          "Steel Rebar",
-        ];
-        const material = materials[i % materials.length];
-        const weight = (Math.random() * 100 + 10).toFixed(1);
-        const price = (Math.random() * 300 + 20).toFixed(2);
-        return {
-          name: `${material} - Batch #${i + 101}`,
-          weight: weight,
-          price: price,
-          subtotal: (weight * price).toFixed(2),
-        };
-      });
+        if (response.ok) {
+          const bookings = await response.json();
+          // Find the specific booking/transaction by ID (loose comparison for string/number match)
+          const found = bookings.find((b) => b.id == id);
 
-      const total = generatedItems.reduce(
-        (acc, item) => acc + Number(item.subtotal),
-        0,
-      );
+          if (found) {
+            // Determine if it's treated as a "Booking" (Pending) or "Transaction" (Completed)
+            // Adjust this logic based on your actual status values
+            const isCompleted =
+              found.status === "Completed" || found.status === "Rejected";
+            const tableType = isCompleted ? "transactions" : "bookings";
 
-      setData({
-        table: "transactions",
-        id: id || "TRX-1045",
-        type: "Sell",
-        status: "Completed",
-        date: "Jan 30, 2026",
-        pickup_address: "Main Warehouse (Walk-in)", // Transactions often happen at the yard
-        total_amount: total,
-        payment_method: "Cash on Pickup",
-        driver_name: "Michael Ray",
-        truck_plate: "ABC-1234",
-        notes: "Verified weight at scale 2. Material purity confirmed.",
-        items: generatedItems,
-      });
+            // Format ID for display (e.g., BK-2026-001)
+            const createdYear = new Date(
+              found.created_at || Date.now(),
+            ).getFullYear();
+            const displayId = `BK-${createdYear}-${String(found.id).padStart(3, "0")}`;
+
+            // Format Items
+            // Note: The provided DB schema currently only shows material_name and estimated_weight.
+            // Prices/Subtotals might be 0 if not yet in DB.
+            const formattedItems = (found.items || []).map((item, idx) => ({
+              name: item.material_name || "Unknown Material",
+              weight: item.estimated_weight || "0",
+              category: "Scrap", // Default category if not in DB
+              // These might need to be calculated or fetched if added to DB later
+              price: item.price || "0.00",
+              subtotal: item.subtotal || "0.00",
+            }));
+
+            // Calculate total estimted weight for the "Booking" view
+            const totalEstWeight = formattedItems.reduce(
+              (acc, i) => acc + Number(i.weight),
+              0,
+            );
+
+            setData({
+              table: tableType,
+              id: displayId, // Display ID
+              dbId: found.id, // Keep real ID for actions
+              type: found.transaction_type || "Buy",
+              status: found.status || "Pending Approval",
+              date: new Date(found.pickup_date).toLocaleDateString("en-US", {
+                month: "short",
+                day: "2-digit",
+                year: "numeric",
+              }),
+              pickup_address: found.pickup_address,
+              vehicle_type: "Truck (Standard)", // Placeholder if not in DB
+              estimated_weight: `Est. ${totalEstWeight} kg`,
+              notes: found.notes,
+              total_amount: found.total_amount || 0,
+              payment_method: "Cash on Pickup", // Placeholder
+              // Map the first item as the main material for the "Booking" summary view
+              material: {
+                name: formattedItems[0]?.name || "Mixed Scrap",
+                category: formattedItems[0]?.category || "General",
+              },
+              items: formattedItems,
+            });
+          } else {
+            console.error("Transaction not found");
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching details:", err);
+      }
+    };
+
+    if (id) {
+      fetchTransactionDetails();
     }
   }, [id]);
 
   // --- HANDLE CANCEL ---
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (
       window.confirm(
         "Are you sure you want to cancel this booking request? This action cannot be undone.",
       )
     ) {
-      // API Call to cancel goes here
-      console.log("Cancelled Booking:", data.id);
-      navigate(-1); // Go back to list
+      try {
+        // Example cancellation endpoint call (Assuming you might add this later)
+        // const res = await fetch(`http://localhost:5000/bookings/${data.dbId}/cancel`, { method: "POST" ... });
+
+        console.log("Cancelled Booking ID:", data.dbId);
+        // For now, just navigate back
+        navigate(-1);
+      } catch (error) {
+        console.error("Error cancelling:", error);
+      }
     }
   };
 
@@ -176,7 +203,7 @@ const TransactionDetails = () => {
               </p>
               <p className="text-3xl font-black tracking-tight">
                 {data.total_amount
-                  ? `₱${data.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  ? `₱${Number(data.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                   : "Pending"}
               </p>
             </div>
@@ -378,7 +405,7 @@ const TransactionDetails = () => {
                     </span>
                     <span className="text-lg font-black text-slate-900">
                       ₱
-                      {data.total_amount?.toLocaleString(undefined, {
+                      {Number(data.total_amount).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}

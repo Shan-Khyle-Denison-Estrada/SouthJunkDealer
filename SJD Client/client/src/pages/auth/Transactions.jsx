@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 const Transactions = () => {
@@ -8,108 +8,83 @@ const Transactions = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ type: "All", status: "All" });
 
+  // State for data instead of hardcoded array
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const tableContainerRef = useRef(null);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  // --- MOCK DATA ---
-  const allTransactions = [
-    {
-      id: "BK-2026-020",
-      date: "Feb 28, 2026",
-      type: "Sell",
-      item: "Industrial Generators",
-      status: "Pending Approval",
-      amount: "---",
-    },
-    {
-      id: "TRX-1045",
-      date: "Jan 30, 2026",
-      type: "Sell",
-      item: "Mixed Copper Wire",
-      status: "Completed",
-      amount: "₱12,500.00",
-    },
-    {
-      id: "BK-2026-019",
-      date: "Feb 25, 2026",
-      type: "Buy",
-      item: "Aluminum Scraps",
-      status: "Scheduled",
-      amount: "---",
-    },
-    {
-      id: "TRX-1044",
-      date: "Jan 28, 2026",
-      type: "Sell",
-      item: "Steel Rebar Bundle",
-      status: "Completed",
-      amount: "₱4,200.00",
-    },
-    {
-      id: "TRX-1043",
-      date: "Jan 25, 2026",
-      type: "Buy",
-      item: "Lead Batteries",
-      status: "Rejected",
-      amount: "---",
-    },
-    {
-      id: "BK-2026-015",
-      date: "Jan 20, 2026",
-      type: "Sell",
-      item: "Brass Fittings",
-      status: "In Progress",
-      amount: "---",
-    },
-    {
-      id: "TRX-1041",
-      date: "Jan 15, 2026",
-      type: "Sell",
-      item: "Titanium Scrap",
-      status: "Completed",
-      amount: "₱45,000.00",
-    },
-    {
-      id: "TRX-1040",
-      date: "Jan 10, 2026",
-      type: "Buy",
-      item: "E-Waste Components",
-      status: "Completed",
-      amount: "₱8,150.00",
-    },
-    {
-      id: "BK-2026-008",
-      date: "Jan 05, 2026",
-      type: "Sell",
-      item: "Mixed Metal",
-      status: "Pending Approval",
-      amount: "---",
-    },
-    {
-      id: "TRX-1035",
-      date: "Jan 01, 2026",
-      type: "Sell",
-      item: "Copper Pipes",
-      status: "Completed",
-      amount: "₱15,000.00",
-    },
-    {
-      id: "BK-2025-112",
-      date: "Dec 28, 2025",
-      type: "Buy",
-      item: "Old Electronics",
-      status: "Scheduled",
-      amount: "---",
-    },
-    {
-      id: "TRX-1030",
-      date: "Dec 20, 2025",
-      type: "Sell",
-      item: "Iron Sheets",
-      status: "Completed",
-      amount: "₱2,400.00",
-    },
-  ];
+  // --- FETCH DATA ---
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/bookings/my-bookings",
+          {
+            method: "GET",
+            headers: {
+              token: localStorage.getItem("token"), // Getting token from storage
+            },
+          },
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+
+          // Transform backend DB structure to match Frontend Table structure
+          const formattedData = data.map((booking) => {
+            // parsing the date
+            const dateObj = new Date(booking.pickup_date);
+            const formattedDate = dateObj.toLocaleDateString("en-US", {
+              month: "short",
+              day: "2-digit",
+              year: "numeric",
+            });
+
+            // summarizing items
+            let itemDisplay = "Mixed Scrap";
+            if (
+              booking.items &&
+              booking.items.length > 0 &&
+              booking.items[0] !== null
+            ) {
+              // specific material name or joined list
+              const names = booking.items
+                .map((i) => i.material_name)
+                .filter(Boolean);
+              itemDisplay = names.length > 0 ? names.join(", ") : "Mixed Scrap";
+              // Truncate if too long for UI
+              if (itemDisplay.length > 30)
+                itemDisplay = itemDisplay.substring(0, 30) + "...";
+            }
+
+            return {
+              id: `BK-${new Date(booking.created_at || Date.now()).getFullYear()}-${String(booking.id).padStart(3, "0")}`, // generating an ID format similar to mock
+              dbId: booking.id, // keeping real ID for navigation
+              date: formattedDate,
+              type: booking.transaction_type || "Buy", // Default to Buy if missing
+              item: itemDisplay,
+              status: booking.status || "Pending Approval", // Default status
+              amount: booking.total_amount
+                ? `₱${Number(booking.total_amount).toLocaleString()}`
+                : "---",
+            };
+          });
+
+          setTransactions(formattedData);
+        } else {
+          console.error("Failed to fetch transactions");
+        }
+      } catch (err) {
+        console.error("Error fetching transactions:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, []);
 
   // --- DYNAMIC HEIGHT LOGIC ---
   useLayoutEffect(() => {
@@ -124,6 +99,7 @@ const Transactions = () => {
         : 48;
 
       const rowElement = container.querySelector("tbody tr");
+      // If no rows (loading or empty), default to 72 to prevent div/0
       const rowHeight = rowElement
         ? rowElement.getBoundingClientRect().height
         : 72;
@@ -140,10 +116,10 @@ const Transactions = () => {
       observer.observe(tableContainerRef.current);
     }
     return () => observer.disconnect();
-  }, [allTransactions]);
+  }, [transactions, loading]); // Added transactions and loading as dep
 
   // --- FILTER & PAGINATION ---
-  const filteredData = allTransactions.filter((item) => {
+  const filteredData = transactions.filter((item) => {
     const matchesSearch =
       item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.item.toLowerCase().includes(searchTerm.toLowerCase());
@@ -220,7 +196,6 @@ const Transactions = () => {
         </div>
 
         {/* Right Side: Controls (ROW LAYOUT) */}
-        {/* Using flex-row + w-full. The input uses flex-1 to fill available width. */}
         <div className="flex flex-row w-full md:w-auto gap-3">
           <input
             type="text"
@@ -250,7 +225,6 @@ const Transactions = () => {
                   clipRule="evenodd"
                 />
               </svg>
-              {/* Text hidden on mobile to save space, visible on tablet/desktop */}
               <span className="hidden sm:inline">Filters</span>
             </button>
           </div>
@@ -304,12 +278,24 @@ const Transactions = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {displayedItems.length > 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center">
+                      <p className="text-slate-400 font-bold text-sm">
+                        Loading transactions...
+                      </p>
+                    </td>
+                  </tr>
+                ) : displayedItems.length > 0 ? (
                   displayedItems.map((item) => (
                     <tr
                       key={item.id}
                       onClick={() =>
-                        navigate(`/auth/transaction-details/${item.id}`)
+                        // Using dbId here if your details page needs the integer ID,
+                        // or stick to item.id if you want the string ID
+                        navigate(
+                          `/auth/transaction-details/${item.dbId || item.id}`,
+                        )
                       }
                       className="group hover:bg-slate-50 transition-colors cursor-pointer"
                     >

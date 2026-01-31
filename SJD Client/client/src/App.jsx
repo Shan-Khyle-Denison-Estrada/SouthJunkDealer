@@ -45,29 +45,37 @@ const Layout = ({ children }) => {
   const navigate = useNavigate();
   const path = location.pathname;
 
-  // Determine layout type
+  // 1. Identify if we are in the 'auth' folder structure
   const isAuthPage = path.startsWith("/auth");
 
+  // 2. Identify if this is a Login or Register page (Public Auth pages)
+  const isPublicAuthPage = path === "/auth/signin" || path === "/auth/register";
+
   useEffect(() => {
-    // 1. Scroll to top on route change
+    // Scroll to top on route change
     window.scrollTo(0, 0);
 
-    // 2. Protect /auth routes
-    if (isAuthPage) {
+    // Protect /auth routes, BUT skip protection for SignIn and Register
+    if (isAuthPage && !isPublicAuthPage) {
       const token = localStorage.getItem("token");
       if (!token || isTokenExpired(token)) {
         localStorage.removeItem("token");
         navigate("/auth/signin");
       }
     }
-  }, [isAuthPage, navigate, path]);
+  }, [isAuthPage, isPublicAuthPage, navigate, path]);
 
+  // Layout for Auth Pages (Dashboard, etc.) AND Signin/Register
   if (isAuthPage) {
     return (
       <div className="flex flex-col h-screen w-screen bg-slate-50 overflow-hidden text-slate-900">
-        <div className="shrink-0 z-50">
-          <AuthHeader />
-        </div>
+        {/* Only show AuthHeader if NOT on SignIn or Register pages */}
+        {!isPublicAuthPage && (
+          <div className="shrink-0 z-50">
+            <AuthHeader />
+          </div>
+        )}
+
         <main className="flex-1 relative overflow-hidden">
           <div className="absolute inset-0 overflow-hidden">{children}</div>
         </main>
@@ -75,7 +83,7 @@ const Layout = ({ children }) => {
     );
   }
 
-  // 3. Public Website Layout
+  // Layout for Public Website (Landing page, etc.)
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -98,7 +106,6 @@ function App() {
 
           <Route path="/auth/transactions" element={<Transactions />} />
 
-          {/* UPDATED: Added :id parameter */}
           <Route
             path="/auth/transaction-details/:id"
             element={<TransactionDetails />}
