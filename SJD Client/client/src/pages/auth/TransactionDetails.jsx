@@ -74,6 +74,19 @@ const TransactionDetails = () => {
     }
   }, [id]);
 
+  // --- HANDLE CANCEL ---
+  const handleCancel = () => {
+    if (
+      window.confirm(
+        "Are you sure you want to cancel this booking request? This action cannot be undone.",
+      )
+    ) {
+      // API Call to cancel goes here
+      console.log("Cancelled Booking:", data.id);
+      navigate(-1); // Go back to list
+    }
+  };
+
   if (!data)
     return (
       <div className="h-full flex items-center justify-center text-slate-400">
@@ -82,6 +95,9 @@ const TransactionDetails = () => {
     );
 
   const isBooking = data.table === "bookings";
+
+  // Define statuses that allow cancellation
+  const isCancelable = ["Pending Approval", "Scheduled"].includes(data.status);
 
   // --- STYLES ---
   const getStatusStyle = (status) => {
@@ -96,6 +112,8 @@ const TransactionDetails = () => {
         return "bg-purple-100 text-purple-800 border-purple-200";
       case "Rejected":
         return "bg-red-100 text-red-800 border-red-200";
+      case "Cancelled":
+        return "bg-slate-200 text-slate-600 border-slate-300";
       default:
         return "bg-slate-100 text-slate-700 border-slate-200";
     }
@@ -218,6 +236,33 @@ const TransactionDetails = () => {
                 </label>
                 <p className="text-xs text-slate-500 leading-relaxed italic">
                   "{data.notes}"
+                </p>
+              </div>
+            )}
+
+            {/* --- CANCEL BUTTON (Visible only if Pending/Scheduled) --- */}
+            {isCancelable && (
+              <div className="pt-4 mt-auto">
+                <button
+                  onClick={handleCancel}
+                  className="w-full py-3 rounded-xl border-2 border-red-100 text-red-600 font-bold text-xs uppercase tracking-wider hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center gap-2"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Cancel Request
+                </button>
+                <p className="text-[10px] text-slate-400 text-center mt-2 font-medium">
+                  Cancellation is irreversible.
                 </p>
               </div>
             )}
