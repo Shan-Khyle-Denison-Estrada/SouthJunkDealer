@@ -1,29 +1,29 @@
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import {
-    ArrowDown,
-    ArrowUp,
-    Check,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    Filter,
-    Search,
-    Trash2,
-    X,
-    XCircle,
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Search,
+  Trash2,
+  X,
+  XCircle,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useColorScheme,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme,
 } from "react-native";
 
 // --- REVERTED TO ORIGINAL PAGE SIZE ---
@@ -476,11 +476,11 @@ export default function MaterialIndex() {
   };
 
   const handleRowClick = (item) => {
-    setSelectedTransaction(item);
-    setItemName(item.item);
-    setTransType(item.type);
-    setStatus(item.status);
-    setEditModalVisible(true);
+    // Navigate to the new detailed page
+    router.push({
+      pathname: "/bookingDetailed",
+      params: { bookingId: item.id },
+    });
   };
 
   const resetForm = () => {

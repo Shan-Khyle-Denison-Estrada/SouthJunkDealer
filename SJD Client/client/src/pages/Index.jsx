@@ -29,7 +29,7 @@ const faqData = [
       "We accept a wide range of scrap materials including copper, aluminum, steel, brass, and electronic waste. Our AI systems help categorize and price these efficiently.",
   },
   {
-    question: "How does the AI pricing work?",
+    question: "How to sell?",
     answer:
       "Our system analyzes market trends and material quality in real-time to provide the most competitive and fair pricing available, removing the guesswork from trading.",
   },
@@ -90,7 +90,8 @@ const Index = () => {
 
           <p className="text-slate-300 text-lg md:text-xl mb-10 max-w-2xl leading-relaxed font-light">
             South Junk Dealer connects you to the circular economy with
-            AI-driven pricing, secure transactions, and hassle-free pickups.
+            AI-driven business process, secure transactions, and hassle-free
+            pickups.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4">

@@ -145,6 +145,11 @@ function RootLayoutNav() {
         name="detailedAuditTrail"
         options={{ title: "Detailed Audit Trail" }}
       />
+
+      <Stack.Screen
+        name="bookingDetailed"
+        options={{ title: "Booking Details" }}
+      />
     </Stack>
   );
 }
