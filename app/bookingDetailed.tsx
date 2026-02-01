@@ -848,7 +848,7 @@ export default function BookingDetailed() {
           <View className="flex-row gap-6 mb-2">
             <View className="flex-1">
               <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                Transaction Type
+                Booking Type
               </Text>
               <View className="h-12">
                 <CustomPicker
@@ -856,8 +856,8 @@ export default function BookingDetailed() {
                   onValueChange={setTransactionType}
                   placeholder="Select Type"
                   items={[
-                    { label: "Buying (In)", value: "Buying" },
-                    { label: "Selling (Out)", value: "Selling" },
+                    { label: "Buying", value: "Buying" },
+                    { label: "Selling", value: "Selling" },
                   ]}
                   theme={theme}
                   disabled={!isEditable}
