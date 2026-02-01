@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
     Ban,
@@ -21,6 +22,7 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
+    Image,
     Modal,
     Pressable,
     ScrollView,
@@ -32,7 +34,7 @@ import {
     View,
 } from "react-native";
 
-// --- MOCK DATABASE (Initial State with Payment Methods) ---
+// --- MOCK DATABASE ---
 const MOCK_DB = {
   "BK-2026-101": {
     type: "Buying",
@@ -53,6 +55,8 @@ const MOCK_DB = {
         subtotal: 5400,
       },
     ],
+    licenseImage: null,
+    scrapImage: null,
   },
   "BK-2026-102": {
     type: "Selling",
@@ -73,6 +77,8 @@ const MOCK_DB = {
         subtotal: 12000,
       },
     ],
+    licenseImage: null,
+    scrapImage: null,
   },
   "BK-2026-103": {
     type: "Buying",
@@ -93,6 +99,8 @@ const MOCK_DB = {
         subtotal: 2100,
       },
     ],
+    licenseImage: null,
+    scrapImage: null,
   },
   "BK-2026-104": {
     type: "Buying",
@@ -108,6 +116,8 @@ const MOCK_DB = {
     items: [
       { id: 1, material: "Steel Rods", price: 17, weight: 500, subtotal: 8500 },
     ],
+    licenseImage: null,
+    scrapImage: null,
   },
   "BK-2026-105": {
     type: "Selling",
@@ -122,6 +132,8 @@ const MOCK_DB = {
     items: [
       { id: 1, material: "Iron Ore", price: 5, weight: 9000, subtotal: 45000 },
     ],
+    licenseImage: null,
+    scrapImage: null,
   },
   DEFAULT: {
     type: "Buying",
@@ -134,6 +146,8 @@ const MOCK_DB = {
     status: "Pending",
     date: "Today",
     items: [],
+    licenseImage: null,
+    scrapImage: null,
   },
 };
 
@@ -346,12 +360,18 @@ export default function BookingDetailed() {
   const [status, setStatus] = useState("Pending");
   const [rejectionNote, setRejectionNote] = useState("");
 
+  // Images State
+  const [licenseImage, setLicenseImage] = useState(null);
+  const [scrapImage, setScrapImage] = useState(null);
+
   // Modals & Inputs
   const [finishModalVisible, setFinishModalVisible] = useState(false);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [processModalVisible, setProcessModalVisible] = useState(false);
   const [addItemModalVisible, setAddItemModalVisible] = useState(false);
-  const [licenseModalVisible, setLicenseModalVisible] = useState(false);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [selectedImageTitle, setSelectedImageTitle] = useState("");
 
   const [paidAmountInput, setPaidAmountInput] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
@@ -363,7 +383,6 @@ export default function BookingDetailed() {
   const loadTransactionData = async () => {
     try {
       setLoading(true);
-      // 1. Try to fetch saved data from phone storage
       const savedData = await AsyncStorage.getItem(`booking_${bookingId}`);
 
       let data;
@@ -373,9 +392,8 @@ export default function BookingDetailed() {
         data = MOCK_DB[bookingId] || MOCK_DB["DEFAULT"];
       }
 
-      // 2. Populate State
       setTransactionType(data.type);
-      setPaymentMethod(data.paymentMethod || ""); // Added Payment Method
+      setPaymentMethod(data.paymentMethod || "");
       setClientName(data.client);
       setClientAffiliation(data.affiliation);
       setDriverName(data.driver);
@@ -387,6 +405,8 @@ export default function BookingDetailed() {
         (data.items || []).reduce((acc, curr) => acc + curr.subtotal, 0),
       );
       setRejectionNote(data.rejectionNote || "");
+      setLicenseImage(data.licenseImage || null);
+      setScrapImage(data.scrapImage || null);
     } catch (e) {
       console.error("Failed to load data", e);
     } finally {
@@ -410,7 +430,7 @@ export default function BookingDetailed() {
     const saveData = async () => {
       const dataToSave = {
         type: transactionType,
-        paymentMethod: paymentMethod, // Added Payment Method
+        paymentMethod: paymentMethod,
         client: clientName,
         affiliation: clientAffiliation,
         driver: driverName,
@@ -419,6 +439,8 @@ export default function BookingDetailed() {
         status: status,
         items: lineItems,
         rejectionNote: rejectionNote,
+        licenseImage: licenseImage,
+        scrapImage: scrapImage,
         date: MOCK_DB[bookingId]?.date || "Today",
       };
       try {
@@ -446,9 +468,71 @@ export default function BookingDetailed() {
     status,
     lineItems,
     rejectionNote,
+    licenseImage,
+    scrapImage,
   ]);
 
   // --- HANDLERS ---
+  const handleOpenCamera = async (target) => {
+    // Request Permission
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert(
+        "Permission Required",
+        "You need to grant camera access to use this feature.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      if (target === "license") {
+        setLicenseImage(result.assets[0].uri);
+        Alert.alert("Success", "License captured successfully.");
+      } else if (target === "scrap") {
+        setScrapImage(result.assets[0].uri);
+
+        // --- AUTO-GENERATE 10 ITEMS (Empty Values) ---
+        const generatedItems = Array.from({ length: 10 }).map((_, i) => {
+          const randomMat =
+            MATERIALS_LIST[Math.floor(Math.random() * MATERIALS_LIST.length)];
+          return {
+            id: Date.now() + i,
+            material: randomMat.label,
+            weight: "", // Empty for manual input
+            price: "", // Empty for manual input
+            subtotal: 0,
+          };
+        });
+
+        const updatedItems = [...lineItems, ...generatedItems];
+        setLineItems(updatedItems);
+        // Recalculate total (will just add 0 since subtotals are 0)
+        setGrandTotal(
+          updatedItems.reduce((acc, curr) => acc + curr.subtotal, 0),
+        );
+
+        Alert.alert(
+          "Scan Complete",
+          "10 scanned items added. Please fill in details.",
+        );
+      }
+    }
+  };
+
+  const handleViewImage = (uri, title) => {
+    if (!uri) return;
+    setSelectedImageUri(uri);
+    setSelectedImageTitle(title);
+    setImageModalVisible(true);
+  };
+
   const handleAddItem = () => {
     if (status !== "Processing") return;
     setNewItemMaterialId(null);
@@ -460,14 +544,15 @@ export default function BookingDetailed() {
     const matName =
       MATERIALS_LIST.find((m) => m.value === newItemMaterialId)?.label ||
       "Unknown";
-    const defPrice =
-      MATERIALS_LIST.find((m) => m.value === newItemMaterialId)?.price || 0;
+    // Default price lookup (optional, or set to "" if you want strict manual)
+    // The previous prompt said "typeable", so setting it to "" for consistency with scan
+    const defPrice = "";
 
     let updatedItems = [...lineItems];
     updatedItems.push({
       id: Date.now(),
       material: matName,
-      weight: 0,
+      weight: "",
       price: defPrice,
       subtotal: 0,
     });
@@ -481,6 +566,7 @@ export default function BookingDetailed() {
     const updatedItems = lineItems.map((item) => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
+        // Ensure calculation handles empty strings safely
         const w = parseFloat(field === "weight" ? value : item.weight) || 0;
         const p = parseFloat(field === "price" ? value : item.price) || 0;
         updatedItem.subtotal = w * p;
@@ -868,23 +954,28 @@ export default function BookingDetailed() {
             </View>
             <TouchableOpacity
               onPress={() =>
-                isCompleted ? setLicenseModalVisible(true) : null
+                licenseImage || isCompleted
+                  ? handleViewImage(licenseImage, "Driver's License")
+                  : isEditable
+                    ? handleOpenCamera("license")
+                    : null
               }
-              disabled={!isEditable && !isCompleted}
+              disabled={!isEditable && !isCompleted && !licenseImage}
               className="h-12 px-3 flex-row items-center gap-2 rounded border flex-shrink-0"
               style={{
                 borderColor: theme.border,
-                backgroundColor: isCompleted
-                  ? isDark
-                    ? "#1e3a8a"
-                    : "#dbeafe"
-                  : isDark
-                    ? "#333"
-                    : "#F3F4F6",
-                opacity: isEditable || isCompleted ? 1 : 0.6,
+                backgroundColor:
+                  isCompleted || licenseImage
+                    ? isDark
+                      ? "#1e3a8a"
+                      : "#dbeafe"
+                    : isDark
+                      ? "#333"
+                      : "#F3F4F6",
+                opacity: isEditable || isCompleted || licenseImage ? 1 : 0.6,
               }}
             >
-              {isCompleted ? (
+              {isCompleted || licenseImage ? (
                 <Eye size={16} color={theme.primary} />
               ) : (
                 <Camera size={16} color={theme.textSecondary} />
@@ -892,10 +983,13 @@ export default function BookingDetailed() {
               <Text
                 className="text-[10px] font-bold uppercase"
                 style={{
-                  color: isCompleted ? theme.primary : theme.textSecondary,
+                  color:
+                    isCompleted || licenseImage
+                      ? theme.primary
+                      : theme.textSecondary,
                 }}
               >
-                {isCompleted ? "View License" : "License"}
+                {isCompleted || licenseImage ? "View License" : "License"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -924,6 +1018,7 @@ export default function BookingDetailed() {
               {isProcessing && (
                 <>
                   <TouchableOpacity
+                    onPress={() => handleOpenCamera("scrap")}
                     className="flex-row items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md border flex-shrink-0"
                     style={{ borderColor: theme.border }}
                   >
@@ -935,6 +1030,15 @@ export default function BookingDetailed() {
                       Scrap Scan
                     </Text>
                   </TouchableOpacity>
+                  {/* If a scan exists, show a view button too */}
+                  {scrapImage && (
+                    <TouchableOpacity
+                      onPress={() => handleViewImage(scrapImage, "Scrap Scan")}
+                      className="flex-row items-center gap-2 bg-green-100 px-3 py-1.5 rounded-md flex-shrink-0"
+                    >
+                      <Eye size={14} color="green" />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     onPress={handleAddItem}
                     className="flex-row items-center gap-2 bg-blue-600 px-3 py-1.5 rounded-md flex-shrink-0"
@@ -945,6 +1049,22 @@ export default function BookingDetailed() {
                     </Text>
                   </TouchableOpacity>
                 </>
+              )}
+              {/* Show Scrap Scan View if Completed and exists */}
+              {isCompleted && scrapImage && (
+                <TouchableOpacity
+                  onPress={() => handleViewImage(scrapImage, "Scrap Scan")}
+                  className="flex-row items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md border flex-shrink-0"
+                  style={{ borderColor: theme.border }}
+                >
+                  <Eye size={14} color={theme.textPrimary} />
+                  <Text
+                    className="text-xs font-bold"
+                    style={{ color: theme.textPrimary }}
+                  >
+                    View Scan
+                  </Text>
+                </TouchableOpacity>
               )}
             </View>
           </View>
@@ -1010,6 +1130,8 @@ export default function BookingDetailed() {
                           handleUpdateLineItem(item.id, "weight", val)
                         }
                         keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor={theme.placeholder}
                         className="w-full text-center border rounded py-1 px-1 font-bold text-sm"
                         style={{
                           color: theme.textPrimary,
@@ -1036,6 +1158,8 @@ export default function BookingDetailed() {
                           handleUpdateLineItem(item.id, "price", val)
                         }
                         keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor={theme.placeholder}
                         className="w-full text-center border rounded py-1 px-1 font-bold text-sm"
                         style={{
                           color: theme.textPrimary,
@@ -1402,16 +1526,16 @@ export default function BookingDetailed() {
         </Pressable>
       </Modal>
 
-      {/* --- MODAL: VIEW LICENSE --- */}
+      {/* --- MODAL: VIEW IMAGE --- */}
       <Modal
-        visible={licenseModalVisible}
+        visible={imageModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setLicenseModalVisible(false)}
+        onRequestClose={() => setImageModalVisible(false)}
       >
         <Pressable
           style={styles.modalOverlay}
-          onPress={() => setLicenseModalVisible(false)}
+          onPress={() => setImageModalVisible(false)}
         >
           <Pressable
             style={[
@@ -1425,26 +1549,36 @@ export default function BookingDetailed() {
                 className="text-lg font-bold"
                 style={{ color: theme.textPrimary }}
               >
-                Driver's License
+                {selectedImageTitle}
               </Text>
-              <TouchableOpacity onPress={() => setLicenseModalVisible(false)}>
+              <TouchableOpacity onPress={() => setImageModalVisible(false)}>
                 <X size={24} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
             <View
-              className="w-full aspect-video bg-gray-200 dark:bg-gray-800 rounded-lg items-center justify-center border-2 border-dashed"
+              className="w-full aspect-video bg-gray-200 dark:bg-gray-800 rounded-lg items-center justify-center border-2 border-dashed overflow-hidden"
               style={{ borderColor: theme.border }}
             >
-              <ImageIcon size={48} color={theme.textSecondary} />
-              <Text
-                className="text-xs font-bold uppercase mt-2"
-                style={{ color: theme.textSecondary }}
-              >
-                License Image Mock
-              </Text>
+              {selectedImageUri ? (
+                <Image
+                  source={{ uri: selectedImageUri }}
+                  style={{ width: "100%", height: "100%" }}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View className="items-center">
+                  <ImageIcon size={48} color={theme.textSecondary} />
+                  <Text
+                    className="text-xs font-bold uppercase mt-2"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    No Image Available
+                  </Text>
+                </View>
+              )}
             </View>
             <TouchableOpacity
-              onPress={() => setLicenseModalVisible(false)}
+              onPress={() => setImageModalVisible(false)}
               className="mt-4 w-full h-12 bg-blue-600 rounded-lg items-center justify-center"
             >
               <Text className="text-white font-bold">Close</Text>
