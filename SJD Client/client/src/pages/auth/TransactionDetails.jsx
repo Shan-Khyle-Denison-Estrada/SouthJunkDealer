@@ -234,14 +234,14 @@ const TransactionDetails = () => {
                 </div>
               )}
 
-              <div className="col-span-2 md:col-span-1">
+              {/* <div className="col-span-2 md:col-span-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                   Vehicle Info
                 </label>
                 <p className="text-sm font-bold text-slate-700">
                   {data.vehicle_type || data.truck_plate || "N/A"}
                 </p>
-              </div>
+              </div> */}
 
               {!isBooking && (
                 <div>
