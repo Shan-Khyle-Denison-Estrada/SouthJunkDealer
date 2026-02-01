@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
     Ban,
@@ -15,8 +16,9 @@ import {
     Trash2,
     X,
 } from "lucide-react-native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     FlatList,
     Modal,
@@ -30,7 +32,7 @@ import {
     View,
 } from "react-native";
 
-// --- MOCK DATABASE FOR DETAILED VIEW ---
+// --- MOCK DATABASE (Initial State with Payment Methods) ---
 const MOCK_DB = {
   "BK-2026-101": {
     type: "Buying",
@@ -39,6 +41,7 @@ const MOCK_DB = {
     driver: "Mike Ross",
     plate: "ABC-123",
     weight: "2500",
+    paymentMethod: "Cash",
     status: "Pending",
     date: "Feb 01, 2026",
     items: [
@@ -58,6 +61,7 @@ const MOCK_DB = {
     driver: "Harvey S.",
     plate: "XYZ-999",
     weight: "5000",
+    paymentMethod: "Bank Transfer",
     status: "Processing",
     date: "Jan 30, 2026",
     items: [
@@ -77,6 +81,7 @@ const MOCK_DB = {
     driver: "N/A",
     plate: "N/A",
     weight: "0",
+    paymentMethod: "Cash",
     status: "Completed",
     date: "Jan 29, 2026",
     items: [
@@ -96,6 +101,7 @@ const MOCK_DB = {
     driver: "Mario B.",
     plate: "DEF-456",
     weight: "1200",
+    paymentMethod: "Cheque",
     status: "Rejected",
     date: "Jan 28, 2026",
     rejectionNote: "Incorrect material grade provided by driver.",
@@ -110,6 +116,7 @@ const MOCK_DB = {
     driver: "Luigi",
     plate: "GHI-789",
     weight: "15000",
+    paymentMethod: "Bank Transfer",
     status: "Pending",
     date: "Jan 27, 2026",
     items: [
@@ -123,6 +130,7 @@ const MOCK_DB = {
     driver: "",
     plate: "",
     weight: "",
+    paymentMethod: "Cash",
     status: "Pending",
     date: "Today",
     items: [],
@@ -194,12 +202,12 @@ const CustomPicker = ({
           {
             backgroundColor: theme.inputBg,
             borderColor: theme.border,
-            opacity: 0.7,
+            opacity: 0.6,
           },
         ]}
       >
         <Text
-          style={[styles.pickerText, { color: theme.textPrimary }]}
+          style={[styles.pickerText, { color: theme.textSecondary }]}
           numberOfLines={1}
         >
           {displayLabel}
@@ -320,6 +328,8 @@ export default function BookingDetailed() {
   };
 
   const bookingId = params.bookingId || "NEW";
+  const [loading, setLoading] = useState(true);
+  const isFirstLoad = useRef(true);
 
   // Data State
   const [lineItems, setLineItems] = useState([]);
@@ -346,22 +356,45 @@ export default function BookingDetailed() {
   const [paidAmountInput, setPaidAmountInput] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
 
-  // Add Item State (Only Material needed for initial add, others edited inline)
+  // Add Item State
   const [newItemMaterialId, setNewItemMaterialId] = useState(null);
 
-  // --- LOAD DATA ---
-  const loadTransactionData = () => {
-    const data = MOCK_DB[bookingId] || MOCK_DB["DEFAULT"];
-    setTransactionType(data.type);
-    setClientName(data.client);
-    setClientAffiliation(data.affiliation);
-    setDriverName(data.driver);
-    setTruckPlate(data.plate);
-    setTruckWeight(data.weight);
-    setStatus(data.status);
-    setLineItems(data.items || []);
-    setGrandTotal(data.items.reduce((acc, curr) => acc + curr.subtotal, 0));
-    setRejectionNote(data.rejectionNote || "");
+  // --- PERSISTENCE: LOAD DATA ---
+  const loadTransactionData = async () => {
+    try {
+      setLoading(true);
+      // 1. Try to fetch saved data from phone storage
+      const savedData = await AsyncStorage.getItem(`booking_${bookingId}`);
+
+      let data;
+      if (savedData) {
+        data = JSON.parse(savedData);
+      } else {
+        data = MOCK_DB[bookingId] || MOCK_DB["DEFAULT"];
+      }
+
+      // 2. Populate State
+      setTransactionType(data.type);
+      setPaymentMethod(data.paymentMethod || ""); // Added Payment Method
+      setClientName(data.client);
+      setClientAffiliation(data.affiliation);
+      setDriverName(data.driver);
+      setTruckPlate(data.plate);
+      setTruckWeight(data.weight);
+      setStatus(data.status);
+      setLineItems(data.items || []);
+      setGrandTotal(
+        (data.items || []).reduce((acc, curr) => acc + curr.subtotal, 0),
+      );
+      setRejectionNote(data.rejectionNote || "");
+    } catch (e) {
+      console.error("Failed to load data", e);
+    } finally {
+      setLoading(false);
+      setTimeout(() => {
+        isFirstLoad.current = false;
+      }, 500);
+    }
   };
 
   useFocusEffect(
@@ -369,6 +402,51 @@ export default function BookingDetailed() {
       loadTransactionData();
     }, [bookingId]),
   );
+
+  // --- PERSISTENCE: SAVE DATA ---
+  useEffect(() => {
+    if (loading || isFirstLoad.current) return;
+
+    const saveData = async () => {
+      const dataToSave = {
+        type: transactionType,
+        paymentMethod: paymentMethod, // Added Payment Method
+        client: clientName,
+        affiliation: clientAffiliation,
+        driver: driverName,
+        plate: truckPlate,
+        weight: truckWeight,
+        status: status,
+        items: lineItems,
+        rejectionNote: rejectionNote,
+        date: MOCK_DB[bookingId]?.date || "Today",
+      };
+      try {
+        await AsyncStorage.setItem(
+          `booking_${bookingId}`,
+          JSON.stringify(dataToSave),
+        );
+        console.log("Auto-saved:", bookingId);
+      } catch (e) {
+        console.error("Failed to save", e);
+      }
+    };
+
+    const debounceSave = setTimeout(() => {
+      saveData();
+    }, 500);
+
+    return () => clearTimeout(debounceSave);
+  }, [
+    transactionType,
+    paymentMethod,
+    driverName,
+    truckPlate,
+    truckWeight,
+    status,
+    lineItems,
+    rejectionNote,
+  ]);
 
   // --- HANDLERS ---
   const handleAddItem = () => {
@@ -382,7 +460,6 @@ export default function BookingDetailed() {
     const matName =
       MATERIALS_LIST.find((m) => m.value === newItemMaterialId)?.label ||
       "Unknown";
-    // Default price lookup
     const defPrice =
       MATERIALS_LIST.find((m) => m.value === newItemMaterialId)?.price || 0;
 
@@ -390,7 +467,7 @@ export default function BookingDetailed() {
     updatedItems.push({
       id: Date.now(),
       material: matName,
-      weight: 0, // Default 0, user types inline
+      weight: 0,
       price: defPrice,
       subtotal: 0,
     });
@@ -404,7 +481,6 @@ export default function BookingDetailed() {
     const updatedItems = lineItems.map((item) => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
-        // Recalculate subtotal
         const w = parseFloat(field === "weight" ? value : item.weight) || 0;
         const p = parseFloat(field === "price" ? value : item.price) || 0;
         updatedItem.subtotal = w * p;
@@ -457,6 +533,17 @@ export default function BookingDetailed() {
   const showTypeBadge = isPending || isRejected;
   const showLogisticsAndPayment = !isPending && !isRejected;
   const isEditable = isProcessing;
+
+  if (loading) {
+    return (
+      <View
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: theme.background }}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
 
   return (
     <View
@@ -667,154 +754,152 @@ export default function BookingDetailed() {
           </View>
         </View>
 
-        {/* LOGISTICS & PAYMENT HEADER CARD (Visible if NOT Pending AND NOT Rejected) */}
-        {showLogisticsAndPayment && (
-          <View
-            className="rounded-lg border bg-card p-4"
-            style={{ backgroundColor: theme.card, borderColor: theme.border }}
-          >
-            <View className="flex-row gap-6 mb-2">
-              <View className="flex-1">
-                <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Transaction Type
-                </Text>
-                <View className="h-12">
-                  <CustomPicker
-                    selectedValue={transactionType}
-                    onValueChange={setTransactionType}
-                    placeholder="Select Type"
-                    items={[
-                      { label: "Buying (In)", value: "Buying" },
-                      { label: "Selling (Out)", value: "Selling" },
-                    ]}
-                    theme={theme}
-                    disabled={!isEditable}
-                  />
-                </View>
-              </View>
-              <View className="flex-1">
-                <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Payment Method
-                </Text>
-                <View className="h-12">
-                  <CustomPicker
-                    selectedValue={paymentMethod}
-                    onValueChange={setPaymentMethod}
-                    placeholder="Select Method"
-                    items={PAYMENT_METHODS}
-                    theme={theme}
-                    disabled={!isEditable}
-                  />
-                </View>
+        {/* LOGISTICS & PAYMENT HEADER CARD (ALWAYS VISIBLE) */}
+        <View
+          className="rounded-lg border bg-card p-4"
+          style={{ backgroundColor: theme.card, borderColor: theme.border }}
+        >
+          <View className="flex-row gap-6 mb-2">
+            <View className="flex-1">
+              <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                Transaction Type
+              </Text>
+              <View className="h-12">
+                <CustomPicker
+                  selectedValue={transactionType}
+                  onValueChange={setTransactionType}
+                  placeholder="Select Type"
+                  items={[
+                    { label: "Buying (In)", value: "Buying" },
+                    { label: "Selling (Out)", value: "Selling" },
+                  ]}
+                  theme={theme}
+                  disabled={!isEditable}
+                />
               </View>
             </View>
-
-            {/* LOGISTICS INFO */}
-            <View
-              className="mt-4 pt-4 border-t flex-row gap-4 items-end"
-              style={{ borderColor: theme.border }}
-            >
-              <View className="flex-1">
-                <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Driver Name
-                </Text>
-                <TextInput
-                  value={driverName}
-                  onChangeText={setDriverName}
-                  editable={isEditable}
-                  className="h-12 px-3 rounded border text-sm"
-                  style={{
-                    backgroundColor: isEditable
-                      ? theme.inputBg
-                      : isDark
-                        ? "#2A2A2A"
-                        : "#F3F4F6",
-                    borderColor: theme.border,
-                    color: isEditable ? theme.textPrimary : theme.textSecondary,
-                  }}
-                  placeholder={isEditable ? "Enter Name" : "N/A"}
-                  placeholderTextColor={theme.placeholder}
+            <View className="flex-1">
+              <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                Payment Method
+              </Text>
+              <View className="h-12">
+                <CustomPicker
+                  selectedValue={paymentMethod}
+                  onValueChange={setPaymentMethod}
+                  placeholder="Select Method"
+                  items={PAYMENT_METHODS}
+                  theme={theme}
+                  disabled={!isEditable}
                 />
               </View>
-              <View className="flex-1">
-                <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Plate Number
-                </Text>
-                <TextInput
-                  value={truckPlate}
-                  onChangeText={setTruckPlate}
-                  editable={isEditable}
-                  className="h-12 px-3 rounded border text-sm"
-                  style={{
-                    backgroundColor: isEditable
-                      ? theme.inputBg
-                      : isDark
-                        ? "#2A2A2A"
-                        : "#F3F4F6",
-                    borderColor: theme.border,
-                    color: isEditable ? theme.textPrimary : theme.textSecondary,
-                  }}
-                  placeholder={isEditable ? "ABC-123" : "N/A"}
-                  placeholderTextColor={theme.placeholder}
-                />
-              </View>
-              <View className="w-24">
-                <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                  Weight
-                </Text>
-                <TextInput
-                  value={truckWeight}
-                  onChangeText={setTruckWeight}
-                  editable={isEditable}
-                  className="h-12 px-3 rounded border text-sm"
-                  style={{
-                    backgroundColor: isEditable
-                      ? theme.inputBg
-                      : isDark
-                        ? "#2A2A2A"
-                        : "#F3F4F6",
-                    borderColor: theme.border,
-                    color: isEditable ? theme.textPrimary : theme.textSecondary,
-                  }}
-                  placeholder="0"
-                  placeholderTextColor={theme.placeholder}
-                />
-              </View>
-              <TouchableOpacity
-                onPress={() =>
-                  isCompleted ? setLicenseModalVisible(true) : null
-                }
-                disabled={!isEditable && !isCompleted}
-                className="h-12 px-3 flex-row items-center gap-2 rounded border flex-shrink-0"
-                style={{
-                  borderColor: theme.border,
-                  backgroundColor: isCompleted
-                    ? isDark
-                      ? "#1e3a8a"
-                      : "#dbeafe"
-                    : isDark
-                      ? "#333"
-                      : "#F3F4F6",
-                  opacity: isEditable || isCompleted ? 1 : 0.6,
-                }}
-              >
-                {isCompleted ? (
-                  <Eye size={16} color={theme.primary} />
-                ) : (
-                  <Camera size={16} color={theme.textSecondary} />
-                )}
-                <Text
-                  className="text-[10px] font-bold uppercase"
-                  style={{
-                    color: isCompleted ? theme.primary : theme.textSecondary,
-                  }}
-                >
-                  {isCompleted ? "View License" : "License"}
-                </Text>
-              </TouchableOpacity>
             </View>
           </View>
-        )}
+
+          {/* LOGISTICS INFO */}
+          <View
+            className="mt-4 pt-4 border-t flex-row gap-4 items-end"
+            style={{ borderColor: theme.border }}
+          >
+            <View className="flex-1">
+              <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                Driver Name
+              </Text>
+              <TextInput
+                value={driverName}
+                onChangeText={setDriverName}
+                editable={isEditable}
+                className="h-12 px-3 rounded border text-sm"
+                style={{
+                  backgroundColor: isEditable
+                    ? theme.inputBg
+                    : isDark
+                      ? "#2A2A2A"
+                      : "#F3F4F6",
+                  borderColor: theme.border,
+                  color: isEditable ? theme.textPrimary : theme.textSecondary,
+                }}
+                placeholder={isEditable ? "Enter Name" : "N/A"}
+                placeholderTextColor={theme.placeholder}
+              />
+            </View>
+            <View className="flex-1">
+              <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                Plate Number
+              </Text>
+              <TextInput
+                value={truckPlate}
+                onChangeText={setTruckPlate}
+                editable={isEditable}
+                className="h-12 px-3 rounded border text-sm"
+                style={{
+                  backgroundColor: isEditable
+                    ? theme.inputBg
+                    : isDark
+                      ? "#2A2A2A"
+                      : "#F3F4F6",
+                  borderColor: theme.border,
+                  color: isEditable ? theme.textPrimary : theme.textSecondary,
+                }}
+                placeholder={isEditable ? "ABC-123" : "N/A"}
+                placeholderTextColor={theme.placeholder}
+              />
+            </View>
+            <View className="w-24">
+              <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                Weight
+              </Text>
+              <TextInput
+                value={truckWeight}
+                onChangeText={setTruckWeight}
+                editable={isEditable}
+                className="h-12 px-3 rounded border text-sm"
+                style={{
+                  backgroundColor: isEditable
+                    ? theme.inputBg
+                    : isDark
+                      ? "#2A2A2A"
+                      : "#F3F4F6",
+                  borderColor: theme.border,
+                  color: isEditable ? theme.textPrimary : theme.textSecondary,
+                }}
+                placeholder="0"
+                placeholderTextColor={theme.placeholder}
+              />
+            </View>
+            <TouchableOpacity
+              onPress={() =>
+                isCompleted ? setLicenseModalVisible(true) : null
+              }
+              disabled={!isEditable && !isCompleted}
+              className="h-12 px-3 flex-row items-center gap-2 rounded border flex-shrink-0"
+              style={{
+                borderColor: theme.border,
+                backgroundColor: isCompleted
+                  ? isDark
+                    ? "#1e3a8a"
+                    : "#dbeafe"
+                  : isDark
+                    ? "#333"
+                    : "#F3F4F6",
+                opacity: isEditable || isCompleted ? 1 : 0.6,
+              }}
+            >
+              {isCompleted ? (
+                <Eye size={16} color={theme.primary} />
+              ) : (
+                <Camera size={16} color={theme.textSecondary} />
+              )}
+              <Text
+                className="text-[10px] font-bold uppercase"
+                style={{
+                  color: isCompleted ? theme.primary : theme.textSecondary,
+                }}
+              >
+                {isCompleted ? "View License" : "License"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* ITEMS TABLE */}
         <View
@@ -907,7 +992,6 @@ export default function BookingDetailed() {
                     borderColor: theme.subtleBorder,
                   }}
                 >
-                  {/* 1. Material Name (Always Text) */}
                   <View className="flex-[2]">
                     <Text
                       className="font-bold text-sm"
@@ -917,7 +1001,7 @@ export default function BookingDetailed() {
                     </Text>
                   </View>
 
-                  {/* 2. Weight (Input if Processing, Text otherwise) */}
+                  {/* Weight Input */}
                   <View className="flex-1 items-center justify-center">
                     {isProcessing ? (
                       <TextInput
@@ -943,7 +1027,7 @@ export default function BookingDetailed() {
                     )}
                   </View>
 
-                  {/* 3. Price (Input if Processing, Text if Completed, '-' if others) */}
+                  {/* Price Input */}
                   <View className="flex-1 items-center justify-center">
                     {isProcessing ? (
                       <TextInput
@@ -971,7 +1055,7 @@ export default function BookingDetailed() {
                     )}
                   </View>
 
-                  {/* 4. Subtotal (Text if Completed/Processing, '-' if others) */}
+                  {/* Subtotal */}
                   <View className="flex-1 items-end justify-center">
                     {isCompleted || isProcessing ? (
                       <Text
@@ -985,7 +1069,7 @@ export default function BookingDetailed() {
                     )}
                   </View>
 
-                  {/* 5. Delete Action (Processing only) */}
+                  {/* Delete Button (Processing only) */}
                   <View className="w-8 items-end">
                     {isProcessing ? (
                       <Pressable
