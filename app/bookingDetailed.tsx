@@ -1,17 +1,21 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
-    ArrowLeft,
+    Ban,
     Camera,
     Check,
     ChevronDown,
+    Eye,
+    Hash,
+    Image as ImageIcon,
     Mail,
     MapPin,
     Phone,
+    Play,
     Plus,
     Trash2,
-    X
+    X,
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
     Alert,
     FlatList,
@@ -26,15 +30,121 @@ import {
     View,
 } from "react-native";
 
-// --- DATABASE IMPORTS ---
-import { eq } from "drizzle-orm";
-import { db } from "../db/client";
-import {
-    materials,
-    paymentMethods,
-    transactionItems,
-    transactions,
-} from "../db/schema";
+// --- MOCK DATABASE FOR DETAILED VIEW ---
+const MOCK_DB = {
+  "BK-2026-101": {
+    type: "Buying",
+    client: "Juan Dela Cruz",
+    affiliation: "JDC Construction",
+    driver: "Mike Ross",
+    plate: "ABC-123",
+    weight: "2500",
+    status: "Pending",
+    date: "Feb 01, 2026",
+    items: [
+      {
+        id: 1,
+        material: "Copper Wire",
+        price: 300,
+        weight: 18,
+        subtotal: 5400,
+      },
+    ],
+  },
+  "BK-2026-102": {
+    type: "Selling",
+    client: "Scrap Trading Co",
+    affiliation: "STC Logistics",
+    driver: "Harvey S.",
+    plate: "XYZ-999",
+    weight: "5000",
+    status: "Processing",
+    date: "Jan 30, 2026",
+    items: [
+      {
+        id: 1,
+        material: "Mixed Scrap",
+        price: 12,
+        weight: 1000,
+        subtotal: 12000,
+      },
+    ],
+  },
+  "BK-2026-103": {
+    type: "Buying",
+    client: "Aling Nena",
+    affiliation: null,
+    driver: "N/A",
+    plate: "N/A",
+    weight: "0",
+    status: "Completed",
+    date: "Jan 29, 2026",
+    items: [
+      {
+        id: 1,
+        material: "Aluminum Cans",
+        price: 21,
+        weight: 100,
+        subtotal: 2100,
+      },
+    ],
+  },
+  "BK-2026-104": {
+    type: "Buying",
+    client: "Construction Site A",
+    affiliation: "Prime Build Corp",
+    driver: "Mario B.",
+    plate: "DEF-456",
+    weight: "1200",
+    status: "Rejected",
+    date: "Jan 28, 2026",
+    rejectionNote: "Incorrect material grade provided by driver.",
+    items: [
+      { id: 1, material: "Steel Rods", price: 17, weight: 500, subtotal: 8500 },
+    ],
+  },
+  "BK-2026-105": {
+    type: "Selling",
+    client: "Global Steel",
+    affiliation: "Global Ind.",
+    driver: "Luigi",
+    plate: "GHI-789",
+    weight: "15000",
+    status: "Pending",
+    date: "Jan 27, 2026",
+    items: [
+      { id: 1, material: "Iron Ore", price: 5, weight: 9000, subtotal: 45000 },
+    ],
+  },
+  DEFAULT: {
+    type: "Buying",
+    client: "New Client",
+    affiliation: "N/A",
+    driver: "",
+    plate: "",
+    weight: "",
+    status: "Pending",
+    date: "Today",
+    items: [],
+  },
+};
+
+const MATERIALS_LIST = [
+  { label: "Copper Wire", value: "m1", price: 300 },
+  { label: "Mixed Scrap", value: "m2", price: 12 },
+  { label: "Aluminum Cans", value: "m3", price: 21 },
+  { label: "Steel Rods", value: "m4", price: 17 },
+  { label: "Iron Ore", value: "m5", price: 5 },
+  { label: "Plastic Pellets", value: "m6", price: 15 },
+  { label: "Cartons", value: "m7", price: 2 },
+];
+
+const PAYMENT_METHODS = [
+  { label: "Cash", value: "Cash" },
+  { label: "Bank Transfer", value: "Bank Transfer" },
+  { label: "GCash", value: "GCash" },
+  { label: "Cheque", value: "Cheque" },
+];
 
 // --- UTILS ---
 const getRandomColor = (name) => {
@@ -70,10 +180,33 @@ const CustomPicker = ({
   placeholder,
   items,
   theme,
+  disabled = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const selectedItem = items.find((i) => i.value === selectedValue);
   const displayLabel = selectedItem ? selectedItem.label : placeholder;
+
+  if (disabled) {
+    return (
+      <View
+        style={[
+          styles.pickerTrigger,
+          {
+            backgroundColor: theme.inputBg,
+            borderColor: theme.border,
+            opacity: 0.7,
+          },
+        ]}
+      >
+        <Text
+          style={[styles.pickerText, { color: theme.textPrimary }]}
+          numberOfLines={1}
+        >
+          {displayLabel}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <>
@@ -186,7 +319,7 @@ export default function BookingDetailed() {
     success: "#10b981",
   };
 
-  const transactionId = params.bookingId ? Number(params.bookingId) : null;
+  const bookingId = params.bookingId || "NEW";
 
   // Data State
   const [lineItems, setLineItems] = useState([]);
@@ -201,191 +334,136 @@ export default function BookingDetailed() {
   const [truckPlate, setTruckPlate] = useState("");
   const [truckWeight, setTruckWeight] = useState("");
   const [status, setStatus] = useState("Pending");
+  const [rejectionNote, setRejectionNote] = useState("");
 
   // Modals & Inputs
   const [finishModalVisible, setFinishModalVisible] = useState(false);
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [processModalVisible, setProcessModalVisible] = useState(false);
   const [addItemModalVisible, setAddItemModalVisible] = useState(false);
+  const [licenseModalVisible, setLicenseModalVisible] = useState(false);
+
   const [paidAmountInput, setPaidAmountInput] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
 
-  // Edit Item State
-  const [materialsList, setMaterialsList] = useState([]);
-  const [paymentMethodList, setPaymentMethodList] = useState([]);
-  const [editingItemId, setEditingItemId] = useState(null);
-
+  // Add Item State (Only Material needed for initial add, others edited inline)
   const [newItemMaterialId, setNewItemMaterialId] = useState(null);
-  const [newItemWeight, setNewItemWeight] = useState("");
-  const [newItemPrice, setNewItemPrice] = useState("");
-  const [newItemSubtotal, setNewItemSubtotal] = useState("0.00");
 
-  // --- LOADERS ---
-  const loadMaterials = async () => {
-    const data = await db.select().from(materials);
-    setMaterialsList(
-      data.map((m) => ({ label: m.name, value: m.id, uom: m.uom })),
-    );
-  };
-
-  const loadPaymentMethods = async () => {
-    try {
-      const data = await db.select().from(paymentMethods);
-      setPaymentMethodList(
-        data.map((pm) => ({ label: pm.name, value: pm.name })),
-      );
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const loadTransactionData = async () => {
-    if (transactionId) {
-      const txHeader = await db
-        .select()
-        .from(transactions)
-        .where(eq(transactions.id, transactionId));
-      if (txHeader.length > 0) {
-        const h = txHeader[0];
-        setTransactionType(h.type || "Buying");
-        setPaymentMethod(h.paymentMethod);
-        setClientName(h.clientName || "");
-        setClientAffiliation(h.clientAffiliation || "");
-        setDriverName(h.driverName || "");
-        setTruckPlate(h.truckPlate || "");
-        setTruckWeight(h.truckWeight ? String(h.truckWeight) : "");
-        setStatus(h.status || "Pending");
-      }
-      const items = await db
-        .select({
-          id: transactionItems.id,
-          material: materials.name,
-          materialId: materials.id,
-          weight: transactionItems.weight,
-          price: transactionItems.price,
-          subtotal: transactionItems.subtotal,
-          uom: materials.uom,
-        })
-        .from(transactionItems)
-        .leftJoin(materials, eq(transactionItems.materialId, materials.id))
-        .where(eq(transactionItems.transactionId, transactionId));
-
-      setLineItems(items);
-      setGrandTotal(items.reduce((sum, item) => sum + item.subtotal, 0));
-    }
+  // --- LOAD DATA ---
+  const loadTransactionData = () => {
+    const data = MOCK_DB[bookingId] || MOCK_DB["DEFAULT"];
+    setTransactionType(data.type);
+    setClientName(data.client);
+    setClientAffiliation(data.affiliation);
+    setDriverName(data.driver);
+    setTruckPlate(data.plate);
+    setTruckWeight(data.weight);
+    setStatus(data.status);
+    setLineItems(data.items || []);
+    setGrandTotal(data.items.reduce((acc, curr) => acc + curr.subtotal, 0));
+    setRejectionNote(data.rejectionNote || "");
   };
 
   useFocusEffect(
     useCallback(() => {
-      loadMaterials();
-      loadPaymentMethods();
       loadTransactionData();
-    }, [transactionId]),
+    }, [bookingId]),
   );
-
-  useEffect(() => {
-    const w = parseFloat(newItemWeight) || 0;
-    const p = parseFloat(newItemPrice) || 0;
-    setNewItemSubtotal((w * p).toFixed(2));
-  }, [newItemWeight, newItemPrice]);
 
   // --- HANDLERS ---
   const handleAddItem = () => {
-    setEditingItemId(null);
+    if (status !== "Processing") return;
     setNewItemMaterialId(null);
-    setNewItemWeight("");
-    setNewItemPrice("");
-    setNewItemSubtotal("0.00");
     setAddItemModalVisible(true);
   };
 
-  const handleEditItem = (item) => {
-    setEditingItemId(item.id);
-    setNewItemMaterialId(item.materialId);
-    setNewItemWeight(String(item.weight));
-    setNewItemPrice(String(item.price));
-    setNewItemSubtotal(String(item.subtotal));
-    setAddItemModalVisible(true);
-  };
+  const saveItem = () => {
+    if (!newItemMaterialId) return;
+    const matName =
+      MATERIALS_LIST.find((m) => m.value === newItemMaterialId)?.label ||
+      "Unknown";
+    // Default price lookup
+    const defPrice =
+      MATERIALS_LIST.find((m) => m.value === newItemMaterialId)?.price || 0;
 
-  const saveItem = async () => {
-    if (!newItemMaterialId || !newItemWeight || !newItemPrice) return;
-    const w = parseFloat(newItemWeight);
-    const p = parseFloat(newItemPrice);
-    const sub = w * p;
+    let updatedItems = [...lineItems];
+    updatedItems.push({
+      id: Date.now(),
+      material: matName,
+      weight: 0, // Default 0, user types inline
+      price: defPrice,
+      subtotal: 0,
+    });
 
-    if (transactionId) {
-      if (editingItemId) {
-        await db
-          .update(transactionItems)
-          .set({
-            materialId: newItemMaterialId,
-            weight: w,
-            price: p,
-            subtotal: sub,
-          })
-          .where(eq(transactionItems.id, editingItemId));
-      } else {
-        await db
-          .insert(transactionItems)
-          .values({
-            transactionId,
-            materialId: newItemMaterialId,
-            weight: w,
-            price: p,
-            subtotal: sub,
-          });
-      }
-      loadTransactionData();
-    }
+    setLineItems(updatedItems);
+    setGrandTotal(updatedItems.reduce((acc, curr) => acc + curr.subtotal, 0));
     setAddItemModalVisible(false);
   };
 
-  const handleDeleteItem = async (itemId) => {
-    if (transactionId) {
-      await db.delete(transactionItems).where(eq(transactionItems.id, itemId));
-      loadTransactionData();
-    }
-  };
-
-  const confirmFinish = async () => {
-    try {
-      if (transactionId) {
-        await db
-          .update(transactions)
-          .set({
-            paidAmount: parseFloat(paidAmountInput) || 0,
-            status: "Completed",
-            totalAmount: grandTotal,
-          })
-          .where(eq(transactions.id, transactionId));
-
-        Alert.alert("Success", "Transaction completed successfully!");
-        setFinishModalVisible(false);
-        router.back();
+  const handleUpdateLineItem = (id, field, value) => {
+    const updatedItems = lineItems.map((item) => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value };
+        // Recalculate subtotal
+        const w = parseFloat(field === "weight" ? value : item.weight) || 0;
+        const p = parseFloat(field === "price" ? value : item.price) || 0;
+        updatedItem.subtotal = w * p;
+        return updatedItem;
       }
-    } catch (e) {
-      Alert.alert("Error", e.message);
-    }
+      return item;
+    });
+    setLineItems(updatedItems);
+    setGrandTotal(updatedItems.reduce((acc, curr) => acc + curr.subtotal, 0));
   };
 
-  // --- MOCK CAMERA ACTIONS ---
-  const handleCaptureScrap = () =>
-    Alert.alert("Camera", "Opening camera for scrap evidence...");
-  const handleCaptureLicense = () =>
-    Alert.alert("Camera", "Opening camera for driver license...");
+  const handleDeleteItem = (itemId) => {
+    if (status !== "Processing") return;
+    const updatedItems = lineItems.filter((i) => i.id !== itemId);
+    setLineItems(updatedItems);
+    setGrandTotal(updatedItems.reduce((acc, curr) => acc + curr.subtotal, 0));
+  };
 
-  // --- UI CONSTANTS ---
+  const handleReject = () => {
+    setStatus("Rejected");
+    setRejectionNote(rejectionReason);
+    setRejectModalVisible(false);
+    Alert.alert("Rejected", "Booking has been rejected.");
+  };
+
+  const handleProcess = () => {
+    setStatus("Processing");
+    setProcessModalVisible(false);
+    Alert.alert("Processing", "Booking is now in progress.");
+  };
+
+  const handleComplete = () => {
+    setStatus("Completed");
+    setFinishModalVisible(false);
+    Alert.alert("Success", "Transaction finalized and paid.");
+    router.back();
+  };
+
+  // --- HELPER CONSTANTS ---
   const clientInitials = clientName
     ? clientName.substring(0, 2).toUpperCase()
     : "NA";
   const clientBgColor = getRandomColor(clientName);
+
+  const isPending = status === "Pending";
+  const isProcessing = status === "Processing";
+  const isCompleted = status === "Completed";
+  const isRejected = status === "Rejected";
+
+  const showTypeBadge = isPending || isRejected;
+  const showLogisticsAndPayment = !isPending && !isRejected;
+  const isEditable = isProcessing;
 
   return (
     <View
       className="flex-1 flex-row"
       style={{ backgroundColor: theme.background }}
     >
-      {/* ======================= */}
       {/* SIDEBAR: CLIENT PROFILE */}
-      {/* ======================= */}
       <View
         className="w-80 border-r flex-col z-20 flex-shrink-0"
         style={{ backgroundColor: theme.card, borderColor: theme.border }}
@@ -397,8 +475,6 @@ export default function BookingDetailed() {
             flexGrow: 1,
           }}
         >
-
-          {/* Avatar */}
           <View className="relative mb-4">
             <View
               className="w-24 h-24 rounded-full items-center justify-center shadow-sm"
@@ -411,29 +487,17 @@ export default function BookingDetailed() {
           </View>
 
           <Text
-            className="text-xl font-bold text-center mb-1"
+            className="text-xl font-bold text-center"
             style={{ color: theme.textPrimary }}
           >
             {clientName || "Unknown Client"}
           </Text>
-
-          <View className="flex-row items-center gap-2 mb-8">
-            <View className="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800">
-              <Text
-                className="text-[10px] font-bold uppercase"
-                style={{ color: theme.textSecondary }}
-              >
-                {transactionId
-                  ? `ID: #${String(transactionId).padStart(4, "0")}`
-                  : "NEW"}
-              </Text>
-            </View>
-            <View className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900">
-              <Text className="text-[10px] font-bold uppercase text-blue-700 dark:text-blue-300">
-                {clientAffiliation || "N/A"}
-              </Text>
-            </View>
-          </View>
+          <Text
+            className="text-sm font-medium text-center mb-8"
+            style={{ color: theme.textSecondary }}
+          >
+            {clientAffiliation || "N/A"}
+          </Text>
 
           {/* Contact Info */}
           <View className="w-full gap-5">
@@ -490,10 +554,9 @@ export default function BookingDetailed() {
             </View>
           </View>
 
-          {/* Spacer */}
           <View style={{ flex: 1 }} />
 
-          {/* Highlighted Status Badge */}
+          {/* Status Badge */}
           <View
             className="w-full p-4 rounded-xl border shadow-sm items-center justify-center mt-6"
             style={{
@@ -502,17 +565,25 @@ export default function BookingDetailed() {
                   ? isDark
                     ? "#064e3b"
                     : "#ecfdf5"
-                  : isDark
-                    ? "#172554"
-                    : "#eff6ff",
+                  : status === "Rejected"
+                    ? isDark
+                      ? "#450a0a"
+                      : "#fef2f2"
+                    : isDark
+                      ? "#172554"
+                      : "#eff6ff",
               borderColor:
                 status === "Completed"
                   ? isDark
                     ? "#059669"
                     : "#6ee7b7"
-                  : isDark
-                    ? "#2563eb"
-                    : "#93c5fd",
+                  : status === "Rejected"
+                    ? isDark
+                      ? "#dc2626"
+                      : "#fca5a5"
+                    : isDark
+                      ? "#2563eb"
+                      : "#93c5fd",
             }}
           >
             <Text
@@ -523,9 +594,13 @@ export default function BookingDetailed() {
                     ? isDark
                       ? "#a7f3d0"
                       : "#065f46"
-                    : isDark
-                      ? "#bfdbfe"
-                      : "#1e40af",
+                    : status === "Rejected"
+                      ? isDark
+                        ? "#fecaca"
+                        : "#991b1b"
+                      : isDark
+                        ? "#bfdbfe"
+                        : "#1e40af",
               }}
             >
               Booking Status
@@ -538,63 +613,103 @@ export default function BookingDetailed() {
                     ? isDark
                       ? "#ffffff"
                       : "#047857"
-                    : isDark
-                      ? "#ffffff"
-                      : "#1d4ed8",
+                    : status === "Rejected"
+                      ? isDark
+                        ? "#ffffff"
+                        : "#991b1b"
+                      : isDark
+                        ? "#ffffff"
+                        : "#1d4ed8",
               }}
             >
               {status}
             </Text>
           </View>
+
+          {/* Admin Note */}
+          {status === "Rejected" && rejectionNote && (
+            <View className="w-full mt-4 p-3 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg">
+              <Text className="text-xs font-bold text-red-800 dark:text-red-400 uppercase mb-1">
+                Admin's Note
+              </Text>
+              <Text className="text-sm text-red-600 dark:text-red-300 italic">
+                "{rejectionNote}"
+              </Text>
+            </View>
+          )}
         </ScrollView>
       </View>
 
-      {/* ================================= */}
-      {/* MAIN AREA: TRANSACTION WORKSPACE  */}
-      {/* ================================= */}
+      {/* MAIN AREA */}
       <View className="flex-1 flex-col p-6 gap-4" style={{ minWidth: 350 }}>
-        {/* 1. HEADER CARD (INFO) */}
-        <View
-          className="rounded-lg border bg-card p-4"
-          style={{ backgroundColor: theme.card, borderColor: theme.border }}
-        >
-          {/* ROW 1: Type & Payment */}
-          <View className="flex-row gap-6 mb-2">
-            <View className="flex-1">
-              <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                Transaction Type
-              </Text>
-              <View className="h-10">
-                <CustomPicker
-                  selectedValue={transactionType}
-                  onValueChange={setTransactionType}
-                  placeholder="Select Type"
-                  items={[
-                    { label: "Buying (In)", value: "Buying" },
-                    { label: "Selling (Out)", value: "Selling" },
-                  ]}
-                  theme={theme}
-                />
+        {/* TOP HEADER */}
+        <View className="flex-row justify-between items-center mb-1">
+          <View className="flex-row items-center gap-2">
+            <Hash size={28} color={theme.textSecondary} />
+            <Text
+              className="text-3xl font-black tracking-tight"
+              style={{ color: theme.textPrimary }}
+            >
+              {bookingId}
+            </Text>
+            {/* Pending or Rejected: Show Type Badge Here */}
+            {showTypeBadge && (
+              <View
+                className={`px-3 py-1 rounded-full border ${transactionType === "Selling" ? "bg-green-100 border-green-200" : "bg-blue-100 border-blue-200"}`}
+              >
+                <Text
+                  className={`text-sm font-bold ${transactionType === "Selling" ? "text-green-700" : "text-blue-700"}`}
+                >
+                  {transactionType}
+                </Text>
               </View>
-            </View>
-            <View className="flex-1">
-              <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
-                Payment Method
-              </Text>
-              <View className="h-10">
-                <CustomPicker
-                  selectedValue={paymentMethod}
-                  onValueChange={setPaymentMethod}
-                  placeholder="Select Method"
-                  items={paymentMethodList}
-                  theme={theme}
-                />
-              </View>
-            </View>
+            )}
           </View>
+        </View>
 
-          {/* ROW 2: Logistics (Conditional) */}
-          {transactionType === "Selling" && (
+        {/* LOGISTICS & PAYMENT HEADER CARD (Visible if NOT Pending AND NOT Rejected) */}
+        {showLogisticsAndPayment && (
+          <View
+            className="rounded-lg border bg-card p-4"
+            style={{ backgroundColor: theme.card, borderColor: theme.border }}
+          >
+            <View className="flex-row gap-6 mb-2">
+              <View className="flex-1">
+                <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                  Transaction Type
+                </Text>
+                <View className="h-12">
+                  <CustomPicker
+                    selectedValue={transactionType}
+                    onValueChange={setTransactionType}
+                    placeholder="Select Type"
+                    items={[
+                      { label: "Buying (In)", value: "Buying" },
+                      { label: "Selling (Out)", value: "Selling" },
+                    ]}
+                    theme={theme}
+                    disabled={!isEditable}
+                  />
+                </View>
+              </View>
+              <View className="flex-1">
+                <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1">
+                  Payment Method
+                </Text>
+                <View className="h-12">
+                  <CustomPicker
+                    selectedValue={paymentMethod}
+                    onValueChange={setPaymentMethod}
+                    placeholder="Select Method"
+                    items={PAYMENT_METHODS}
+                    theme={theme}
+                    disabled={!isEditable}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* LOGISTICS INFO */}
             <View
               className="mt-4 pt-4 border-t flex-row gap-4 items-end"
               style={{ borderColor: theme.border }}
@@ -606,13 +721,18 @@ export default function BookingDetailed() {
                 <TextInput
                   value={driverName}
                   onChangeText={setDriverName}
-                  className="h-10 px-3 rounded border text-sm"
+                  editable={isEditable}
+                  className="h-12 px-3 rounded border text-sm"
                   style={{
-                    backgroundColor: theme.inputBg,
+                    backgroundColor: isEditable
+                      ? theme.inputBg
+                      : isDark
+                        ? "#2A2A2A"
+                        : "#F3F4F6",
                     borderColor: theme.border,
-                    color: theme.textPrimary,
+                    color: isEditable ? theme.textPrimary : theme.textSecondary,
                   }}
-                  placeholder="Enter Name"
+                  placeholder={isEditable ? "Enter Name" : "N/A"}
                   placeholderTextColor={theme.placeholder}
                 />
               </View>
@@ -623,13 +743,18 @@ export default function BookingDetailed() {
                 <TextInput
                   value={truckPlate}
                   onChangeText={setTruckPlate}
-                  className="h-10 px-3 rounded border text-sm"
+                  editable={isEditable}
+                  className="h-12 px-3 rounded border text-sm"
                   style={{
-                    backgroundColor: theme.inputBg,
+                    backgroundColor: isEditable
+                      ? theme.inputBg
+                      : isDark
+                        ? "#2A2A2A"
+                        : "#F3F4F6",
                     borderColor: theme.border,
-                    color: theme.textPrimary,
+                    color: isEditable ? theme.textPrimary : theme.textSecondary,
                   }}
-                  placeholder="ABC-123"
+                  placeholder={isEditable ? "ABC-123" : "N/A"}
                   placeholderTextColor={theme.placeholder}
                 />
               </View>
@@ -640,41 +765,62 @@ export default function BookingDetailed() {
                 <TextInput
                   value={truckWeight}
                   onChangeText={setTruckWeight}
-                  className="h-10 px-3 rounded border text-sm"
+                  editable={isEditable}
+                  className="h-12 px-3 rounded border text-sm"
                   style={{
-                    backgroundColor: theme.inputBg,
+                    backgroundColor: isEditable
+                      ? theme.inputBg
+                      : isDark
+                        ? "#2A2A2A"
+                        : "#F3F4F6",
                     borderColor: theme.border,
-                    color: theme.textPrimary,
+                    color: isEditable ? theme.textPrimary : theme.textSecondary,
                   }}
                   placeholder="0"
                   placeholderTextColor={theme.placeholder}
                 />
               </View>
-
-              {/* DRIVER LICENSE CAMERA BUTTON */}
               <TouchableOpacity
-                onPress={handleCaptureLicense}
-                className="h-10 px-3 flex-row items-center gap-2 rounded border bg-gray-100 dark:bg-gray-800 flex-shrink-0"
-                style={{ borderColor: theme.border }}
+                onPress={() =>
+                  isCompleted ? setLicenseModalVisible(true) : null
+                }
+                disabled={!isEditable && !isCompleted}
+                className="h-12 px-3 flex-row items-center gap-2 rounded border flex-shrink-0"
+                style={{
+                  borderColor: theme.border,
+                  backgroundColor: isCompleted
+                    ? isDark
+                      ? "#1e3a8a"
+                      : "#dbeafe"
+                    : isDark
+                      ? "#333"
+                      : "#F3F4F6",
+                  opacity: isEditable || isCompleted ? 1 : 0.6,
+                }}
               >
-                <Camera size={16} color={theme.textSecondary} />
+                {isCompleted ? (
+                  <Eye size={16} color={theme.primary} />
+                ) : (
+                  <Camera size={16} color={theme.textSecondary} />
+                )}
                 <Text
                   className="text-[10px] font-bold uppercase"
-                  style={{ color: theme.textSecondary }}
+                  style={{
+                    color: isCompleted ? theme.primary : theme.textSecondary,
+                  }}
                 >
-                  License
+                  {isCompleted ? "View License" : "License"}
                 </Text>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
+          </View>
+        )}
 
-        {/* 2. TABLE CARD (Occupies remaining vertical space) */}
+        {/* ITEMS TABLE */}
         <View
           className="flex-1 rounded-lg border overflow-hidden"
           style={{ backgroundColor: theme.card, borderColor: theme.border }}
         >
-          {/* TABLE HEADER: Title + Buttons (Wrapped for resiliency) */}
           <View
             className="px-4 py-3 border-b flex-row flex-wrap justify-between items-center gap-2"
             style={{
@@ -688,37 +834,38 @@ export default function BookingDetailed() {
             >
               Items
             </Text>
-
             <View className="flex-row gap-2">
-              {/* SCRAP CAMERA BUTTON */}
-              <TouchableOpacity
-                onPress={handleCaptureScrap}
-                className="flex-row items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md border flex-shrink-0"
-                style={{ borderColor: theme.border }}
-              >
-                <Camera size={14} color={theme.textPrimary} />
-                <Text
-                  className="text-xs font-bold"
-                  style={{ color: theme.textPrimary }}
-                >
-                  Scrap Scan
-                </Text>
-              </TouchableOpacity>
-
-              {/* ADD ITEM BUTTON */}
-              <TouchableOpacity
-                onPress={handleAddItem}
-                className="flex-row items-center gap-2 bg-blue-600 px-3 py-1.5 rounded-md flex-shrink-0"
-              >
-                <Plus size={16} color="white" />
-                <Text className="text-white text-xs font-bold">Add Item</Text>
-              </TouchableOpacity>
+              {/* BUTTONS: ONLY VISIBLE IF PROCESSING */}
+              {isProcessing && (
+                <>
+                  <TouchableOpacity
+                    className="flex-row items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md border flex-shrink-0"
+                    style={{ borderColor: theme.border }}
+                  >
+                    <Camera size={14} color={theme.textPrimary} />
+                    <Text
+                      className="text-xs font-bold"
+                      style={{ color: theme.textPrimary }}
+                    >
+                      Scrap Scan
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleAddItem}
+                    className="flex-row items-center gap-2 bg-blue-600 px-3 py-1.5 rounded-md flex-shrink-0"
+                  >
+                    <Plus size={16} color="white" />
+                    <Text className="text-white text-xs font-bold">
+                      Add Item
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
 
-          {/* Column Headers */}
           <View
-            className="flex-row px-4 py-2 border-b"
+            className="flex-row px-4 py-2 border-b gap-2"
             style={{
               backgroundColor: theme.subtleBorder,
               borderColor: theme.border,
@@ -730,13 +877,15 @@ export default function BookingDetailed() {
             <Text className="flex-1 text-[10px] font-bold uppercase text-gray-500 text-center">
               Weight
             </Text>
+            <Text className="flex-1 text-[10px] font-bold uppercase text-gray-500 text-center">
+              Price/Unit
+            </Text>
             <Text className="flex-1 text-[10px] font-bold uppercase text-gray-500 text-right">
               Subtotal
             </Text>
             <View className="w-8" />
           </View>
 
-          {/* SCROLLABLE LIST */}
           <ScrollView
             className="flex-1"
             contentContainerStyle={{ paddingBottom: 20 }}
@@ -749,16 +898,16 @@ export default function BookingDetailed() {
               </View>
             ) : (
               lineItems.map((item, index) => (
-                <TouchableOpacity
+                <View
                   key={item.id}
-                  onPress={() => handleEditItem(item)}
-                  className="flex-row px-4 py-3 items-center border-b"
+                  className="flex-row px-4 py-3 items-center border-b gap-2"
                   style={{
                     backgroundColor:
                       index % 2 === 0 ? theme.card : theme.background,
                     borderColor: theme.subtleBorder,
                   }}
                 >
+                  {/* 1. Material Name (Always Text) */}
                   <View className="flex-[2]">
                     <Text
                       className="font-bold text-sm"
@@ -766,37 +915,93 @@ export default function BookingDetailed() {
                     >
                       {item.material}
                     </Text>
-                    <Text className="text-[10px] text-gray-400">
-                      @{formatCurrency(item.price)} / kg
-                    </Text>
                   </View>
 
-                  <Text
-                    className="flex-1 text-center font-medium text-sm"
-                    style={{ color: theme.textPrimary }}
-                  >
-                    {item.weight} {item.uom}
-                  </Text>
+                  {/* 2. Weight (Input if Processing, Text otherwise) */}
+                  <View className="flex-1 items-center justify-center">
+                    {isProcessing ? (
+                      <TextInput
+                        value={String(item.weight)}
+                        onChangeText={(val) =>
+                          handleUpdateLineItem(item.id, "weight", val)
+                        }
+                        keyboardType="numeric"
+                        className="w-full text-center border rounded py-1 px-1 font-bold text-sm"
+                        style={{
+                          color: theme.textPrimary,
+                          borderColor: theme.border,
+                          backgroundColor: theme.inputBg,
+                        }}
+                      />
+                    ) : (
+                      <Text
+                        className="font-medium text-sm"
+                        style={{ color: theme.textPrimary }}
+                      >
+                        {item.weight} kg
+                      </Text>
+                    )}
+                  </View>
 
-                  <Text
-                    className="flex-1 text-right font-bold text-sm"
-                    style={{ color: theme.textPrimary }}
-                  >
-                    {formatCurrency(item.subtotal)}
-                  </Text>
+                  {/* 3. Price (Input if Processing, Text if Completed, '-' if others) */}
+                  <View className="flex-1 items-center justify-center">
+                    {isProcessing ? (
+                      <TextInput
+                        value={String(item.price)}
+                        onChangeText={(val) =>
+                          handleUpdateLineItem(item.id, "price", val)
+                        }
+                        keyboardType="numeric"
+                        className="w-full text-center border rounded py-1 px-1 font-bold text-sm"
+                        style={{
+                          color: theme.textPrimary,
+                          borderColor: theme.border,
+                          backgroundColor: theme.inputBg,
+                        }}
+                      />
+                    ) : isCompleted ? (
+                      <Text
+                        className="font-medium text-sm"
+                        style={{ color: theme.textPrimary }}
+                      >
+                        {formatCurrency(item.price)}
+                      </Text>
+                    ) : (
+                      <Text className="font-bold text-gray-400">-</Text>
+                    )}
+                  </View>
 
-                  <Pressable
-                    onPress={() => handleDeleteItem(item.id)}
-                    className="w-8 items-end justify-center h-full opacity-60 hover:opacity-100"
-                  >
-                    <Trash2 size={16} color={theme.danger} />
-                  </Pressable>
-                </TouchableOpacity>
+                  {/* 4. Subtotal (Text if Completed/Processing, '-' if others) */}
+                  <View className="flex-1 items-end justify-center">
+                    {isCompleted || isProcessing ? (
+                      <Text
+                        className="font-bold text-sm"
+                        style={{ color: theme.textPrimary }}
+                      >
+                        {formatCurrency(item.subtotal)}
+                      </Text>
+                    ) : (
+                      <Text className="font-bold text-gray-400">-</Text>
+                    )}
+                  </View>
+
+                  {/* 5. Delete Action (Processing only) */}
+                  <View className="w-8 items-end">
+                    {isProcessing ? (
+                      <Pressable
+                        onPress={() => handleDeleteItem(item.id)}
+                        className="opacity-60 hover:opacity-100"
+                      >
+                        <Trash2 size={16} color={theme.danger} />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
               ))
             )}
           </ScrollView>
 
-          {/* TABLE FOOTER: Totals & Process Button */}
+          {/* FOOTER ACTIONS */}
           <View
             className="p-4 border-t"
             style={{
@@ -804,32 +1009,67 @@ export default function BookingDetailed() {
               backgroundColor: theme.headerBg,
             }}
           >
-            {/* Grand Total - Using items-center instead of items-end to prevent squashing */}
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-xs font-bold text-gray-500 uppercase flex-shrink-0 mr-2">
                 Total
               </Text>
               <Text className="text-2xl font-black text-blue-600">
-                {formatCurrency(grandTotal)}
+                {isCompleted || isProcessing ? formatCurrency(grandTotal) : "-"}
               </Text>
             </View>
 
-            <TouchableOpacity
-              onPress={() => setFinishModalVisible(true)}
-              className="w-full bg-blue-600 h-12 rounded-lg flex-row items-center justify-center gap-2"
-            >
-              <Check size={18} color="white" />
-              <Text className="text-white font-bold text-sm">
-                Process Transaction
-              </Text>
-            </TouchableOpacity>
+            {isPending && (
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={() => setRejectModalVisible(true)}
+                  className="flex-1 h-12 rounded-lg items-center justify-center border border-red-200 bg-red-50"
+                >
+                  <Text className="text-red-600 font-bold text-sm">Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setProcessModalVisible(true)}
+                  className="flex-[2] bg-blue-600 h-12 rounded-lg flex-row items-center justify-center gap-2"
+                >
+                  <Play size={18} color="white" fill="white" />
+                  <Text className="text-white font-bold text-sm">
+                    Start Processing
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {isProcessing && (
+              <TouchableOpacity
+                onPress={() => setFinishModalVisible(true)}
+                className="w-full bg-green-600 h-12 rounded-lg flex-row items-center justify-center gap-2"
+              >
+                <Check size={18} color="white" />
+                <Text className="text-white font-bold text-sm">
+                  Complete Transaction
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {status === "Completed" && (
+              <View className="w-full h-12 rounded-lg bg-gray-200 dark:bg-gray-800 items-center justify-center">
+                <Text className="text-gray-500 font-bold">
+                  Transaction Closed
+                </Text>
+              </View>
+            )}
+
+            {status === "Rejected" && (
+              <View className="w-full h-12 rounded-lg bg-red-100 dark:bg-red-900/20 items-center justify-center">
+                <Text className="text-red-500 font-bold">
+                  Transaction Rejected
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
 
-      {/* ======================= */}
-      {/* MODAL: ADD / EDIT ITEM  */}
-      {/* ======================= */}
+      {/* --- MODAL: ADD ITEM (Select Material Only) --- */}
       <Modal
         visible={addItemModalVisible}
         transparent
@@ -852,95 +1092,159 @@ export default function BookingDetailed() {
                 className="text-lg font-bold"
                 style={{ color: theme.textPrimary }}
               >
-                {editingItemId ? "Edit Item" : "Add New Item"}
+                Add New Item
               </Text>
               <TouchableOpacity onPress={() => setAddItemModalVisible(false)}>
                 <X size={20} color={theme.textSecondary} />
               </TouchableOpacity>
             </View>
-
             <View className="gap-4">
               <View>
                 <Text className="text-[10px] font-bold uppercase text-gray-500 mb-1">
                   Material
                 </Text>
                 <View
-                  className="h-10 border rounded"
+                  className="h-12 border rounded"
                   style={{ borderColor: theme.border }}
                 >
                   <CustomPicker
                     selectedValue={newItemMaterialId}
                     onValueChange={setNewItemMaterialId}
                     placeholder="Select..."
-                    items={materialsList}
+                    items={MATERIALS_LIST}
                     theme={theme}
                   />
                 </View>
               </View>
-
-              <View className="flex-row gap-4">
-                <View className="flex-1">
-                  <Text className="text-[10px] font-bold uppercase text-gray-500 mb-1">
-                    Weight
-                  </Text>
-                  <TextInput
-                    keyboardType="numeric"
-                    value={newItemWeight}
-                    onChangeText={setNewItemWeight}
-                    className="h-10 border rounded px-3 font-bold"
-                    style={{
-                      color: theme.textPrimary,
-                      borderColor: theme.border,
-                      backgroundColor: theme.inputBg,
-                    }}
-                    placeholder="0.00"
-                    placeholderTextColor={theme.placeholder}
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-[10px] font-bold uppercase text-gray-500 mb-1">
-                    Price
-                  </Text>
-                  <TextInput
-                    keyboardType="numeric"
-                    value={newItemPrice}
-                    onChangeText={setNewItemPrice}
-                    className="h-10 border rounded px-3 font-bold"
-                    style={{
-                      color: theme.textPrimary,
-                      borderColor: theme.border,
-                      backgroundColor: theme.inputBg,
-                    }}
-                    placeholder="0.00"
-                    placeholderTextColor={theme.placeholder}
-                  />
-                </View>
-              </View>
-
-              <View
-                className="flex-row justify-between items-center mt-2 py-2 border-t"
-                style={{ borderColor: theme.border }}
-              >
-                <Text className="text-xs text-gray-500">Subtotal:</Text>
-                <Text className="text-lg font-bold text-blue-600">
-                  ₱{newItemSubtotal}
-                </Text>
-              </View>
-
+              <Text className="text-xs text-gray-500 italic">
+                Select a material. You can enter weight and adjust price in the
+                table.
+              </Text>
               <TouchableOpacity
                 onPress={saveItem}
                 className="bg-blue-600 p-3 rounded-lg items-center"
               >
-                <Text className="text-white font-bold">Save Item</Text>
+                <Text className="text-white font-bold">Add to List</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
         </Pressable>
       </Modal>
 
-      {/* ======================= */}
-      {/* MODAL: PAY / CONFIRM    */}
-      {/* ======================= */}
+      {/* --- MODAL: REJECT --- */}
+      <Modal
+        visible={rejectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRejectModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setRejectModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View className="items-center mb-4">
+              <View className="w-12 h-12 rounded-full bg-red-100 items-center justify-center mb-2">
+                <Ban size={24} color="#ef4444" />
+              </View>
+              <Text
+                className="text-lg font-bold"
+                style={{ color: theme.textPrimary }}
+              >
+                Reject Booking?
+              </Text>
+              <Text className="text-center text-sm text-gray-500 mt-1">
+                This action cannot be undone. Please provide a reason.
+              </Text>
+            </View>
+            <TextInput
+              multiline
+              numberOfLines={3}
+              value={rejectionReason}
+              onChangeText={setRejectionReason}
+              className="border rounded p-3 mb-6 text-sm"
+              style={{
+                color: theme.textPrimary,
+                borderColor: theme.border,
+                backgroundColor: theme.inputBg,
+                textAlignVertical: "top",
+              }}
+              placeholder="Reason for rejection..."
+              placeholderTextColor={theme.placeholder}
+            />
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setRejectModalVisible(false)}
+                className="flex-1 py-3 rounded-lg border items-center"
+                style={{ borderColor: theme.border }}
+              >
+                <Text style={{ color: theme.textPrimary, fontWeight: "bold" }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleReject}
+                className="flex-1 py-3 rounded-lg bg-red-600 items-center"
+              >
+                <Text className="text-white font-bold">Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* --- MODAL: PROCESS CONFIRMATION --- */}
+      <Modal
+        visible={processModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProcessModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setProcessModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
+            <View className="items-center mb-6">
+              <Text
+                className="text-lg font-bold"
+                style={{ color: theme.textPrimary }}
+              >
+                Start Processing?
+              </Text>
+              <Text className="text-center text-sm text-gray-500 mt-2">
+                This will move the booking to "In Progress". You can then add
+                items and finalize the weight.
+              </Text>
+            </View>
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setProcessModalVisible(false)}
+                className="flex-1 py-3 rounded-lg border items-center"
+                style={{ borderColor: theme.border }}
+              >
+                <Text style={{ color: theme.textPrimary, fontWeight: "bold" }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleProcess}
+                className="flex-1 py-3 rounded-lg bg-blue-600 items-center"
+              >
+                <Text className="text-white font-bold">Start</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* --- MODAL: FINISH / PAY --- */}
       <Modal
         visible={finishModalVisible}
         transparent
@@ -963,7 +1267,6 @@ export default function BookingDetailed() {
                 Complete Transaction
               </Text>
             </View>
-
             <View
               className="mb-6 p-4 rounded bg-gray-50 dark:bg-gray-800 border"
               style={{ borderColor: theme.border }}
@@ -975,7 +1278,6 @@ export default function BookingDetailed() {
                 {formatCurrency(grandTotal)}
               </Text>
             </View>
-
             <Text
               className="text-[10px] uppercase font-bold mb-1 ml-1"
               style={{ color: theme.textSecondary }}
@@ -986,7 +1288,7 @@ export default function BookingDetailed() {
               value={paidAmountInput}
               onChangeText={setPaidAmountInput}
               keyboardType="numeric"
-              className="border rounded px-3 h-12 text-lg font-bold mb-6"
+              className="border rounded px-3 h-14 text-lg font-bold mb-6"
               style={{
                 color: theme.textPrimary,
                 borderColor: theme.border,
@@ -995,12 +1297,73 @@ export default function BookingDetailed() {
               placeholder="0.00"
               placeholderTextColor={theme.placeholder}
             />
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setFinishModalVisible(false)}
+                className="flex-1 h-12 rounded-lg items-center justify-center border"
+                style={{ borderColor: theme.border }}
+              >
+                <Text style={{ color: theme.textPrimary, fontWeight: "bold" }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleComplete}
+                className="flex-[2] h-12 bg-green-600 rounded-lg items-center justify-center"
+              >
+                <Text className="text-white font-bold">Confirm Payment</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
-            <TouchableOpacity
-              onPress={confirmFinish}
-              className="h-12 bg-green-600 rounded-lg items-center justify-center"
+      {/* --- MODAL: VIEW LICENSE --- */}
+      <Modal
+        visible={licenseModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLicenseModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setLicenseModalVisible(false)}
+        >
+          <Pressable
+            style={[
+              styles.modalContent,
+              { backgroundColor: theme.card, width: 450 },
+            ]}
+            onPress={() => {}}
+          >
+            <View className="flex-row justify-between items-center mb-4">
+              <Text
+                className="text-lg font-bold"
+                style={{ color: theme.textPrimary }}
+              >
+                Driver's License
+              </Text>
+              <TouchableOpacity onPress={() => setLicenseModalVisible(false)}>
+                <X size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <View
+              className="w-full aspect-video bg-gray-200 dark:bg-gray-800 rounded-lg items-center justify-center border-2 border-dashed"
+              style={{ borderColor: theme.border }}
             >
-              <Text className="text-white font-bold">Confirm</Text>
+              <ImageIcon size={48} color={theme.textSecondary} />
+              <Text
+                className="text-xs font-bold uppercase mt-2"
+                style={{ color: theme.textSecondary }}
+              >
+                License Image Mock
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setLicenseModalVisible(false)}
+              className="mt-4 w-full h-12 bg-blue-600 rounded-lg items-center justify-center"
+            >
+              <Text className="text-white font-bold">Close</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
