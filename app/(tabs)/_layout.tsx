@@ -7,6 +7,7 @@ import { Drawer } from "expo-router/drawer";
 import {
   ArrowRightLeft,
   Blocks,
+  CalendarDays,
   FileClock,
   LayoutDashboard,
   Package,
@@ -141,6 +142,14 @@ export default function TabLayout() {
             drawerIcon: ({ color }) => (
               <LayoutDashboard color={color} size={24} />
             ),
+          }}
+        />
+        <Drawer.Screen
+          name="bookings"
+          options={{
+            drawerLabel: "Bookings",
+            title: "Bookings",
+            drawerIcon: ({ color }) => <CalendarDays color={color} size={24} />,
           }}
         />
         <Drawer.Screen
